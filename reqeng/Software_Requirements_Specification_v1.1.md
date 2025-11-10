@@ -13,7 +13,7 @@
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0 | 2025-11-06 | Requirements Engineering Team | Initial requirements specification |
-| 1.1 | 2025-11-10 | Requirements Engineering Team | Clarified ambiguous terms, resolved contradictions, added missing requirements |
+| 1.1 | 2025-11-10 | Requirements Engineering Team | Clarified ambiguous terms, resolved contradictions, added missing requirements, specified EUR as currency |
 
 ### Major Changes in v1.1
 - Specified concrete performance metrics (replaced "as quickly as possible")
