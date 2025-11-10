@@ -25,6 +25,7 @@
 - Added validation ranges for prices and purchase limits
 - Clarified maintenance mode precedence over operating hours
 - Added missing requirements for API unavailability and security
+- Specified EUR as the only currency
 
 ---
 
@@ -234,7 +235,7 @@ The system operates as a trust-based, self-service solution where customers sele
 #### 3.2.2 Product Management
 **FR-6.1:** Admins SHALL be able to add new products with the following attributes:
 - **Product name** (required, 1-100 characters)
-- **Price** (required, range: 0.01 to 999.99 EUR/DKK, 2 decimal places)
+- **Price** (required, range: 0.01 to 999.99 EUR, 2 decimal places)
 - **Product image** (optional, with default placeholder)
 - **Category/categories** (required, can assign to multiple)
 - **Allergen information** (optional, free text up to 500 characters)
@@ -242,10 +243,10 @@ The system operates as a trust-based, self-service solution where customers sele
 - **Purchase limit per transaction** (optional, range: 1-50 items, default: unlimited)
 
 **FR-6.1.1:** Price validation:
-- Must be between 0.01 and 999.99
+- Must be between 0.01 and 999.99 EUR
 - Must have exactly 2 decimal places
 - Cannot be negative or zero
-- Display error message if validation fails: "Price must be between 0.01 and 999.99"
+- Display error message if validation fails: "Price must be between 0.01€ and 999.99€"
 
 **FR-6.1.2:** Purchase limit validation:
 - If set, must be between 1 and 50
@@ -479,7 +480,7 @@ The system operates as a trust-based, self-service solution where customers sele
 
 #### 3.2.8 Pricing Management
 **FR-12.1:** Admins SHALL have full control over product pricing with the following constraints:
-- Range: 0.01 to 999.99 EUR/DKK
+- Range: 0.01 to 999.99 EUR
 - 2 decimal places required
 - Price changes effective immediately on kiosk
 
@@ -487,6 +488,7 @@ The system operates as a trust-based, self-service solution where customers sele
 - Discounts or promotional pricing
 - Special pricing tiers (member vs non-member)
 - Time-based pricing (happy hour, etc.)
+- Multiple currencies (EUR only)
 
 **FR-12.3:** The system does NOT require tax handling functionality (prices are final/inclusive).
 
@@ -1149,7 +1151,8 @@ RequestID: VARCHAR(100), NULL (for tracing)
 - Kiosk tablet device has minimum 10" touchscreen display with 1280x800px resolution
 - Operating environment is student lounge (indoor, climate-controlled, supervised area)
 - Expected transaction volume: 50-100 per day during academic year
-- Currency is EUR or DKK (configurable, no multi-currency support needed)
+- All transactions are conducted in EUR (Euro)
+- No multi-currency support required
 
 ### 9.2 Dependencies
 
