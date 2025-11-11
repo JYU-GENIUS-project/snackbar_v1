@@ -1,7 +1,7 @@
 # Requirements Clarification Document
 ## Self-Service Snack Bar Kiosk System - SRS Review
 
-**Project:** algo_snackbar  
+**Project:** snackbar  
 **Version:** 1.0 Clarifications  
 **Date:** 2025-11-10  
 **Reviewed By:** Requirements Analysis Team  

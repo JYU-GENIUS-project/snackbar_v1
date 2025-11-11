@@ -1,7 +1,7 @@
 # Software Requirements Specification (SRS)
 ## Self-Service Snack Bar Kiosk System
 
-**Project:** algo_snackbar  
+**Project:** snackbar  
 **Version:** 1.1  
 **Date:** 2025-11-10  
 **Prepared for:** Student Lounge Snack Bar Initiative
