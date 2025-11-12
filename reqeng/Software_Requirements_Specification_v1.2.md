@@ -96,9 +96,9 @@ The system operates as a trust-based, self-service solution where customers sele
 - Must support both desktop and tablet interfaces for admin portal
 - Must work with existing MobilePay merchant account
 - **Technology Stack (PERN):**
-  - **Backend:** Node.js 20.x LTS with Express.js 4.18.x
-  - **Frontend:** React 18.2.x with modern hooks and functional components
-  - **Database:** PostgreSQL 16.x
+  - **Backend:** Node.js 24.11 LTS with Express.js 5.1
+  - **Frontend:** React 19.2 with modern hooks and functional components
+  - **Database:** PostgreSQL 18
   - **Architecture:** RESTful API with component-based frontend
 
 ---
@@ -1047,7 +1047,7 @@ The admin portal SHALL provide the following pages:
 
 ## 8. Data Requirements
 
-**Database:** PostgreSQL 16.x with JSONB support, UUID extension, and advanced indexing
+**Database:** PostgreSQL 18 with JSONB support, UUID extension, and advanced indexing
 
 ### 8.1 Data Entities
 
@@ -1431,8 +1431,8 @@ The system will be considered complete and ready for production when:
 
 ### 15.1 Production Environment
 **PERN Stack Deployment:**
-- **Application Server:** Node.js 20.x LTS with Express.js 4.18.x
-- **Database:** PostgreSQL 16.x with connection pooling (pg-pool)
+- **Application Server:** Node.js 24.11 LTS with Express.js 5.1
+- **Database:** PostgreSQL 18 with connection pooling (pg-pool)
   - **Connection Pool Configuration:**
     - Max connections: 20 (adjustable based on load)
     - Idle timeout: 30 seconds
@@ -1571,7 +1571,7 @@ This section provides comprehensive details on all technologies, frameworks, lib
 ### 16.1 Core Stack (PERN)
 
 #### 16.1.1 Database Layer
-- **PostgreSQL:** Version 16.1
+- **PostgreSQL:** Version 18
   - Primary relational database with advanced features
   - UUID support via uuid-ossp extension
   - JSONB for flexible JSON data storage
@@ -1580,20 +1580,20 @@ This section provides comprehensive details on all technologies, frameworks, lib
   - Transactional integrity with ACID compliance
 
 #### 16.1.2 Backend Layer
-- **Node.js:** Version 20.10 LTS
+- **Node.js:** Version 24.11 LTS
   - JavaScript runtime built on Chrome's V8 engine
   - Long-term support for stability
   - Native ES modules support
   - Excellent async/await performance
   
-- **Express.js:** Version 4.18.2
+- **Express.js:** Version 5.1
   - Minimalist web framework for Node.js
   - Robust routing and middleware system
   - RESTful API architecture
   - Easy integration with third-party libraries
 
 #### 16.1.3 Frontend Layer
-- **React:** Version 18.2.0
+- **React:** Version 19.2
   - Modern UI library with declarative component model
   - Functional components with hooks (useState, useEffect, useContext, etc.)
   - Virtual DOM for efficient rendering
@@ -1853,7 +1853,7 @@ version: '3.8'
 
 services:
   postgres:
-    image: postgres:16.1
+    image: postgres:18
     environment:
       POSTGRES_DB: snackbar_prod
       POSTGRES_USER: snackbar_app
@@ -1881,7 +1881,7 @@ volumes:
 ### 16.7 Version Control & Package Management
 
 #### 16.7.1 Package Managers
-- **npm:** Version 10.x (bundled with Node.js 20.x)
+- **npm:** Version 10.x (bundled with Node.js 24.11)
   - Default Node.js package manager
   - Lock file: package-lock.json
   - Scripts for build, test, start
@@ -1904,14 +1904,14 @@ volumes:
 
 #### 16.8.1 Prerequisites
 ```bash
-# Install Node.js 20.x LTS
-# Install PostgreSQL 16.x
+# Install Node.js 24.11 LTS
+# Install PostgreSQL 18
 # Install Git
 
 # Verify installations
-node --version  # Should show v20.10.x
+node --version  # Should show v24.11.x
 npm --version   # Should show 10.x
-psql --version  # Should show 16.1
+psql --version  # Should show 18.x
 git --version   # Should show 2.40+
 ```
 
