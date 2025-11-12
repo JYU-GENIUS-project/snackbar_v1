@@ -2,8 +2,8 @@
 ## Self-Service Snack Bar Kiosk System
 
 **Project:** snackbar  
-**Version:** 1.1  
-**Date:** 2025-11-10  
+**Version:** 1.2  
+**Date:** 2025-11-12  
 **Prepared for:** Student Lounge Snack Bar Initiative
 
 ---
@@ -14,6 +14,16 @@
 |---------|------|--------|---------|
 | 1.0 | 2025-11-06 | Requirements Engineering Team | Initial requirements specification |
 | 1.1 | 2025-11-10 | Requirements Engineering Team | Clarified ambiguous terms, resolved contradictions, added missing requirements, specified EUR as currency |
+| 1.2 | 2025-11-12 | Requirements Engineering Team | Added PERN stack technology specifications, PostgreSQL data types, deployment requirements |
+
+### Major Changes in v1.2
+- Specified PERN stack (PostgreSQL, Express.js, React, Node.js) as core technology
+- Added detailed technology stack specification with exact versions (Section 16)
+- Specified PostgreSQL-specific data types (UUID, DECIMAL, TIMESTAMP WITH TIME ZONE, JSONB, ENUM)
+- Added database indexing and foreign key constraint specifications
+- Defined Node.js/Express.js production deployment requirements
+- Specified PostgreSQL connection pooling with node-postgres (pg)
+- Added development tools and optional TypeScript support
 
 ### Major Changes in v1.1
 - Specified concrete performance metrics (replaced "as quickly as possible")
@@ -85,6 +95,11 @@ The system operates as a trust-based, self-service solution where customers sele
 - Web-based or application-based (customer-agnostic)
 - Must support both desktop and tablet interfaces for admin portal
 - Must work with existing MobilePay merchant account
+- **Technology Stack (PERN):**
+  - **Backend:** Node.js 20.x LTS with Express.js 4.18.x
+  - **Frontend:** React 18.2.x with modern hooks and functional components
+  - **Database:** PostgreSQL 16.x
+  - **Architecture:** RESTful API with component-based frontend
 
 ---
 
@@ -751,7 +766,31 @@ The admin portal SHALL provide the following pages:
 
 ### 5.3 Software Interfaces
 
-#### 5.3.1 MobilePay API
+#### 5.3.1 PostgreSQL Database
+- **Purpose:** Primary data storage for all application data
+- **Connection Library:** node-postgres (pg) version 8.11.x
+- **Connection Method:** Connection pooling with pg.Pool
+- **Configuration:**
+  - Connection parameters stored in environment variables:
+    - `DB_HOST` - Database server hostname
+    - `DB_PORT` - Database port (default: 5432)
+    - `DB_NAME` - Database name
+    - `DB_USER` - Database username
+    - `DB_PASSWORD` - Database password
+    - `DB_SSL` - SSL mode (require/prefer/disable)
+  - Connection pool settings:
+    - `POOL_MIN` - Minimum pool size (default: 2)
+    - `POOL_MAX` - Maximum pool size (default: 10)
+    - `POOL_IDLE_TIMEOUT` - Idle timeout in ms (default: 30000)
+- **Features Used:**
+  - Parameterized queries for SQL injection prevention
+  - Transaction support for data consistency
+  - JSONB for flexible data storage
+  - Native UUID support
+  - Timestamp with time zone for accurate datetime handling
+- **Security:** SSL/TLS encrypted connections, credentials in environment variables
+
+#### 5.3.2 MobilePay API
 - **Purpose:** Payment processing
 - **Integration Method:** RESTful API
 - **Authentication:** API key in Authorization header
@@ -771,7 +810,7 @@ The admin portal SHALL provide the following pages:
   - Timeout after 30 seconds: Display timeout message
 - **Security:** HTTPS/TLS 1.2+, API credentials in environment variables
 
-#### 5.3.2 Email Service
+#### 5.3.3 Email Service
 - **Purpose:** Admin notifications
 - **Integration Method:** SMTP or API (e.g., SendGrid, AWS SES, Mailgun)
 - **Requirements:**
@@ -789,7 +828,7 @@ The admin portal SHALL provide the following pages:
   - Retry logic (3 attempts with exponential backoff)
   - Logging of all send attempts
 
-#### 5.3.3 Authentication Service (Optional)
+#### 5.3.4 Authentication Service (Optional)
 - **Purpose:** Google OAuth integration
 - **Requirements:** Google OAuth 2.0 API
 - **Usage:** Alternative admin login method
@@ -1008,107 +1047,158 @@ The admin portal SHALL provide the following pages:
 
 ## 8. Data Requirements
 
+**Database:** PostgreSQL 16.x with JSONB support, UUID extension, and advanced indexing
+
 ### 8.1 Data Entities
 
+**PostgreSQL-Specific Features:**
+- **Data Types:** UUID (via uuid-ossp extension), DECIMAL for monetary values, TIMESTAMP WITH TIME ZONE for accurate datetime, JSONB for flexible JSON storage, ENUM for status fields
+- **Indexing:** B-tree indexes on frequently queried columns, partial indexes for active records
+- **Foreign Keys:** CASCADE on delete for dependent data, RESTRICT for reference data
+- **Connection Pooling:** pg-pool for efficient connection management
+
 #### 8.1.1 Product
-```
-ProductID: UUID (primary key)
-Name: VARCHAR(100), NOT NULL
-Price: DECIMAL(5,2), NOT NULL, CHECK (Price >= 0.01 AND Price <= 999.99)
-ImageURL: VARCHAR(500), NULL (default placeholder if null)
-Categories: ARRAY or JSON (many-to-many relationship)
-AllergenInfo: TEXT(500), NULL
-IsHot: BOOLEAN, DEFAULT FALSE
-PurchaseLimit: INTEGER, NULL, CHECK (PurchaseLimit >= 1 AND PurchaseLimit <= 50)
-StockQuantity: INTEGER, NULL (null if inventory tracking disabled, can be negative)
-LowStockThreshold: INTEGER, DEFAULT 5, CHECK (LowStockThreshold >= 1 AND LowStockThreshold <= 99)
-IsActive: BOOLEAN, DEFAULT TRUE (soft delete)
-CreatedAt: TIMESTAMP, NOT NULL
-UpdatedAt: TIMESTAMP, NOT NULL
-CreatedBy: UUID (foreign key to Admin)
-UpdatedBy: UUID (foreign key to Admin)
+```sql
+ProductID: UUID PRIMARY KEY DEFAULT uuid_generate_v4()
+Name: VARCHAR(100) NOT NULL
+Price: DECIMAL(5,2) NOT NULL CHECK (Price >= 0.01 AND Price <= 999.99)
+ImageURL: VARCHAR(500) NULL
+Categories: JSONB NULL  -- Flexible array storage: ["Drinks", "Cold Drinks"]
+AllergenInfo: TEXT NULL
+IsHot: BOOLEAN DEFAULT FALSE
+PurchaseLimit: INTEGER NULL CHECK (PurchaseLimit >= 1 AND PurchaseLimit <= 50)
+StockQuantity: INTEGER NULL  -- NULL if tracking disabled, can be negative
+LowStockThreshold: INTEGER DEFAULT 5 CHECK (LowStockThreshold >= 1 AND LowStockThreshold <= 99)
+IsActive: BOOLEAN DEFAULT TRUE  -- Soft delete flag
+CreatedAt: TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
+UpdatedAt: TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
+CreatedBy: UUID REFERENCES Admin(AdminID) ON DELETE SET NULL
+UpdatedBy: UUID REFERENCES Admin(AdminID) ON DELETE SET NULL
+
+-- Indexes for performance
+INDEX idx_product_active ON Product(IsActive) WHERE IsActive = TRUE
+INDEX idx_product_stock ON Product(StockQuantity) WHERE InventoryTrackingEnabled = TRUE
+INDEX idx_product_categories ON Product USING GIN(Categories)  -- GIN index for JSONB
 ```
 
 #### 8.1.2 Category
-```
-CategoryID: UUID (primary key)
-CategoryName: VARCHAR(50), NOT NULL, UNIQUE
-DisplayOrder: INTEGER, DEFAULT 0
-IsDefault: BOOLEAN, DEFAULT FALSE (for pre-configured categories)
-CreatedAt: TIMESTAMP, NOT NULL
+```sql
+CategoryID: UUID PRIMARY KEY DEFAULT uuid_generate_v4()
+CategoryName: VARCHAR(50) NOT NULL UNIQUE
+DisplayOrder: INTEGER DEFAULT 0
+IsDefault: BOOLEAN DEFAULT FALSE
+CreatedAt: TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
+
+-- Index
+INDEX idx_category_display_order ON Category(DisplayOrder)
 ```
 
 #### 8.1.3 Transaction
-```
-TransactionID: UUID (primary key)
-Timestamp: TIMESTAMP, NOT NULL, INDEXED
-TotalAmount: DECIMAL(6,2), NOT NULL
-PaymentStatus: ENUM('PENDING', 'COMPLETED', 'FAILED', 'PAYMENT_UNCERTAIN', 'REFUNDED'), NOT NULL, INDEXED
-MobilePayTransactionID: VARCHAR(100), NULL
-ReconciledBy: UUID (foreign key to Admin), NULL
-ReconciledAt: TIMESTAMP, NULL
-CreatedAt: TIMESTAMP, NOT NULL
+```sql
+TransactionID: UUID PRIMARY KEY DEFAULT uuid_generate_v4()
+Timestamp: TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
+TotalAmount: DECIMAL(6,2) NOT NULL
+PaymentStatus: payment_status_enum NOT NULL  -- ENUM type defined below
+MobilePayTransactionID: VARCHAR(100) NULL UNIQUE
+ReconciledBy: UUID REFERENCES Admin(AdminID) ON DELETE SET NULL
+ReconciledAt: TIMESTAMP WITH TIME ZONE NULL
+CreatedAt: TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
+
+-- ENUM type definition
+CREATE TYPE payment_status_enum AS ENUM (
+    'PENDING', 
+    'COMPLETED', 
+    'FAILED', 
+    'PAYMENT_UNCERTAIN', 
+    'REFUNDED'
+);
+
+-- Indexes for performance
+INDEX idx_transaction_timestamp ON Transaction(Timestamp DESC)
+INDEX idx_transaction_status ON Transaction(PaymentStatus)
+INDEX idx_transaction_date_status ON Transaction(Timestamp DESC, PaymentStatus)  -- Composite index
 ```
 
 #### 8.1.4 TransactionItem
-```
-TransactionItemID: UUID (primary key)
-TransactionID: UUID (foreign key to Transaction), NOT NULL, INDEXED
-ProductID: UUID (foreign key to Product), NOT NULL
-ProductName: VARCHAR(100), NOT NULL (snapshot for historical accuracy)
-Quantity: INTEGER, NOT NULL, CHECK (Quantity > 0)
-PriceAtPurchase: DECIMAL(5,2), NOT NULL (snapshot of price at time of purchase)
-WasOutOfStock: BOOLEAN, DEFAULT FALSE (flag for confirmed out-of-stock purchases)
+```sql
+TransactionItemID: UUID PRIMARY KEY DEFAULT uuid_generate_v4()
+TransactionID: UUID NOT NULL REFERENCES Transaction(TransactionID) ON DELETE CASCADE
+ProductID: UUID NOT NULL REFERENCES Product(ProductID) ON DELETE RESTRICT
+ProductName: VARCHAR(100) NOT NULL  -- Snapshot for historical accuracy
+Quantity: INTEGER NOT NULL CHECK (Quantity > 0)
+PriceAtPurchase: DECIMAL(5,2) NOT NULL  -- Price snapshot
+WasOutOfStock: BOOLEAN DEFAULT FALSE
+
+-- Indexes
+INDEX idx_transaction_item_transaction ON TransactionItem(TransactionID)
+INDEX idx_transaction_item_product ON TransactionItem(ProductID)
 ```
 
 #### 8.1.5 SystemConfiguration
-```
-ConfigID: UUID (primary key)
-OperatingHoursStart: TIME, DEFAULT '08:00'
-OperatingHoursEnd: TIME, DEFAULT '19:00'
-CartTimeoutMinutes: INTEGER, DEFAULT 5 (fixed in v1.0)
-InventoryTrackingEnabled: BOOLEAN, DEFAULT TRUE
-MaintenanceModeEnabled: BOOLEAN, DEFAULT FALSE
-MaintenanceModeMessage: TEXT(500), NULL
-AdminNotificationEmails: TEXT (comma-separated, up to 5 emails)
-UpdatedAt: TIMESTAMP, NOT NULL
-UpdatedBy: UUID (foreign key to Admin)
+```sql
+ConfigID: UUID PRIMARY KEY DEFAULT uuid_generate_v4()
+OperatingHoursStart: TIME DEFAULT '08:00'
+OperatingHoursEnd: TIME DEFAULT '19:00'
+CartTimeoutMinutes: INTEGER DEFAULT 5
+InventoryTrackingEnabled: BOOLEAN DEFAULT TRUE
+MaintenanceModeEnabled: BOOLEAN DEFAULT FALSE
+MaintenanceModeMessage: TEXT NULL
+AdminNotificationEmails: TEXT NULL  -- Comma-separated emails
+UpdatedAt: TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
+UpdatedBy: UUID REFERENCES Admin(AdminID) ON DELETE SET NULL
 ```
 
 #### 8.1.6 Admin
-```
-AdminID: UUID (primary key)
-Username: VARCHAR(100), NOT NULL, UNIQUE (email format)
-PasswordHash: VARCHAR(255), NOT NULL (bcrypt/Argon2)
-Email: VARCHAR(100), NOT NULL (for notifications)
-IsPrimaryAdmin: BOOLEAN, DEFAULT FALSE
-CreatedAt: TIMESTAMP, NOT NULL
-LastLogin: TIMESTAMP, NULL
-IsActive: BOOLEAN, DEFAULT TRUE
+```sql
+AdminID: UUID PRIMARY KEY DEFAULT uuid_generate_v4()
+Username: VARCHAR(100) NOT NULL UNIQUE  -- Email format
+PasswordHash: VARCHAR(255) NOT NULL  -- bcrypt with salt
+Email: VARCHAR(100) NOT NULL
+IsPrimaryAdmin: BOOLEAN DEFAULT FALSE
+CreatedAt: TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
+LastLogin: TIMESTAMP WITH TIME ZONE NULL
+IsActive: BOOLEAN DEFAULT TRUE
+
+-- Index
+INDEX idx_admin_username ON Admin(Username)
+INDEX idx_admin_active ON Admin(IsActive) WHERE IsActive = TRUE
 ```
 
 #### 8.1.7 AuditLog
-```
-AuditLogID: UUID (primary key)
-AdminID: UUID (foreign key to Admin), NOT NULL
-Action: VARCHAR(100), NOT NULL (e.g., 'PRODUCT_CREATED', 'INVENTORY_UPDATED')
-EntityType: VARCHAR(50), NOT NULL (e.g., 'Product', 'Category')
-EntityID: UUID, NOT NULL
-OldValue: JSON, NULL
-NewValue: JSON, NULL
-Timestamp: TIMESTAMP, NOT NULL, INDEXED
-IPAddress: VARCHAR(45), NULL
+```sql
+AuditLogID: UUID PRIMARY KEY DEFAULT uuid_generate_v4()
+AdminID: UUID NOT NULL REFERENCES Admin(AdminID) ON DELETE CASCADE
+Action: VARCHAR(100) NOT NULL  -- e.g., 'PRODUCT_CREATED', 'INVENTORY_UPDATED'
+EntityType: VARCHAR(50) NOT NULL  -- e.g., 'Product', 'Category'
+EntityID: UUID NOT NULL
+OldValue: JSONB NULL  -- Previous state for comparison
+NewValue: JSONB NULL  -- New state after change
+Timestamp: TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
+IPAddress: INET NULL  -- PostgreSQL INET type for IP addresses
+
+-- Indexes
+INDEX idx_audit_log_timestamp ON AuditLog(Timestamp DESC)
+INDEX idx_audit_log_admin ON AuditLog(AdminID)
+INDEX idx_audit_log_entity ON AuditLog(EntityType, EntityID)
 ```
 
 #### 8.1.8 ErrorLog
-```
-ErrorLogID: UUID (primary key)
-Timestamp: TIMESTAMP, NOT NULL, INDEXED
-LogLevel: ENUM('ERROR', 'WARN', 'INFO', 'DEBUG'), NOT NULL
-Component: VARCHAR(100), NOT NULL (e.g., 'MobilePayAPI', 'EmailService')
-Message: TEXT, NOT NULL
-StackTrace: TEXT, NULL
-RequestID: VARCHAR(100), NULL (for tracing)
+```sql
+ErrorLogID: UUID PRIMARY KEY DEFAULT uuid_generate_v4()
+Timestamp: TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
+LogLevel: log_level_enum NOT NULL  -- ENUM type defined below
+Component: VARCHAR(100) NOT NULL  -- e.g., 'MobilePayAPI', 'EmailService'
+Message: TEXT NOT NULL
+StackTrace: TEXT NULL
+RequestID: VARCHAR(100) NULL  -- For request tracing
+
+-- ENUM type definition
+CREATE TYPE log_level_enum AS ENUM ('ERROR', 'WARN', 'INFO', 'DEBUG');
+
+-- Indexes
+INDEX idx_error_log_timestamp ON ErrorLog(Timestamp DESC)
+INDEX idx_error_log_level ON ErrorLog(LogLevel)
+INDEX idx_error_log_component ON ErrorLog(Component)
 ```
 
 ### 8.2 Data Storage
@@ -1340,24 +1430,584 @@ The system will be considered complete and ready for production when:
 ## 15. Deployment Requirements
 
 ### 15.1 Production Environment
-- **Web Server:** Nginx or Apache
-- **Application Server:** Node.js 18+ or Python 3.10+
-- **Database:** PostgreSQL 14+ or MySQL 8+
-- **Storage:** Minimum 10GB database, 20GB for images and backups
+**PERN Stack Deployment:**
+- **Application Server:** Node.js 20.x LTS with Express.js 4.18.x
+- **Database:** PostgreSQL 16.x with connection pooling (pg-pool)
+  - **Connection Pool Configuration:**
+    - Max connections: 20 (adjustable based on load)
+    - Idle timeout: 30 seconds
+    - Connection timeout: 5 seconds
+  - **PostgreSQL Configuration Requirements:**
+    - `max_connections`: 100 (minimum)
+    - `shared_buffers`: 512MB (minimum, 25% of RAM recommended)
+    - `effective_cache_size`: 1.5GB (minimum, 50-75% of RAM)
+    - `work_mem`: 16MB (per query operation)
+    - `maintenance_work_mem`: 128MB (for maintenance operations)
+- **Web Server:** Nginx 1.24+ as reverse proxy
+  - Handles SSL/TLS termination
+  - Serves static files (React build, images)
+  - Proxies API requests to Node.js backend
+  - Compression and caching for performance
+- **Process Manager:** PM2 2.5+ for Node.js process management
+  - Auto-restart on crashes
+  - Load balancing with cluster mode (2-4 instances)
+  - Log management and rotation
+  - Zero-downtime deployments
+- **Storage:** 
+  - Minimum 10GB database storage
+  - Minimum 20GB for product images and backups
+  - SSD recommended for database performance
 - **Memory:** Minimum 4GB RAM
-- **CPU:** Minimum 2 cores
+  - 2GB allocated for Node.js application (PM2 cluster)
+  - 2GB allocated for PostgreSQL
+  - Additional RAM for OS and caching recommended
+- **CPU:** Minimum 2 cores (4 cores recommended for production load)
+- **Operating System:** Ubuntu 22.04 LTS or similar Linux distribution
+- **Optional:** Docker containerization for easier deployment and scaling
 
 ### 15.2 Configuration
-- Environment variables for sensitive data (API keys, database credentials)
-- HTTPS certificate (Let's Encrypt or commercial SSL)
-- SMTP/email service configuration
-- MobilePay API credentials
+- **Environment Variables:** (stored in .env file, never committed to version control)
+  ```
+  # Node.js Application
+  NODE_ENV=production
+  PORT=3000
+  
+  # PostgreSQL Database
+  DB_HOST=localhost
+  DB_PORT=5432
+  DB_NAME=snackbar_prod
+  DB_USER=snackbar_app
+  DB_PASSWORD=<secure_password>
+  DB_SSL=require
+  POOL_MIN=2
+  POOL_MAX=10
+  
+  # MobilePay API
+  MOBILEPAY_API_KEY=<api_key>
+  MOBILEPAY_MERCHANT_ID=<merchant_id>
+  MOBILEPAY_WEBHOOK_SECRET=<webhook_secret>
+  
+  # Email Service (SMTP)
+  SMTP_HOST=smtp.example.com
+  SMTP_PORT=587
+  SMTP_USER=<smtp_username>
+  SMTP_PASSWORD=<smtp_password>
+  SMTP_FROM=noreply@snackbar.example.com
+  
+  # Security
+  JWT_SECRET=<random_secure_key>
+  SESSION_SECRET=<random_secure_key>
+  BCRYPT_ROUNDS=12
+  
+  # Application Settings
+  ADMIN_NOTIFICATION_EMAILS=admin@example.com
+  ```
+- **HTTPS Certificate:** Let's Encrypt or commercial SSL (configured in Nginx)
+- **Nginx Configuration Example:**
+  ```nginx
+  upstream nodejs_backend {
+      server localhost:3000;
+  }
+  
+  server {
+      listen 80;
+      server_name snackbar.example.com;
+      return 301 https://$server_name$request_uri;
+  }
+  
+  server {
+      listen 443 ssl http2;
+      server_name snackbar.example.com;
+      
+      ssl_certificate /etc/letsencrypt/live/snackbar.example.com/fullchain.pem;
+      ssl_certificate_key /etc/letsencrypt/live/snackbar.example.com/privkey.pem;
+      
+      # Static files (React frontend)
+      location / {
+          root /var/www/snackbar/client/build;
+          try_files $uri /index.html;
+          expires 1d;
+      }
+      
+      # API endpoints
+      location /api/ {
+          proxy_pass http://nodejs_backend;
+          proxy_http_version 1.1;
+          proxy_set_header Upgrade $http_upgrade;
+          proxy_set_header Connection 'upgrade';
+          proxy_set_header Host $host;
+          proxy_cache_bypass $http_upgrade;
+      }
+      
+      # Product images
+      location /images/ {
+          root /var/www/snackbar/uploads;
+          expires 7d;
+      }
+  }
+  ```
 
 ### 15.3 Monitoring
-- Server uptime monitoring (e.g., UptimeRobot, Pingdom)
-- Application error tracking (e.g., Sentry, Rollbar)
-- Database performance monitoring
-- Backup verification alerts
+- **Server uptime monitoring:** UptimeRobot, Pingdom, or similar service
+- **Application error tracking:** Sentry, Rollbar, or built-in logging with PM2
+- **Database performance monitoring:** 
+  - PostgreSQL built-in statistics (pg_stat_statements extension)
+  - Query performance monitoring
+  - Connection pool monitoring
+- **Backup verification alerts:** Email notifications on backup success/failure
+- **System metrics:** CPU, memory, disk usage monitoring
+- **Node.js Application Monitoring:**
+  - PM2 monitoring dashboard
+  - Request/response time tracking
+  - Error rate monitoring
+  - Memory leak detection
+
+---
+
+## 16. Technology Stack Specification
+
+This section provides comprehensive details on all technologies, frameworks, libraries, and tools used in the PERN stack implementation.
+
+### 16.1 Core Stack (PERN)
+
+#### 16.1.1 Database Layer
+- **PostgreSQL:** Version 16.1
+  - Primary relational database with advanced features
+  - UUID support via uuid-ossp extension
+  - JSONB for flexible JSON data storage
+  - Full-text search capabilities
+  - Advanced indexing (B-tree, GIN, partial indexes)
+  - Transactional integrity with ACID compliance
+
+#### 16.1.2 Backend Layer
+- **Node.js:** Version 20.10 LTS
+  - JavaScript runtime built on Chrome's V8 engine
+  - Long-term support for stability
+  - Native ES modules support
+  - Excellent async/await performance
+  
+- **Express.js:** Version 4.18.2
+  - Minimalist web framework for Node.js
+  - Robust routing and middleware system
+  - RESTful API architecture
+  - Easy integration with third-party libraries
+
+#### 16.1.3 Frontend Layer
+- **React:** Version 18.2.0
+  - Modern UI library with declarative component model
+  - Functional components with hooks (useState, useEffect, useContext, etc.)
+  - Virtual DOM for efficient rendering
+  - Component-based architecture for reusability
+  - React.StrictMode for development best practices
+
+### 16.2 Backend Dependencies
+
+#### 16.2.1 Database & Data Access
+- **pg (node-postgres):** Version 8.11.x
+  - PostgreSQL client for Node.js
+  - Connection pooling support
+  - Parameterized queries for SQL injection prevention
+  - Transaction management
+  - Prepared statements for performance
+
+#### 16.2.2 Security
+- **bcrypt:** Version 5.1.x
+  - Password hashing with automatic salt generation
+  - Configurable rounds (default: 12)
+  - Resistant to rainbow table attacks
+  
+- **jsonwebtoken:** Version 9.0.x
+  - JWT (JSON Web Token) generation and verification
+  - Stateless authentication for API endpoints
+  - Token expiration and refresh support
+  
+- **helmet:** Version 7.1.x
+  - Security middleware for Express.js
+  - Sets various HTTP headers for security
+  - Protection against common vulnerabilities (XSS, clickjacking, etc.)
+  
+- **cors:** Version 2.8.x
+  - Cross-Origin Resource Sharing middleware
+  - Configurable allowed origins
+  - Credentials support for authenticated requests
+
+#### 16.2.3 Validation & Data Processing
+- **express-validator:** Version 7.0.x
+  - Request validation and sanitization
+  - Chain validation rules
+  - Custom validators support
+  - Automatic error formatting
+  
+- **dotenv:** Version 16.3.x
+  - Environment variable management
+  - Loads .env file into process.env
+  - Never commit sensitive data to version control
+
+#### 16.2.4 Communication
+- **nodemailer:** Version 6.9.x
+  - Email sending library
+  - SMTP and API-based email services support
+  - HTML and plain text emails
+  - Attachment support
+  - Template integration
+
+#### 16.2.5 Logging & Performance
+- **morgan:** Version 1.10.x
+  - HTTP request logger middleware
+  - Customizable log formats
+  - Development and production modes
+  - Useful for debugging and monitoring
+  
+- **compression:** Version 1.7.x
+  - Response compression middleware
+  - Gzip compression for HTTP responses
+  - Reduces bandwidth and improves load times
+  - Configurable compression level
+
+### 16.3 Frontend Dependencies
+
+#### 16.3.1 Routing & Navigation
+- **react-router-dom:** Version 6.20.x
+  - Declarative routing for React applications
+  - Browser history management
+  - Nested routes support
+  - Protected route components
+  - Navigation hooks (useNavigate, useParams, useLocation)
+
+#### 16.3.2 HTTP Client
+- **axios:** Version 1.6.x
+  - Promise-based HTTP client
+  - Request/response interceptors
+  - Automatic JSON transformation
+  - Request cancellation support
+  - Browser and Node.js compatible
+
+#### 16.3.3 UI Component Libraries
+**Choose one of the following:**
+
+**Option A: Material-UI (MUI)**
+- **@mui/material:** Version 5.14.x
+- **@mui/icons-material:** Version 5.14.x
+- Google Material Design implementation
+- Comprehensive component library
+- Theming and customization
+- Accessibility built-in
+- Responsive by default
+
+**Option B: Chakra UI**
+- **@chakra-ui/react:** Version 2.8.x
+- **@emotion/react:** Version 11.11.x (peer dependency)
+- **@emotion/styled:** Version 11.11.x (peer dependency)
+- Modular and accessible components
+- Simple styling with props
+- Dark mode support
+- Responsive utilities
+
+#### 16.3.4 Date & Time Handling
+**Choose one of the following:**
+
+**Option A: date-fns**
+- **date-fns:** Version 2.30.x
+- Modern JavaScript date utility library
+- Tree-shakable (only import what you use)
+- Immutable and pure functions
+- i18n support
+
+**Option B: Day.js**
+- **dayjs:** Version 1.11.x
+- Lightweight alternative to Moment.js
+- Similar API to Moment.js
+- Plugin architecture
+- Small bundle size (2KB)
+
+### 16.4 Development Tools
+
+#### 16.4.1 Build Tools
+- **Vite:** Version 5.0.x
+  - Next-generation frontend build tool
+  - Fast Hot Module Replacement (HMR)
+  - Optimized production builds
+  - Native ES modules in development
+  - React plugin support (@vitejs/plugin-react)
+
+#### 16.4.2 Code Quality
+- **ESLint:** Version 8.x
+  - JavaScript and React linting
+  - Customizable rules
+  - Code style enforcement
+  - Integration with editors (VS Code, WebStorm, etc.)
+  - Recommended configurations: eslint-config-airbnb, eslint-plugin-react
+  
+- **Prettier:** Version 3.x
+  - Opinionated code formatter
+  - Consistent code style across team
+  - Integration with ESLint
+  - Format on save support
+  - Configuration: .prettierrc
+
+#### 16.4.3 Testing
+**Backend Testing:**
+- **Jest:** Version 29.x
+  - JavaScript testing framework
+  - Unit and integration tests
+  - Code coverage reports
+  - Mocking support
+  - Snapshot testing
+  
+- **Supertest:** Version 6.3.x
+  - HTTP assertion library
+  - API endpoint testing
+  - Works with Express.js
+  - Chai-like assertions
+
+**Frontend Testing:**
+- **React Testing Library:** Version 14.x
+  - User-centric testing approach
+  - DOM testing utilities
+  - Integration with Jest
+  - Accessibility testing support
+  
+- **@testing-library/jest-dom:** Version 6.x
+  - Custom Jest matchers for DOM
+  - Improved assertions for React components
+
+### 16.5 Optional but Recommended
+
+#### 16.5.1 TypeScript
+- **TypeScript:** Version 5.3.x
+  - Static type checking for JavaScript
+  - Enhanced IDE support and autocomplete
+  - Catch errors at compile time
+  - Better code documentation through types
+  - Gradual adoption possible (can mix .js and .ts files)
+  - Type definitions: @types/node, @types/express, @types/react, @types/react-dom
+
+**Benefits:**
+- Reduced runtime errors
+- Better refactoring support
+- Improved team collaboration
+- Self-documenting code
+
+**Configuration files:**
+- `tsconfig.json` for TypeScript compiler options
+- Strict mode recommended for new projects
+
+### 16.6 Deployment & DevOps
+
+#### 16.6.1 Process Management
+- **PM2:** Version 2.5.x
+  - Production process manager for Node.js
+  - Process clustering and load balancing
+  - Auto-restart on crashes
+  - Log management and rotation
+  - Zero-downtime deployments
+  - Monitoring dashboard
+  - Startup script generation
+
+**PM2 Configuration (ecosystem.config.js):**
+```javascript
+module.exports = {
+  apps: [{
+    name: 'snackbar-api',
+    script: './server.js',
+    instances: 2,
+    exec_mode: 'cluster',
+    env: {
+      NODE_ENV: 'production',
+      PORT: 3000
+    },
+    error_file: './logs/err.log',
+    out_file: './logs/out.log',
+    log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+    merge_logs: true,
+    max_memory_restart: '1G'
+  }]
+};
+```
+
+#### 16.6.2 Web Server
+- **Nginx:** Version 1.24+
+  - High-performance HTTP server and reverse proxy
+  - SSL/TLS termination
+  - Static file serving
+  - Load balancing
+  - Gzip compression
+  - Request rate limiting
+  - Security headers
+
+#### 16.6.3 Containerization (Optional)
+- **Docker:** Version 24.x (optional)
+  - Containerization platform
+  - Consistent environments across dev/staging/prod
+  - Easy scaling and deployment
+  - Docker Compose for multi-container setup
+  
+**Docker Files:**
+- `Dockerfile` for Node.js application
+- `Dockerfile.postgres` for PostgreSQL (or use official image)
+- `docker-compose.yml` for orchestration
+
+**Example docker-compose.yml:**
+```yaml
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16.1
+    environment:
+      POSTGRES_DB: snackbar_prod
+      POSTGRES_USER: snackbar_app
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+  
+  api:
+    build: .
+    depends_on:
+      - postgres
+    environment:
+      NODE_ENV: production
+      DB_HOST: postgres
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+```
+
+### 16.7 Version Control & Package Management
+
+#### 16.7.1 Package Managers
+- **npm:** Version 10.x (bundled with Node.js 20.x)
+  - Default Node.js package manager
+  - Lock file: package-lock.json
+  - Scripts for build, test, start
+  
+**Alternative:**
+- **pnpm:** Version 8.x (optional, more efficient disk usage)
+- **yarn:** Version 4.x (optional, alternative to npm)
+
+#### 16.7.2 Version Control
+- **Git:** Version 2.40+
+  - Distributed version control
+  - .gitignore configuration to exclude:
+    - node_modules/
+    - .env files
+    - build/dist directories
+    - log files
+    - uploaded images (use separate storage or CDN)
+
+### 16.8 Development Environment Setup
+
+#### 16.8.1 Prerequisites
+```bash
+# Install Node.js 20.x LTS
+# Install PostgreSQL 16.x
+# Install Git
+
+# Verify installations
+node --version  # Should show v20.10.x
+npm --version   # Should show 10.x
+psql --version  # Should show 16.1
+git --version   # Should show 2.40+
+```
+
+#### 16.8.2 Initial Setup
+```bash
+# Clone repository
+git clone https://github.com/org/snackbar.git
+cd snackbar
+
+# Install backend dependencies
+cd server
+npm install
+
+# Install frontend dependencies
+cd ../client
+npm install
+
+# Setup environment variables
+cp .env.example .env
+# Edit .env with actual values
+
+# Setup database
+createdb snackbar_dev
+psql snackbar_dev < schema.sql
+
+# Run migrations (if using migration tool)
+npm run migrate
+
+# Start development servers
+# Terminal 1 - Backend
+cd server && npm run dev
+
+# Terminal 2 - Frontend
+cd client && npm run dev
+```
+
+### 16.9 Package.json Scripts
+
+#### Backend (server/package.json)
+```json
+{
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "test": "jest --coverage",
+    "test:watch": "jest --watch",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"**/*.{js,json,md}\""
+  }
+}
+```
+
+#### Frontend (client/package.json)
+```json
+{
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "lint": "eslint src --ext .js,.jsx",
+    "lint:fix": "eslint src --ext .js,.jsx --fix",
+    "format": "prettier --write \"src/**/*.{js,jsx,css}\""
+  }
+}
+```
+
+### 16.10 Additional Considerations
+
+#### 16.10.1 Image Processing (for product images)
+- **sharp:** Version 0.33.x
+  - High-performance image processing
+  - Resize, compress, format conversion
+  - WebP generation with JPEG fallback
+  - EXIF metadata stripping
+
+#### 16.10.2 API Documentation
+- **Swagger/OpenAPI:** Version 3.0
+  - API specification format
+  - Interactive documentation
+  - **swagger-ui-express:** Version 5.0.x for serving docs
+  - **swagger-jsdoc:** Version 6.2.x for generating from comments
+
+#### 16.10.3 Rate Limiting
+- **express-rate-limit:** Version 7.1.x
+  - Prevent brute-force attacks
+  - API abuse protection
+  - Configurable windows and limits
+
+#### 16.10.4 Session Management
+- **express-session:** Version 1.17.x
+  - Session middleware for Express
+  - PostgreSQL session store (connect-pg-simple)
+  - Cookie-based sessions
 
 ---
 
