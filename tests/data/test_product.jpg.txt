@@ -1,0 +1,2 @@
+# Placeholder for test product image
+# Create a test JPEG image and save as test_product.jpg

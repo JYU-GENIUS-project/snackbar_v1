@@ -1,0 +1,40 @@
+# Robot Framework test artifacts
+output.xml
+log.html
+report.html
+*.png
+selenium-screenshot-*.png
+
+# Test results directory
+results/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv
+
+# Test data - actual images (use placeholders only)
+tests/data/*.jpg
+tests/data/*.jpeg
+tests/data/*.png
+tests/data/*.gif
+tests/data/*.webp
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

@@ -1,0 +1,25 @@
+# Python dependencies for Robot Framework acceptance testing
+
+# Robot Framework core
+robotframework>=6.1.0
+
+# Selenium Library for browser automation
+robotframework-seleniumlibrary>=6.1.0
+
+# Selenium WebDriver
+selenium>=4.15.0
+
+# Optional: Database Library for backend verification
+# robotframework-databaselibrary>=1.4
+
+# Optional: Requests Library for API testing
+# robotframework-requests>=0.9.4
+
+# Optional: Faker for generating test data
+# robotframework-faker>=5.0.0
+
+# Optional: Screenshot comparison
+# robotframework-imagehorizonlibrary>=2.0.2
+
+# Optional: Better reporting
+# robotframework-metrics>=3.3.2
