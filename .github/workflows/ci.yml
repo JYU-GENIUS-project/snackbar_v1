@@ -43,6 +43,15 @@ jobs:
     # Runner environment - using latest Ubuntu for compatibility
     runs-on: ubuntu-latest
     
+    # -----------------------------------------------------------------------
+    # Security: Limit GITHUB_TOKEN Permissions
+    # -----------------------------------------------------------------------
+    # Following principle of least privilege, explicitly define minimal
+    # permissions required for this workflow
+    permissions:
+      # Read access to repository contents for checkout
+      contents: read
+    
     # Job execution steps
     steps:
       # -----------------------------------------------------------------------
