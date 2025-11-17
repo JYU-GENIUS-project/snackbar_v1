@@ -1,0 +1,208 @@
+# =============================================================================
+# GitHub Actions CI/CD Pipeline Configuration
+# =============================================================================
+# 
+# Purpose: This workflow automates the continuous integration and testing 
+#          process for the Snackbar Kiosk System project.
+#
+# Maintainer: DevOps Team
+# Last Updated: 2025-11-17
+# =============================================================================
+
+# Workflow name displayed in GitHub Actions UI
+name: CI Pipeline
+
+# =============================================================================
+# Trigger Configuration
+# =============================================================================
+# This section defines when the workflow should run
+
+on:
+  # Trigger on every push to the main branch
+  push:
+    branches:
+      - main
+    # Note: This workflow runs on every commit to main, ensuring continuous
+    # integration and early detection of issues
+
+# =============================================================================
+# Job Definitions
+# =============================================================================
+# Jobs define the tasks to be executed in this workflow
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Build and Test Job
+  # ---------------------------------------------------------------------------
+  # This job handles dependency installation and test execution
+  
+  build-and-test:
+    # Job display name in GitHub Actions UI
+    name: Build and Test
+    
+    # Runner environment - using latest Ubuntu for compatibility
+    runs-on: ubuntu-latest
+    
+    # Job execution steps
+    steps:
+      # -----------------------------------------------------------------------
+      # Step 1: Checkout Repository
+      # -----------------------------------------------------------------------
+      # Downloads the repository code to the runner environment
+      # Uses the official GitHub checkout action (v4 is the latest stable)
+      
+      - name: Checkout code
+        uses: actions/checkout@v4
+        # This action checks out your repository so the workflow can access it
+      
+      # -----------------------------------------------------------------------
+      # Step 2: Setup Python Environment
+      # -----------------------------------------------------------------------
+      # Configures the Python environment required for Robot Framework
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          # Python version - using 3.11 for stability and modern features
+          python-version: '3.11'
+          # Cache pip dependencies to speed up subsequent workflow runs
+          cache: 'pip'
+          # Specify cache dependency path
+          cache-dependency-path: 'tests/requirements.txt'
+      
+      # -----------------------------------------------------------------------
+      # Step 3: Display Python Version
+      # -----------------------------------------------------------------------
+      # Verification step to confirm Python installation
+      
+      - name: Display Python version
+        run: python --version
+        # Outputs the Python version to the workflow logs for verification
+      
+      # -----------------------------------------------------------------------
+      # Step 4: Install Dependencies
+      # -----------------------------------------------------------------------
+      # Installs Robot Framework and all required test dependencies
+      
+      - name: Install dependencies
+        run: |
+          # Upgrade pip to the latest version to avoid compatibility issues
+          python -m pip install --upgrade pip
+          
+          # Install all dependencies from requirements file
+          # This includes Robot Framework, SeleniumLibrary, and Selenium WebDriver
+          pip install -r tests/requirements.txt
+          
+          # Display installed packages for debugging purposes
+          pip list
+        # Note: The requirements.txt contains:
+        #       - robotframework>=6.1.0
+        #       - robotframework-seleniumlibrary>=6.1.0
+        #       - selenium>=4.15.0
+      
+      # -----------------------------------------------------------------------
+      # Step 5: Install Browser Driver
+      # -----------------------------------------------------------------------
+      # Installs Chrome and ChromeDriver for Selenium-based tests
+      
+      - name: Install Chrome and ChromeDriver
+        run: |
+          # Install Google Chrome browser (headless mode compatible)
+          sudo apt-get update
+          sudo apt-get install -y google-chrome-stable
+          
+          # Verify Chrome installation
+          google-chrome --version
+        # Note: ChromeDriver is automatically managed by Selenium Manager
+        #       in Selenium 4.15+ (installed via requirements.txt)
+      
+      # -----------------------------------------------------------------------
+      # Step 6: Run Tests
+      # -----------------------------------------------------------------------
+      # Executes Robot Framework acceptance tests
+      # IMPORTANT: continue-on-error is set to true as tests are expected to fail
+      
+      - name: Test
+        # Continue workflow even if tests fail - critical for development phase
+        continue-on-error: true
+        run: |
+          # Run Robot Framework tests from the acceptance directory
+          # --outputdir: Specifies where to save test results
+          # --loglevel: Sets logging verbosity (DEBUG, INFO, WARN, ERROR)
+          robot --outputdir results --loglevel INFO tests/acceptance/
+        # Note: Tests are expected to fail during development/implementation phase
+        #       Setting continue-on-error: true ensures the workflow completes
+        #       and artifacts are uploaded even when tests fail
+      
+      # -----------------------------------------------------------------------
+      # Step 7: Upload Test Results
+      # -----------------------------------------------------------------------
+      # Saves test results as workflow artifacts for later review
+      
+      - name: Upload test results
+        # Run this step even if previous steps failed (e.g., if tests failed)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          # Artifact name visible in GitHub Actions UI
+          name: robot-test-results
+          
+          # Path to test results directory created by Robot Framework
+          path: results/
+          
+          # Retention period for artifacts (adjust as needed)
+          retention-days: 30
+        # This allows downloading test reports (log.html, report.html, output.xml)
+        # from the GitHub Actions workflow run page
+      
+      # -----------------------------------------------------------------------
+      # Step 8: Display Test Summary
+      # -----------------------------------------------------------------------
+      # Shows a quick summary of test results in the workflow logs
+      
+      - name: Display test summary
+        if: always()
+        run: |
+          echo "=========================================="
+          echo "Test Execution Complete"
+          echo "=========================================="
+          echo ""
+          echo "Test results are available in the artifacts."
+          echo "Download 'robot-test-results' to view detailed reports:"
+          echo "  - log.html: Detailed test execution log"
+          echo "  - report.html: Test results summary"
+          echo "  - output.xml: Machine-readable test output"
+          echo ""
+          
+          # Display basic test statistics if output.xml exists
+          if [ -f results/output.xml ]; then
+            echo "Quick Statistics:"
+            grep -m 1 '<statistics>' results/output.xml || echo "Statistics not available"
+          fi
+        # Provides immediate feedback in the workflow logs
+
+# =============================================================================
+# Additional Notes
+# =============================================================================
+#
+# Workflow Features:
+# - ✅ Automatic trigger on push to main branch
+# - ✅ Python environment setup with dependency caching
+# - ✅ Browser and driver installation for Selenium tests
+# - ✅ Test execution with continue-on-error enabled
+# - ✅ Comprehensive test result artifact upload
+# - ✅ Detailed logging and status reporting
+#
+# Common Customizations:
+# - To run on pull requests, add 'pull_request:' to the 'on:' section
+# - To schedule runs, add 'schedule:' with cron syntax
+# - To run on multiple Python versions, use matrix strategy
+# - To add deployment steps, create a new job with dependencies
+#
+# Troubleshooting:
+# - Check workflow logs in GitHub Actions tab
+# - Download artifacts to view detailed Robot Framework reports
+# - Verify Python version compatibility with requirements
+# - Ensure Chrome/ChromeDriver versions are compatible
+#
+# =============================================================================
