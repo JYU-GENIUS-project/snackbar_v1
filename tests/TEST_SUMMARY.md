@@ -6,8 +6,8 @@ Comprehensive Robot Framework acceptance test suite created for the Snackbar Sel
 ## Test Statistics
 
 ### Files Created
-- **11 files** total in the tests directory
-- **5 test suites** (.robot files)
+- **12 files** total in the tests directory
+- **6 test suites** (.robot files)
 - **1 resource file** with common keywords
 - **3 documentation files** (README, data README, requirements.txt)
 - **1 .gitignore** for test artifacts
@@ -15,7 +15,7 @@ Comprehensive Robot Framework acceptance test suite created for the Snackbar Sel
 
 ### Test Coverage
 
-#### Total Test Cases: **37 tests**
+#### Total Test Cases: **46 tests**
 - ✅ All tests pass syntax validation (`robot --dryrun`)
 - ✅ Gherkin-style (Given-When-Then) format
 - ✅ Comprehensive edge case coverage
@@ -25,18 +25,20 @@ Comprehensive Robot Framework acceptance test suite created for the Snackbar Sel
 1. **customer_product_browsing.robot** - 8 tests (US-001 to US-005)
 2. **customer_shopping_cart.robot** - 7 tests (US-006 to US-010)
 3. **customer_payment_checkout.robot** - 6 tests (US-011 to US-015)
-4. **admin_authentication_products.robot** - 9 tests (US-019 to US-028)
-5. **admin_inventory_management.robot** - 7 tests (US-032 to US-038)
+4. **customer_system_status.robot** - 9 tests (US-016 to US-018)
+5. **admin_authentication_products.robot** - 9 tests (US-019 to US-028)
+6. **admin_inventory_management.robot** - 7 tests (US-032 to US-038)
 
 #### By Priority:
-- **High Priority User Stories**: 21 user stories covered
-- **Edge Cases**: 8 additional edge case tests
+- **High Priority User Stories**: 24 user stories covered
+- **Edge Cases**: 11 additional edge case tests
 - **Performance Tests**: QR generation (<1s), filter response (<300ms), sync (<5s)
 - **Security Tests**: Authentication, session timeout, password hashing verification
+- **Accessibility Tests**: WCAG AA compliance, touch target validation, font size verification
 
 ## User Stories Covered
 
-### Customer Stories (21 tests)
+### Customer Stories (30 tests)
 ✅ US-001: View products in grid layout
 ✅ US-002: Filter products by category  
 ✅ US-003: View allergen information
@@ -48,6 +50,13 @@ Comprehensive Robot Framework acceptance test suite created for the Snackbar Sel
 ✅ US-009: Remove individual items from cart
 ✅ US-010: Automatic cart clearing after 5 minutes
 ✅ US-011: QR code generation within 1 second
+✅ US-012: Pay using MobilePay by scanning QR
+✅ US-013: Success message with green checkmark
+✅ US-014: Error message with retry options
+✅ US-015: Uncertain payment status notification
+✅ US-016: Closed message outside operating hours
+✅ US-017: Warning when inventory tracking disabled
+✅ US-018: Touch-optimized text and buttons
 ✅ US-012: Pay using MobilePay by scanning QR
 ✅ US-013: Success message with green checkmark
 ✅ US-014: Error message with retry options
