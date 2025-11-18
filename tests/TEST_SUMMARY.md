@@ -15,7 +15,7 @@ Comprehensive Robot Framework acceptance test suite created for the Snackbar Sel
 
 ### Test Coverage
 
-#### Total Test Cases: **46 tests**
+#### Total Test Cases: **52 tests**
 - ✅ All tests pass syntax validation (`robot --dryrun`)
 - ✅ Gherkin-style (Given-When-Then) format
 - ✅ Comprehensive edge case coverage
@@ -26,14 +26,15 @@ Comprehensive Robot Framework acceptance test suite created for the Snackbar Sel
 2. **customer_shopping_cart.robot** - 7 tests (US-006 to US-010)
 3. **customer_payment_checkout.robot** - 6 tests (US-011 to US-015)
 4. **customer_system_status.robot** - 9 tests (US-016 to US-018)
-5. **admin_authentication_products.robot** - 9 tests (US-019 to US-028)
+5. **admin_authentication_products.robot** - 15 tests (US-019 to US-028) **UPDATED**
 6. **admin_inventory_management.robot** - 7 tests (US-032 to US-038)
 
 #### By Priority:
 - **High Priority User Stories**: 24 user stories covered
-- **Edge Cases**: 11 additional edge case tests
+- **Medium Priority User Stories**: 2 user stories covered (US-021, US-022) **NEW**
+- **Edge Cases**: 14 additional edge case tests
 - **Performance Tests**: QR generation (<1s), filter response (<300ms), sync (<5s)
-- **Security Tests**: Authentication, session timeout, password hashing verification
+- **Security Tests**: Authentication, session timeout, password hashing verification, audit immutability
 - **Accessibility Tests**: WCAG AA compliance, touch target validation, font size verification
 
 ## User Stories Covered
@@ -57,14 +58,12 @@ Comprehensive Robot Framework acceptance test suite created for the Snackbar Sel
 ✅ US-016: Closed message outside operating hours
 ✅ US-017: Warning when inventory tracking disabled
 ✅ US-018: Touch-optimized text and buttons
-✅ US-012: Pay using MobilePay by scanning QR
-✅ US-013: Success message with green checkmark
-✅ US-014: Error message with retry options
-✅ US-015: Uncertain payment status notification
 
-### Admin Stories (16 tests)
+### Admin Stories (22 tests) **UPDATED**
 ✅ US-019: Secure admin login with username/password
 ✅ US-020: Session timeout after 30 minutes
+✅ US-021: Create and manage multiple admin accounts **NEW**
+✅ US-022: Audit trail for admin actions **NEW**
 ✅ US-023: Add new product with all information
 ✅ US-024: Image upload with automatic processing
 ✅ US-025: Edit existing product information
