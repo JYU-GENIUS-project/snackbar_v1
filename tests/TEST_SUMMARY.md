@@ -6,8 +6,8 @@ Comprehensive Robot Framework acceptance test suite created for the Snackbar Sel
 ## Test Statistics
 
 ### Files Created
-- **12 files** total in the tests directory
-- **6 test suites** (.robot files)
+- **13 files** total in the tests directory
+- **7 test suites** (.robot files)
 - **1 resource file** with common keywords
 - **3 documentation files** (README, data README, requirements.txt)
 - **1 .gitignore** for test artifacts
@@ -15,7 +15,7 @@ Comprehensive Robot Framework acceptance test suite created for the Snackbar Sel
 
 ### Test Coverage
 
-#### Total Test Cases: **55 tests**
+#### Total Test Cases: **64 tests**
 - ✅ All tests pass syntax validation (`robot --dryrun`)
 - ✅ Gherkin-style (Given-When-Then) format
 - ✅ Comprehensive edge case coverage
@@ -26,13 +26,14 @@ Comprehensive Robot Framework acceptance test suite created for the Snackbar Sel
 2. **customer_shopping_cart.robot** - 7 tests (US-006 to US-010)
 3. **customer_payment_checkout.robot** - 6 tests (US-011 to US-015)
 4. **customer_system_status.robot** - 9 tests (US-016 to US-018)
-5. **admin_authentication_products.robot** - 18 tests (US-019 to US-028) **UPDATED**
-6. **admin_inventory_management.robot** - 7 tests (US-032 to US-038)
+5. **admin_authentication_products.robot** - 18 tests (US-019 to US-028)
+6. **admin_category_management.robot** - 9 tests (US-029 to US-031) **NEW**
+7. **admin_inventory_management.robot** - 7 tests (US-032 to US-038)
 
 #### By Priority:
 - **High Priority User Stories**: 24 user stories covered
-- **Medium Priority User Stories**: 3 user stories covered (US-021, US-022, US-026) **UPDATED**
-- **Edge Cases**: 17 additional edge case tests **UPDATED**
+- **Medium Priority User Stories**: 6 user stories covered (US-021, US-022, US-026, US-029, US-030, US-031) **UPDATED**
+- **Edge Cases**: 20 additional edge case tests **UPDATED**
 - **Performance Tests**: QR generation (<1s), filter response (<300ms), sync (<5s)
 - **Security Tests**: Authentication, session timeout, password hashing verification, audit immutability
 - **Accessibility Tests**: WCAG AA compliance, touch target validation, font size verification
@@ -70,6 +71,9 @@ Comprehensive Robot Framework acceptance test suite created for the Snackbar Sel
 ✅ US-026: Set purchase limits per product **NEW**
 ✅ US-027: Remove products from system
 ✅ US-028: Product changes reflect on kiosk immediately
+✅ US-029: Create custom product categories **NEW**
+✅ US-030: Edit and delete categories **NEW**
+✅ US-031: Assign products to multiple categories **NEW**
 ✅ US-032: Enable/disable inventory tracking system-wide
 ✅ US-033: View stock quantities in sortable table
 ✅ US-034: Manually update stock quantities
