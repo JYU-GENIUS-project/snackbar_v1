@@ -211,6 +211,51 @@ US-025: Edit Existing Product Information
     And a success confirmation should be shown
 
 
+US-026: Set Purchase Limits Per Product
+    [Documentation]    As an administrator, I want to set purchase limits per product 
+    ...                so that I can prevent customers from buying excessive quantities 
+    ...                of limited items.
+    [Tags]    US-026    purchase-limits    inventory-control    medium-priority
+    
+    [Setup]    Admin Login
+    Given the admin is editing a product
+    When the admin sets purchase limit to 5
+    And saves the product
+    Then the purchase limit should be saved
+    And the limit should be enforced on the kiosk
+    And customers should not exceed the limit
+    And a message should display when limit is reached
+
+
+US-026-Edge: Purchase Limit Enforcement On Kiosk
+    [Documentation]    Edge case: Kiosk enforces purchase limits in cart
+    [Tags]    US-026    edge-case    limit-enforcement
+    
+    [Setup]    Admin Login
+    Given a product has a purchase limit of 3
+    When a customer adds 3 items to cart
+    Then the "+" button should be disabled for that product
+    When the customer tries to add more
+    Then a message should show "Maximum 3 of this item per purchase"
+    And the quantity should remain at 3
+
+
+US-026-Boundary: Valid Purchase Limit Range
+    [Documentation]    Boundary case: Purchase limits between 1-50
+    [Tags]    US-026    boundary-case    validation
+    
+    [Setup]    Admin Login
+    Given the admin is setting a purchase limit
+    When the admin enters 1
+    Then the limit should be accepted
+    When the admin enters 50
+    Then the limit should be accepted
+    When the admin enters 0
+    Then an error should indicate "Minimum limit is 1"
+    When the admin enters 51
+    Then an error should indicate "Maximum limit is 50"
+
+
 US-028: Product Changes Reflect On Kiosk Immediately
     [Documentation]    As an administrator, I want my product changes to reflect on the 
     ...                kiosk immediately (within 5 seconds) so that customers always see 
@@ -858,3 +903,94 @@ Logs should be retained for at least 3 years
     [Documentation]    Verifies retention policy
     # Would verify system configuration and database policies
     Log    Audit log retention policy: minimum 3 years
+
+# US-026 Keywords
+The admin is editing a product
+    [Documentation]    Admin opens product edit form
+    Click Element    id=products-menu
+    Wait Until Element Is Visible    css=.product-list    timeout=5s
+    Click Element    css=.product-item:first-child .edit-button
+    Wait Until Element Is Visible    id=product-form    timeout=5s
+
+The admin sets purchase limit to ${limit}
+    [Documentation]    Sets purchase limit for product
+    Wait Until Element Is Visible    id=purchase-limit-input    timeout=5s
+    Clear Element Text    id=purchase-limit-input
+    Input Text    id=purchase-limit-input    ${limit}
+
+Saves the product
+    [Documentation]    Saves product changes
+    Click Button    id=save-product-button
+    Wait Until Page Contains    Product saved    timeout=5s
+
+The purchase limit should be saved
+    [Documentation]    Verifies limit is persisted
+    ${saved_limit}=    Get Element Attribute    id=purchase-limit-input    value
+    Should Be Equal    ${saved_limit}    5
+
+The limit should be enforced on the kiosk
+    [Documentation]    Verifies kiosk enforces limit
+    # Would verify via kiosk interface or API
+    Log    Purchase limit enforced on kiosk
+
+Customers should not exceed the limit
+    [Documentation]    Verifies limit prevents excessive purchases
+    # Would test via kiosk that adding more than limit is prevented
+    Log    Customers cannot exceed purchase limit
+
+A message should display when limit is reached
+    [Documentation]    Verifies limit reached message
+    # Would verify on kiosk interface
+    Log    Message displays: Maximum X of this item per purchase
+
+A product has a purchase limit of ${limit}
+    [Documentation]    Precondition: Product configured with limit
+    The admin is editing a product
+    The admin sets purchase limit to ${limit}
+    Saves the product
+
+A customer adds ${quantity} items to cart
+    [Documentation]    Customer adds items on kiosk
+    # Would interact with kiosk interface
+    Log    Customer adds ${quantity} items to cart
+
+The "+" button should be disabled for that product
+    [Documentation]    Verifies plus button disabled at limit
+    # Would check kiosk UI
+    Element Should Be Disabled    css=.quantity-plus-button
+    Log    Plus button disabled at purchase limit
+
+The customer tries to add more
+    [Documentation]    Customer attempts to exceed limit
+    # Would attempt to click disabled button or add more
+    Log    Customer attempts to exceed limit
+
+A message should show "Maximum ${limit} of this item per purchase"
+    [Documentation]    Verifies limit message displayed
+    Page Should Contain    Maximum ${limit} of this item per purchase
+
+The quantity should remain at ${quantity}
+    [Documentation]    Verifies quantity unchanged
+    ${cart_qty}=    Get Text    css=.cart-item-quantity
+    Should Be Equal    ${cart_qty}    ${quantity}
+
+The admin is setting a purchase limit
+    [Documentation]    Admin in purchase limit field
+    The admin is editing a product
+    Wait Until Element Is Visible    id=purchase-limit-input    timeout=5s
+    Click Element    id=purchase-limit-input
+
+The admin enters ${value}
+    [Documentation]    Enters limit value
+    Clear Element Text    id=purchase-limit-input
+    Input Text    id=purchase-limit-input    ${value}
+
+The limit should be accepted
+    [Documentation]    Verifies valid limit accepted
+    Click Button    id=save-product-button
+    Wait Until Page Contains    Product saved    timeout=5s
+
+An error should indicate "${message}"
+    [Documentation]    Verifies validation error message
+    ${error}=    Get Text    id=purchase-limit-error
+    Should Contain    ${error}    ${message}

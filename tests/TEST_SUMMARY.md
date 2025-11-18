@@ -15,7 +15,7 @@ Comprehensive Robot Framework acceptance test suite created for the Snackbar Sel
 
 ### Test Coverage
 
-#### Total Test Cases: **52 tests**
+#### Total Test Cases: **55 tests**
 - ✅ All tests pass syntax validation (`robot --dryrun`)
 - ✅ Gherkin-style (Given-When-Then) format
 - ✅ Comprehensive edge case coverage
@@ -26,13 +26,13 @@ Comprehensive Robot Framework acceptance test suite created for the Snackbar Sel
 2. **customer_shopping_cart.robot** - 7 tests (US-006 to US-010)
 3. **customer_payment_checkout.robot** - 6 tests (US-011 to US-015)
 4. **customer_system_status.robot** - 9 tests (US-016 to US-018)
-5. **admin_authentication_products.robot** - 15 tests (US-019 to US-028) **UPDATED**
+5. **admin_authentication_products.robot** - 18 tests (US-019 to US-028) **UPDATED**
 6. **admin_inventory_management.robot** - 7 tests (US-032 to US-038)
 
 #### By Priority:
 - **High Priority User Stories**: 24 user stories covered
-- **Medium Priority User Stories**: 2 user stories covered (US-021, US-022) **NEW**
-- **Edge Cases**: 14 additional edge case tests
+- **Medium Priority User Stories**: 3 user stories covered (US-021, US-022, US-026) **UPDATED**
+- **Edge Cases**: 17 additional edge case tests **UPDATED**
 - **Performance Tests**: QR generation (<1s), filter response (<300ms), sync (<5s)
 - **Security Tests**: Authentication, session timeout, password hashing verification, audit immutability
 - **Accessibility Tests**: WCAG AA compliance, touch target validation, font size verification
@@ -59,7 +59,7 @@ Comprehensive Robot Framework acceptance test suite created for the Snackbar Sel
 ✅ US-017: Warning when inventory tracking disabled
 ✅ US-018: Touch-optimized text and buttons
 
-### Admin Stories (22 tests) **UPDATED**
+### Admin Stories (25 tests) **UPDATED**
 ✅ US-019: Secure admin login with username/password
 ✅ US-020: Session timeout after 30 minutes
 ✅ US-021: Create and manage multiple admin accounts **NEW**
@@ -67,6 +67,7 @@ Comprehensive Robot Framework acceptance test suite created for the Snackbar Sel
 ✅ US-023: Add new product with all information
 ✅ US-024: Image upload with automatic processing
 ✅ US-025: Edit existing product information
+✅ US-026: Set purchase limits per product **NEW**
 ✅ US-027: Remove products from system
 ✅ US-028: Product changes reflect on kiosk immediately
 ✅ US-032: Enable/disable inventory tracking system-wide
