@@ -6,8 +6,8 @@ Comprehensive Robot Framework acceptance test suite created for the Snackbar Sel
 ## Test Statistics
 
 ### Files Created
-- **13 files** total in the tests directory
-- **7 test suites** (.robot files)
+- **14 files** total in the tests directory
+- **8 test suites** (.robot files) **UPDATED**
 - **1 resource file** with common keywords
 - **3 documentation files** (README, data README, requirements.txt)
 - **1 .gitignore** for test artifacts
@@ -15,7 +15,7 @@ Comprehensive Robot Framework acceptance test suite created for the Snackbar Sel
 
 ### Test Coverage
 
-#### Total Test Cases: **64 tests**
+#### Total Test Cases: **79 tests**
 - ✅ All tests pass syntax validation (`robot --dryrun`)
 - ✅ Gherkin-style (Given-When-Then) format
 - ✅ Comprehensive edge case coverage
@@ -27,16 +27,18 @@ Comprehensive Robot Framework acceptance test suite created for the Snackbar Sel
 3. **customer_payment_checkout.robot** - 6 tests (US-011 to US-015)
 4. **customer_system_status.robot** - 9 tests (US-016 to US-018)
 5. **admin_authentication_products.robot** - 18 tests (US-019 to US-028)
-6. **admin_category_management.robot** - 9 tests (US-029 to US-031) **NEW**
+6. **admin_category_management.robot** - 9 tests (US-029 to US-031)
 7. **admin_inventory_management.robot** - 7 tests (US-032 to US-038)
+8. **admin_transactions_statistics.robot** - 15 tests (US-039 to US-043) **NEW**
 
 #### By Priority:
-- **High Priority User Stories**: 24 user stories covered
-- **Medium Priority User Stories**: 6 user stories covered (US-021, US-022, US-026, US-029, US-030, US-031) **UPDATED**
-- **Edge Cases**: 20 additional edge case tests **UPDATED**
-- **Performance Tests**: QR generation (<1s), filter response (<300ms), sync (<5s)
+- **High Priority User Stories**: 38 user stories covered **UPDATED**
+- **Medium Priority User Stories**: 6 user stories covered (US-021, US-022, US-026, US-029, US-030, US-031)
+- **Edge Cases**: 26 additional edge case tests **UPDATED**
+- **Performance Tests**: QR generation (<1s), filter response (<300ms), sync (<5s), statistics update (<2s) **UPDATED**
 - **Security Tests**: Authentication, session timeout, password hashing verification, audit immutability
 - **Accessibility Tests**: WCAG AA compliance, touch target validation, font size verification
+- **Compliance Tests**: Data retention (3 years), GDPR compliance (anonymous transactions) **NEW**
 
 ## User Stories Covered
 
@@ -81,6 +83,11 @@ Comprehensive Robot Framework acceptance test suite created for the Snackbar Sel
 ✅ US-036: Email notifications for low stock
 ✅ US-037: Highlight products with negative stock
 ✅ US-038: Manually adjust inventory for discrepancies
+✅ US-039: View complete transaction history with filtering **NEW**
+✅ US-040: See transactions marked as payment uncertain **NEW**
+✅ US-041: Manually mark uncertain payments as confirmed/refunded **NEW**
+✅ US-042: Transaction history retained for 3 years **NEW**
+✅ US-043: View statistics showing most popular products **NEW**
 
 ## Test Infrastructure
 
