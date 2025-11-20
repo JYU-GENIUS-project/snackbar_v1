@@ -328,7 +328,7 @@ US-046: Export Transaction Data To CSV Format
     Given the admin is on the transaction history page
     And some transactions are displayed
     When the admin clicks "Export to CSV"
-    Then a CSV file should download
+    Then a CSV file should be downloaded
     And the filename should be "transactions_YYYY-MM-DD_to_YYYY-MM-DD.csv"
     And the CSV should include headers "Transaction ID,Date,Time,Items,Quantities,Total Amount,Payment Status"
     And the CSV should include all visible transaction data
@@ -1029,94 +1029,6 @@ US-045-Comprehensive: Preset Date Ranges And Custom Combo
     And the admin can save custom ranges as favorites
 
 
-US-046: Export Transaction Data To CSV Format
-    [Documentation]    As an administrator, I want to export transaction data to CSV format 
-    ...                so that I can perform detailed analysis in spreadsheet software.
-    [Tags]    US-046    export    csv    data-analysis
-    
-    Given the admin is on the transaction history page
-    And some transactions are displayed
-    When the admin clicks "Export to CSV"
-    Then a CSV file should download
-    And the filename should be "transactions_YYYY-MM-DD_to_YYYY-MM-DD.csv"
-    And the CSV should include headers "Transaction ID,Date,Time,Items,Quantities,Total Amount,Payment Status"
-    And the CSV should include all visible transaction data
-    And date format should be "YYYY-MM-DD HH:MM:SS"
-    And currency should be formatted as "XX.XX"
-
-
-US-046-Edge: CSV Export With Applied Filters
-    [Documentation]    Edge case: CSV export respects active filters
-    [Tags]    US-046    edge-case    filtered-export
-    
-    Given the admin has filtered transactions
-    And filtered by date range "Last 7 Days"
-    And filtered by status "COMPLETED"
-    When the admin clicks "Export to CSV"
-    Then the CSV should only include filtered transactions
-    And the filename should include the date range
-    And a note in the CSV should indicate active filters
-    And row count should match visible filtered results
-
-
-US-046-Comprehensive: Large Dataset CSV Export
-    [Documentation]    Comprehensive test: CSV export handles large datasets
-    [Tags]    US-046    comprehensive    large-export
-    
-    Given more than 1000 transactions exist
-    When the admin exports all transactions to CSV
-    Then a loading indicator should show "Preparing export..."
-    And the export should complete within 30 seconds
-    And all transactions should be included in the CSV
-    And the CSV file size should be reasonable (compressed if large)
-    And the admin receives a notification "Export complete: XXXX transactions exported"
-    And UTF-8 encoding should be used for special characters
-
-
-US-047: Statistics Calculate Within 2 Seconds With Thousands Of Transactions
-    [Documentation]    As an administrator, I want statistics to calculate within 2 seconds 
-    ...                even with thousands of transactions so that reporting remains responsive.
-    [Tags]    US-047    performance    optimization
-    
-    Given more than 10000 transactions exist in the database
-    When the admin opens the statistics page
-    Then the page should load within 2 seconds
-    When the admin selects a different date range
-    Then the statistics should recalculate within 2 seconds
-    And a loading indicator should show during calculation
-    And all charts should update smoothly
-    And the interface should remain responsive
-
-
-US-047-Edge: Performance With Complex Filters
-    [Documentation]    Edge case: Complex filter combinations maintain performance
-    [Tags]    US-047    edge-case    filter-performance
-    
-    Given the database contains 50000 transactions
-    When the admin applies multiple filters simultaneously
-    And filters by custom date range spanning 6 months
-    And filters by specific products (5 selected)
-    And filters by status "COMPLETED"
-    Then filtered results should display within 2 seconds
-    And pagination should work smoothly
-    And the admin can sort results without delay
-
-
-US-047-Comprehensive: Performance Monitoring And Optimization
-    [Documentation]    Comprehensive test: System monitors and maintains performance
-    [Tags]    US-047    comprehensive    monitoring
-    
-    Given statistics are being calculated
-    When calculation time approaches 2 seconds
-    Then the system should use database indexing
-    And should cache frequently accessed statistics
-    And should limit calculations to visible data only
-    When performance degrades below threshold
-    Then the admin should see "Performance may be slower due to large dataset"
-    And optimization suggestions should be shown
-    And the admin can enable "Light Mode" for faster but less detailed stats
-
-
 *** Keywords ***
 
 Each ${period} should be labeled on the X-axis
@@ -1340,9 +1252,6 @@ Some transactions are displayed
     ${count}=    Get Element Count    css=.transaction-row
     Should Be True    ${count} > 0
 
-The filename should be "transactions_YYYY-MM-DD_to_YYYY-MM-DD.csv"
-    [Documentation]    Verifies filename pattern
-    Log    Filename follows pattern: transactions_YYYY-MM-DD_to_YYYY-MM-DD.csv
 
 The CSV should include headers "${headers}"
     [Documentation]    Verifies CSV headers
@@ -1543,3 +1452,9 @@ The admin can enable "Light Mode" for faster but less detailed stats
     [Documentation]    Performance mode available
     Element Should Be Visible    id=enable-light-mode-button
     Log    Light Mode option available for better performance
+
+The admin selects a different date range
+    [Documentation]    Changes date range
+    Click Element    id=date-range-dropdown
+    Click Element    id=date-range-last-month
+    Wait For Page Load Complete
