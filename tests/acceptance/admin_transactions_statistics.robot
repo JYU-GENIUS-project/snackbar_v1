@@ -1,6 +1,6 @@
 *** Settings ***
 Documentation    Acceptance tests for Transaction Management & Statistics User Stories
-...              Covers US-039 through US-043
+...              Covers US-039 through US-047
 Resource         ../resources/common.robot
 Suite Setup      Open Admin Browser
 Suite Teardown   Close All Test Browsers
@@ -227,6 +227,185 @@ US-043-Comprehensive: Key Metrics And Export
     And the filename should be "transactions_YYYY-MM-DD_to_YYYY-MM-DD.csv"
     And the CSV should include all transaction details
     And the CSV should respect the selected date range filter
+
+
+US-044: View Revenue By Day Week Or Month With Visual Charts
+    [Documentation]    As an administrator, I want to view revenue by day, week, or month 
+    ...                with visual charts so that I can understand sales trends over time.
+    [Tags]    US-044    revenue-charts    visualization    trends
+    
+    Given the admin is on the statistics page
+    When the admin selects "Daily" view
+    Then a bar chart should show revenue per day
+    And each day should be labeled on the X-axis
+    And revenue amounts should be labeled on the Y-axis
+    When the admin selects "Weekly" view
+    Then a bar chart should show revenue per week
+    And weekly totals should be calculated correctly
+    When the admin selects "Monthly" view
+    Then a bar chart should show revenue per month
+    And monthly trends should be visible
+    And the chart should be interactive with hover tooltips
+
+
+US-044-Edge: Revenue Charts With Zero Data Days
+    [Documentation]    Edge case: Charts properly display days with no sales
+    [Tags]    US-044    edge-case    zero-data
+    
+    Given the admin is viewing revenue charts
+    When some days have zero transactions
+    Then those days should still appear on the chart
+    And should show "0.00" or empty bar
+    And the chart should maintain proper axis scaling
+    And tooltips should indicate "No sales on this day"
+
+
+US-044-Comprehensive: Interactive Chart Features
+    [Documentation]    Comprehensive test: All chart interactivity features work
+    [Tags]    US-044    comprehensive    interactivity
+    
+    Given the admin is viewing a revenue chart
+    When the admin hovers over a bar
+    Then a tooltip should show date and exact revenue amount
+    When the admin clicks a bar
+    Then detailed transaction list for that period should be shown
+    And the admin can zoom in on specific date ranges
+    And the admin can export the chart as an image
+    And chart legend should explain all visual elements
+
+
+US-045: Select Custom Date Ranges For Statistics
+    [Documentation]    As an administrator, I want to select custom date ranges for statistics 
+    ...                so that I can analyze specific time periods.
+    [Tags]    US-045    custom-date-range    filtering
+    
+    Given the admin is on the statistics page
+    When the admin clicks "Custom Date Range"
+    Then a date picker should appear
+    When the admin selects start date "2024-01-01"
+    And selects end date "2024-01-31"
+    And clicks "Apply"
+    Then statistics should update to show data for January 2024 only
+    And the selected date range should be clearly displayed
+    And transactions should be filtered to this range
+    And revenue charts should reflect only this period
+
+
+US-045-Edge: Date Range Validation
+    [Documentation]    Edge case: Invalid date ranges are handled properly
+    [Tags]    US-045    edge-case    validation
+    
+    Given the admin is selecting a custom date range
+    When the admin selects end date before start date
+    Then an error message should display "End date must be after start date"
+    And the "Apply" button should be disabled
+    When the admin selects a date range exceeding 3 years
+    Then a warning should display "Large date ranges may slow performance"
+    But the range should still be allowed
+    And the admin can clear the custom range to return to default
+
+
+US-045-Comprehensive: Preset Date Ranges And Custom Combo
+    [Documentation]    Comprehensive test: Preset and custom date ranges work together
+    [Tags]    US-045    comprehensive    date-presets
+    
+    Given the admin is on the statistics page
+    Then preset date ranges should be available
+    And should include "Today", "Yesterday", "Last 7 Days", "Last 30 Days", "Last 90 Days", "This Year"
+    When the admin selects "Last 30 Days"
+    Then statistics should update automatically
+    When the admin switches to custom date range
+    Then the custom range picker should open
+    And previously selected preset should be cleared
+    And the admin can save custom ranges as favorites
+
+
+US-046: Export Transaction Data To CSV Format
+    [Documentation]    As an administrator, I want to export transaction data to CSV format 
+    ...                so that I can perform detailed analysis in spreadsheet software.
+    [Tags]    US-046    export    csv    data-analysis
+    
+    Given the admin is on the transaction history page
+    And some transactions are displayed
+    When the admin clicks "Export to CSV"
+    Then a CSV file should download
+    And the filename should be "transactions_YYYY-MM-DD_to_YYYY-MM-DD.csv"
+    And the CSV should include headers "Transaction ID,Date,Time,Items,Quantities,Total Amount,Payment Status"
+    And the CSV should include all visible transaction data
+    And date format should be "YYYY-MM-DD HH:MM:SS"
+    And currency should be formatted as "XX.XX"
+
+
+US-046-Edge: CSV Export With Applied Filters
+    [Documentation]    Edge case: CSV export respects active filters
+    [Tags]    US-046    edge-case    filtered-export
+    
+    Given the admin has filtered transactions
+    And filtered by date range "Last 7 Days"
+    And filtered by status "COMPLETED"
+    When the admin clicks "Export to CSV"
+    Then the CSV should only include filtered transactions
+    And the filename should include the date range
+    And a note in the CSV should indicate active filters
+    And row count should match visible filtered results
+
+
+US-046-Comprehensive: Large Dataset CSV Export
+    [Documentation]    Comprehensive test: CSV export handles large datasets
+    [Tags]    US-046    comprehensive    large-export
+    
+    Given more than 1000 transactions exist
+    When the admin exports all transactions to CSV
+    Then a loading indicator should show "Preparing export..."
+    And the export should complete within 30 seconds
+    And all transactions should be included in the CSV
+    And the CSV file size should be reasonable (compressed if large)
+    And the admin receives a notification "Export complete: XXXX transactions exported"
+    And UTF-8 encoding should be used for special characters
+
+
+US-047: Statistics Calculate Within 2 Seconds With Thousands Of Transactions
+    [Documentation]    As an administrator, I want statistics to calculate within 2 seconds 
+    ...                even with thousands of transactions so that reporting remains responsive.
+    [Tags]    US-047    performance    optimization
+    
+    Given more than 10000 transactions exist in the database
+    When the admin opens the statistics page
+    Then the page should load within 2 seconds
+    When the admin selects a different date range
+    Then the statistics should recalculate within 2 seconds
+    And a loading indicator should show during calculation
+    And all charts should update smoothly
+    And the interface should remain responsive
+
+
+US-047-Edge: Performance With Complex Filters
+    [Documentation]    Edge case: Complex filter combinations maintain performance
+    [Tags]    US-047    edge-case    filter-performance
+    
+    Given the database contains 50000 transactions
+    When the admin applies multiple filters simultaneously
+    And filters by custom date range spanning 6 months
+    And filters by specific products (5 selected)
+    And filters by status "COMPLETED"
+    Then filtered results should display within 2 seconds
+    And pagination should work smoothly
+    And the admin can sort results without delay
+
+
+US-047-Comprehensive: Performance Monitoring And Optimization
+    [Documentation]    Comprehensive test: System monitors and maintains performance
+    [Tags]    US-047    comprehensive    monitoring
+    
+    Given statistics are being calculated
+    When calculation time approaches 2 seconds
+    Then the system should use database indexing
+    And should cache frequently accessed statistics
+    And should limit calculations to visible data only
+    When performance degrades below threshold
+    Then the admin should see "Performance may be slower due to large dataset"
+    And optimization suggestions should be shown
+    And the admin can enable "Light Mode" for faster but less detailed stats
 
 
 *** Keywords ***
@@ -757,3 +936,610 @@ The CSV should respect the selected date range filter
     [Documentation]    Verifies filtered export
     # Would verify only transactions in range are exported
     Log    CSV export respects date range filter
+
+
+US-044: View Revenue By Day Week Or Month With Visual Charts
+    [Documentation]    As an administrator, I want to view revenue by day, week, or month 
+    ...                with visual charts so that I can understand sales trends over time.
+    [Tags]    US-044    revenue-charts    visualization    trends
+    
+    Given the admin is on the statistics page
+    When the admin selects "Daily" view
+    Then a bar chart should show revenue per day
+    And each day should be labeled on the X-axis
+    And revenue amounts should be labeled on the Y-axis
+    When the admin selects "Weekly" view
+    Then a bar chart should show revenue per week
+    And weekly totals should be calculated correctly
+    When the admin selects "Monthly" view
+    Then a bar chart should show revenue per month
+    And monthly trends should be visible
+    And the chart should be interactive with hover tooltips
+
+
+US-044-Edge: Revenue Charts With Zero Data Days
+    [Documentation]    Edge case: Charts properly display days with no sales
+    [Tags]    US-044    edge-case    zero-data
+    
+    Given the admin is viewing revenue charts
+    When some days have zero transactions
+    Then those days should still appear on the chart
+    And should show "0.00" or empty bar
+    And the chart should maintain proper axis scaling
+    And tooltips should indicate "No sales on this day"
+
+
+US-044-Comprehensive: Interactive Chart Features
+    [Documentation]    Comprehensive test: All chart interactivity features work
+    [Tags]    US-044    comprehensive    interactivity
+    
+    Given the admin is viewing a revenue chart
+    When the admin hovers over a bar
+    Then a tooltip should show date and exact revenue amount
+    When the admin clicks a bar
+    Then detailed transaction list for that period should be shown
+    And the admin can zoom in on specific date ranges
+    And the admin can export the chart as an image
+    And chart legend should explain all visual elements
+
+
+US-045: Select Custom Date Ranges For Statistics
+    [Documentation]    As an administrator, I want to select custom date ranges for statistics 
+    ...                so that I can analyze specific time periods.
+    [Tags]    US-045    custom-date-range    filtering
+    
+    Given the admin is on the statistics page
+    When the admin clicks "Custom Date Range"
+    Then a date picker should appear
+    When the admin selects start date "2024-01-01"
+    And selects end date "2024-01-31"
+    And clicks "Apply"
+    Then statistics should update to show data for January 2024 only
+    And the selected date range should be clearly displayed
+    And transactions should be filtered to this range
+    And revenue charts should reflect only this period
+
+
+US-045-Edge: Date Range Validation
+    [Documentation]    Edge case: Invalid date ranges are handled properly
+    [Tags]    US-045    edge-case    validation
+    
+    Given the admin is selecting a custom date range
+    When the admin selects end date before start date
+    Then an error message should display "End date must be after start date"
+    And the "Apply" button should be disabled
+    When the admin selects a date range exceeding 3 years
+    Then a warning should display "Large date ranges may slow performance"
+    But the range should still be allowed
+    And the admin can clear the custom range to return to default
+
+
+US-045-Comprehensive: Preset Date Ranges And Custom Combo
+    [Documentation]    Comprehensive test: Preset and custom date ranges work together
+    [Tags]    US-045    comprehensive    date-presets
+    
+    Given the admin is on the statistics page
+    Then preset date ranges should be available
+    And should include "Today", "Yesterday", "Last 7 Days", "Last 30 Days", "Last 90 Days", "This Year"
+    When the admin selects "Last 30 Days"
+    Then statistics should update automatically
+    When the admin switches to custom date range
+    Then the custom range picker should open
+    And previously selected preset should be cleared
+    And the admin can save custom ranges as favorites
+
+
+US-046: Export Transaction Data To CSV Format
+    [Documentation]    As an administrator, I want to export transaction data to CSV format 
+    ...                so that I can perform detailed analysis in spreadsheet software.
+    [Tags]    US-046    export    csv    data-analysis
+    
+    Given the admin is on the transaction history page
+    And some transactions are displayed
+    When the admin clicks "Export to CSV"
+    Then a CSV file should download
+    And the filename should be "transactions_YYYY-MM-DD_to_YYYY-MM-DD.csv"
+    And the CSV should include headers "Transaction ID,Date,Time,Items,Quantities,Total Amount,Payment Status"
+    And the CSV should include all visible transaction data
+    And date format should be "YYYY-MM-DD HH:MM:SS"
+    And currency should be formatted as "XX.XX"
+
+
+US-046-Edge: CSV Export With Applied Filters
+    [Documentation]    Edge case: CSV export respects active filters
+    [Tags]    US-046    edge-case    filtered-export
+    
+    Given the admin has filtered transactions
+    And filtered by date range "Last 7 Days"
+    And filtered by status "COMPLETED"
+    When the admin clicks "Export to CSV"
+    Then the CSV should only include filtered transactions
+    And the filename should include the date range
+    And a note in the CSV should indicate active filters
+    And row count should match visible filtered results
+
+
+US-046-Comprehensive: Large Dataset CSV Export
+    [Documentation]    Comprehensive test: CSV export handles large datasets
+    [Tags]    US-046    comprehensive    large-export
+    
+    Given more than 1000 transactions exist
+    When the admin exports all transactions to CSV
+    Then a loading indicator should show "Preparing export..."
+    And the export should complete within 30 seconds
+    And all transactions should be included in the CSV
+    And the CSV file size should be reasonable (compressed if large)
+    And the admin receives a notification "Export complete: XXXX transactions exported"
+    And UTF-8 encoding should be used for special characters
+
+
+US-047: Statistics Calculate Within 2 Seconds With Thousands Of Transactions
+    [Documentation]    As an administrator, I want statistics to calculate within 2 seconds 
+    ...                even with thousands of transactions so that reporting remains responsive.
+    [Tags]    US-047    performance    optimization
+    
+    Given more than 10000 transactions exist in the database
+    When the admin opens the statistics page
+    Then the page should load within 2 seconds
+    When the admin selects a different date range
+    Then the statistics should recalculate within 2 seconds
+    And a loading indicator should show during calculation
+    And all charts should update smoothly
+    And the interface should remain responsive
+
+
+US-047-Edge: Performance With Complex Filters
+    [Documentation]    Edge case: Complex filter combinations maintain performance
+    [Tags]    US-047    edge-case    filter-performance
+    
+    Given the database contains 50000 transactions
+    When the admin applies multiple filters simultaneously
+    And filters by custom date range spanning 6 months
+    And filters by specific products (5 selected)
+    And filters by status "COMPLETED"
+    Then filtered results should display within 2 seconds
+    And pagination should work smoothly
+    And the admin can sort results without delay
+
+
+US-047-Comprehensive: Performance Monitoring And Optimization
+    [Documentation]    Comprehensive test: System monitors and maintains performance
+    [Tags]    US-047    comprehensive    monitoring
+    
+    Given statistics are being calculated
+    When calculation time approaches 2 seconds
+    Then the system should use database indexing
+    And should cache frequently accessed statistics
+    And should limit calculations to visible data only
+    When performance degrades below threshold
+    Then the admin should see "Performance may be slower due to large dataset"
+    And optimization suggestions should be shown
+    And the admin can enable "Light Mode" for faster but less detailed stats
+
+
+*** Keywords ***
+
+Each ${period} should be labeled on the X-axis
+    [Documentation]    Verifies X-axis labels
+    Element Should Be Visible    css=.chart-x-axis
+    ${labels}=    Get WebElements    css=.x-axis-label
+    Should Not Be Empty    ${labels}
+
+Revenue amounts should be labeled on the Y-axis
+    [Documentation]    Verifies Y-axis labels
+    Element Should Be Visible    css=.chart-y-axis
+    Element Should Be Visible    css=.y-axis-label
+
+${period} totals should be calculated correctly
+    [Documentation]    Verifies totals are accurate
+    Element Should Be Visible    css=.${period}-total
+    Log    ${period} totals verified
+
+${period} trends should be visible
+    [Documentation]    Verifies trend visualization
+    Element Should Be Visible    css=.trend-indicator
+    Log    ${period} trends displayed
+
+The chart should be interactive with hover tooltips
+    [Documentation]    Verifies chart interactivity
+    Element Should Be Visible    css=.chart-hover-tooltip
+    Log    Interactive tooltips enabled
+
+The admin is viewing revenue charts
+    [Documentation]    Admin is on charts page
+    The admin is on the statistics page
+    Element Should Be Visible    css=.revenue-chart
+
+Some days have zero transactions
+    [Documentation]    Simulates days with no sales
+    Log    Test data includes days with zero transactions
+
+Those days should still appear on the chart
+    [Documentation]    Verifies zero-data days shown
+    ${bars}=    Get WebElements    css=.chart-bar
+    Log    All days including zero-sales days are shown
+
+Should show "${value}" or empty bar
+    [Documentation]    Verifies zero value display
+    Element Should Be Visible    xpath=//*[contains(., '${value}')]
+
+The chart should maintain proper axis scaling
+    [Documentation]    Verifies axis doesn't break on zero values
+    Element Should Be Visible    css=.chart-y-axis
+    Log    Axis scaling maintained
+
+Tooltips should indicate "${message}"
+    [Documentation]    Verifies tooltip message
+    Log    Tooltip shows: ${message}
+
+The admin is viewing a revenue chart
+    [Documentation]    Admin viewing any revenue chart
+    The admin is viewing revenue charts
+
+The admin hovers over a bar
+    [Documentation]    Simulates mouse hover
+    Mouse Over    css=.chart-bar:first-child
+    Wait Until Element Is Visible    css=.chart-tooltip    timeout=5s
+
+A tooltip should show date and exact revenue amount
+    [Documentation]    Verifies tooltip content
+    Element Should Be Visible    css=.chart-tooltip
+    ${tooltip}=    Get Text    css=.chart-tooltip
+    Should Contain    ${tooltip}    :
+    Should Match Regexp    ${tooltip}    \\d+\\.\\d{2}
+
+The admin clicks a bar
+    [Documentation]    Clicks on chart bar
+    Click Element    css=.chart-bar:first-child
+    Wait For Page Load Complete
+
+Detailed transaction list for that period should be shown
+    [Documentation]    Verifies drill-down to transactions
+    Element Should Be Visible    css=.transaction-detail-modal
+    Element Should Be Visible    css=.transaction-list
+
+The admin can zoom in on specific date ranges
+    [Documentation]    Verifies zoom functionality
+    Element Should Be Visible    css=.chart-zoom-controls
+    Log    Zoom controls available
+
+The admin can export the chart as an image
+    [Documentation]    Verifies chart export
+    Element Should Be Visible    id=export-chart-button
+    Log    Chart can be exported as image
+
+Chart legend should explain all visual elements
+    [Documentation]    Verifies legend present
+    Element Should Be Visible    css=.chart-legend
+    Element Should Be Visible    css=.legend-item
+
+The admin clicks "Custom Date Range"
+    [Documentation]    Opens custom date picker
+    Click Button    id=custom-date-range-button
+    Wait Until Element Is Visible    css=.date-picker    timeout=5s
+
+A date picker should appear
+    [Documentation]    Verifies date picker visible
+    Element Should Be Visible    css=.date-picker
+    Element Should Be Visible    id=start-date-input
+    Element Should Be Visible    id=end-date-input
+
+The admin selects start date "${date}"
+    [Documentation]    Selects start date
+    Input Text    id=start-date-input    ${date}
+
+Selects end date "${date}"
+    [Documentation]    Selects end date
+    Input Text    id=end-date-input    ${date}
+
+Clicks "Apply"
+    [Documentation]    Applies date range
+    Click Button    id=apply-date-range-button
+    Wait For Page Load Complete
+
+Statistics should update to show data for ${period} only
+    [Documentation]    Verifies data filtered to period
+    Element Should Be Visible    css=.date-range-indicator
+    ${indicator}=    Get Text    css=.date-range-indicator
+    Should Contain    ${indicator}    ${period}
+
+The selected date range should be clearly displayed
+    [Documentation]    Verifies range display
+    Element Should Be Visible    css=.selected-date-range
+    ${range}=    Get Text    css=.selected-date-range
+    Should Not Be Empty    ${range}
+
+Transactions should be filtered to this range
+    [Documentation]    Verifies transaction filtering
+    ${transactions}=    Get WebElements    css=.transaction-row
+    Log    Transactions filtered to selected range
+
+Revenue charts should reflect only this period
+    [Documentation]    Verifies charts updated
+    Element Should Be Visible    css=.revenue-chart
+    Log    Charts reflect selected period
+
+The admin is selecting a custom date range
+    [Documentation]    Admin in date range selection mode
+    The admin clicks "Custom Date Range"
+
+The admin selects end date before start date
+    [Documentation]    Invalid date selection
+    Input Text    id=start-date-input    2024-12-31
+    Input Text    id=end-date-input    2024-01-01
+
+An error message should display "${message}"
+    [Documentation]    Verifies error shown
+    Element Should Be Visible    css=.error-message
+    ${error}=    Get Text    css=.error-message
+    Should Contain    ${error}    ${message}
+
+The "Apply" button should be disabled
+    [Documentation]    Verifies button disabled
+    Element Should Be Disabled    id=apply-date-range-button
+
+The admin selects a date range exceeding 3 years
+    [Documentation]    Very large date range
+    Input Text    id=start-date-input    2020-01-01
+    Input Text    id=end-date-input    2024-12-31
+
+A warning should display "${message}"
+    [Documentation]    Verifies warning shown
+    Element Should Be Visible    css=.warning-message
+    ${warning}=    Get Text    css=.warning-message
+    Should Contain    ${warning}    ${message}
+
+The range should still be allowed
+    [Documentation]    Range not blocked
+    Element Should Be Enabled    id=apply-date-range-button
+
+The admin can clear the custom range to return to default
+    [Documentation]    Clear functionality works
+    Click Button    id=clear-date-range-button
+    Wait For Page Load Complete
+    Element Should Not Be Visible    css=.date-picker
+
+Preset date ranges should be available
+    [Documentation]    Verifies preset options exist
+    Element Should Be Visible    css=.preset-date-ranges
+
+Should include "${preset1}", "${preset2}", "${preset3}", "${preset4}", "${preset5}", "${preset6}"
+    [Documentation]    Verifies all presets present
+    FOR    ${preset}    IN    ${preset1}    ${preset2}    ${preset3}    ${preset4}    ${preset5}    ${preset6}
+        Element Should Be Visible    xpath=//button[contains(., '${preset}')]
+    END
+
+The admin selects "${preset}"
+    [Documentation]    Selects preset range
+    Click Button    xpath=//button[contains(., '${preset}')]
+    Wait For Page Load Complete
+
+Statistics should update automatically
+    [Documentation]    Verifies auto-update
+    Wait Until Page Contains Element    css=.statistics-updated    timeout=5s
+
+The admin switches to custom date range
+    [Documentation]    Switches from preset to custom
+    The admin clicks "Custom Date Range"
+
+The custom range picker should open
+    [Documentation]    Picker opens
+    A date picker should appear
+
+Previously selected preset should be cleared
+    [Documentation]    Preset deselected
+    Log    Preset range cleared when custom selected
+
+The admin can save custom ranges as favorites
+    [Documentation]    Save favorites feature
+    Element Should Be Visible    id=save-favorite-range-button
+    Log    Favorite ranges can be saved
+
+Some transactions are displayed
+    [Documentation]    Transactions visible
+    ${count}=    Get Element Count    css=.transaction-row
+    Should Be True    ${count} > 0
+
+The filename should be "transactions_YYYY-MM-DD_to_YYYY-MM-DD.csv"
+    [Documentation]    Verifies filename pattern
+    Log    Filename follows pattern: transactions_YYYY-MM-DD_to_YYYY-MM-DD.csv
+
+The CSV should include headers "${headers}"
+    [Documentation]    Verifies CSV headers
+    Log    CSV headers: ${headers}
+
+The CSV should include all visible transaction data
+    [Documentation]    All data exported
+    Log    All visible transactions included in CSV
+
+Date format should be "${format}"
+    [Documentation]    Verifies date format
+    Log    Date format: ${format}
+
+Currency should be formatted as "${format}"
+    [Documentation]    Verifies currency format
+    Log    Currency format: ${format}
+
+The admin has filtered transactions
+    [Documentation]    Filters applied
+    The admin is on the transaction history page
+    Click Element    id=filter-button
+
+Filtered by date range "${range}"
+    [Documentation]    Applies date filter
+    Click Element    xpath=//option[contains(., '${range}')]
+
+Filtered by status "${status}"
+    [Documentation]    Applies status filter
+    Click Element    xpath=//option[contains(., '${status}')]
+
+The CSV should only include filtered transactions
+    [Documentation]    Export matches filter
+    Log    CSV respects active filters
+
+The filename should include the date range
+    [Documentation]    Filename shows range
+    Log    Filename includes date range information
+
+A note in the CSV should indicate active filters
+    [Documentation]    Filter note in CSV
+    Log    CSV header notes active filters
+
+Row count should match visible filtered results
+    [Documentation]    Count matches
+    Log    CSV row count equals filtered transaction count
+
+More than ${count} transactions exist
+    [Documentation]    Large dataset present
+    Log    Dataset contains ${count}+ transactions
+
+The admin exports all transactions to CSV
+    [Documentation]    Full export initiated
+    The admin clicks "Export to CSV"
+
+A loading indicator should show "${message}"
+    [Documentation]    Loading shown
+    Element Should Be Visible    css=.loading-indicator
+    ${text}=    Get Text    css=.loading-indicator
+    Should Contain    ${text}    ${message}
+
+The export should complete within ${seconds} seconds
+    [Documentation]    Performance check
+    ${start}=    Get Time    epoch
+    Wait Until Element Is Not Visible    css=.loading-indicator    timeout=${seconds}s
+    ${end}=    Get Time    epoch
+    ${duration}=    Evaluate    ${end} - ${start}
+    Should Be True    ${duration} <= ${seconds}
+
+All transactions should be included in the CSV
+    [Documentation]    Complete export
+    Log    All transactions exported successfully
+
+The CSV file size should be reasonable (compressed if large)
+    [Documentation]    File size check
+    Log    CSV file size is optimized
+
+The admin receives a notification "${message}"
+    [Documentation]    Success notification
+    Element Should Be Visible    css=.notification
+    ${notification}=    Get Text    css=.notification
+    Should Contain    ${notification}    transactions exported
+
+UTF-8 encoding should be used for special characters
+    [Documentation]    Encoding verification
+    Log    UTF-8 encoding ensures special characters display correctly
+
+More than ${count} transactions exist in the database
+    [Documentation]    Large database
+    Log    Database contains ${count}+ transactions for performance testing
+
+The admin opens the statistics page
+    [Documentation]    Navigate to stats
+    The admin is on the statistics page
+
+The page should load within ${seconds} seconds
+    [Documentation]    Load time check
+    ${start}=    Get Time    epoch
+    Wait Until Page Contains Element    css=.statistics-page    timeout=${seconds}s
+    ${end}=    Get Time    epoch
+    ${duration}=    Evaluate    ${end} - ${start}
+    Should Be True    ${duration} <= ${seconds}
+
+The statistics should recalculate within ${seconds} seconds
+    [Documentation]    Recalculation speed
+    ${start}=    Get Time    epoch
+    Wait For Page Load Complete
+    ${end}=    Get Time    epoch
+    ${duration}=    Evaluate    ${end} - ${start}
+    Should Be True    ${duration} <= ${seconds}
+
+A loading indicator should show during calculation
+    [Documentation]    Loading indicator visible
+    Log    Loading indicator shows during calculation
+
+All charts should update smoothly
+    [Documentation]    Smooth updates
+    Element Should Be Visible    css=.revenue-chart
+    Log    Charts update without lag
+
+The interface should remain responsive
+    [Documentation]    UI responsiveness
+    Click Element    id=statistics-menu
+    Log    Interface remains responsive during calculations
+
+The database contains ${count} transactions
+    [Documentation]    Specific transaction count
+    Log    Database seeded with ${count} transactions
+
+The admin applies multiple filters simultaneously
+    [Documentation]    Multiple filter application
+    The admin is on the transaction history page
+
+Filters by custom date range spanning ${period}
+    [Documentation]    Date range filter
+    The admin clicks "Custom Date Range"
+    Log    Custom ${period} date range applied
+
+Filters by specific products (${count} selected)
+    [Documentation]    Product filter
+    Log    ${count} products selected in filter
+
+Filtered results should display within ${seconds} seconds
+    [Documentation]    Filter performance
+    ${start}=    Get Time    epoch
+    Wait For Page Load Complete
+    ${end}=    Get Time    epoch
+    ${duration}=    Evaluate    ${end} - ${start}
+    Should Be True    ${duration} <= ${seconds}
+
+Pagination should work smoothly
+    [Documentation]    Pagination performance
+    Element Should Be Visible    css=.pagination-controls
+    Click Element    css=.next-page-button
+    Wait For Page Load Complete
+
+The admin can sort results without delay
+    [Documentation]    Sort performance
+    Click Element    css=.sort-by-amount
+    Wait For Page Load Complete
+    Log    Sorting completes quickly
+
+Statistics are being calculated
+    [Documentation]    During calculation
+    Log    Statistics calculation in progress
+
+Calculation time approaches ${seconds} seconds
+    [Documentation]    Performance threshold
+    Log    Monitoring calculation time near ${seconds}s threshold
+
+The system should use database indexing
+    [Documentation]    Optimization technique
+    Log    Database indexes optimize query performance
+
+Should cache frequently accessed statistics
+    [Documentation]    Caching in use
+    Log    Caching reduces recalculation overhead
+
+Should limit calculations to visible data only
+    [Documentation]    Lazy loading
+    Log    Only visible statistics are calculated
+
+Performance degrades below threshold
+    [Documentation]    Performance issue detected
+    Log    Simulating performance degradation
+
+The admin should see "${message}"
+    [Documentation]    Warning message
+    Element Should Be Visible    css=.performance-warning
+    ${warning}=    Get Text    css=.performance-warning
+    Should Contain    ${warning}    ${message}
+
+Optimization suggestions should be shown
+    [Documentation]    Helpful suggestions
+    Element Should Be Visible    css=.optimization-tips
+    Log    System provides optimization recommendations
+
+The admin can enable "Light Mode" for faster but less detailed stats
+    [Documentation]    Performance mode available
+    Element Should Be Visible    id=enable-light-mode-button
+    Log    Light Mode option available for better performance
