@@ -15,7 +15,7 @@ Comprehensive Robot Framework acceptance test suite created for the Snackbar Sel
 
 ### Test Coverage
 
-#### Total Test Cases: **109 tests** **UPDATED**
+#### Total Test Cases: **124 tests** **UPDATED**
 - ✅ All tests pass syntax validation (`robot --dryrun`)
 - ✅ Gherkin-style (Given-When-Then) format
 - ✅ Comprehensive edge case coverage
@@ -30,14 +30,14 @@ Comprehensive Robot Framework acceptance test suite created for the Snackbar Sel
 6. **admin_category_management.robot** - 9 tests (US-029 to US-031)
 7. **admin_inventory_management.robot** - 7 tests (US-032 to US-038)
 8. **admin_transactions_statistics.robot** - 27 tests (US-039 to US-047)
-9. **admin_system_configuration.robot** - 15 tests (US-048 to US-052) **UPDATED**
-10. **admin_monitoring_troubleshooting.robot** - 3 tests (US-053) **NEW**
+9. **admin_system_configuration.robot** - 15 tests (US-048 to US-052)
+10. **admin_monitoring_troubleshooting.robot** - 18 tests (US-053 to US-058) **UPDATED**
 
 #### By Priority:
-- **High Priority User Stories**: 53 user stories covered **UPDATED**
-- **Medium Priority User Stories**: 18 user stories covered (US-021, US-022, US-026, US-029-031, US-044-053) **UPDATED**
-- **Edge Cases**: 41 additional edge case tests **UPDATED**
-- **Performance Tests**: QR generation (<1s), filter response (<300ms), sync (<5s), statistics (<2s), CSV export (<30s), log export (<10s) **UPDATED**
+- **High Priority User Stories**: 58 user stories covered **UPDATED**
+- **Medium Priority User Stories**: 23 user stories covered (US-021, US-022, US-026, US-029-031, US-044-058) **UPDATED**
+- **Edge Cases**: 47 additional edge case tests **UPDATED**
+- **Performance Tests**: QR generation (<1s), kiosk UI updates (<300ms), filter response (<300ms), sync (<5s), statistics (<2s), CSV export (<30s), log export (<10s) **UPDATED**
 - **Security Tests**: Authentication, session timeout, password hashing verification, audit immutability
 - **Accessibility Tests**: WCAG AA compliance, touch target validation, font size verification
 - **Compliance Tests**: Data retention (3 years), GDPR compliance (anonymous transactions)
@@ -97,9 +97,16 @@ Comprehensive Robot Framework acceptance test suite created for the Snackbar Sel
 ✅ US-048: Configure operating hours **NEW**
 ✅ US-049: Enable maintenance mode **NEW**
 ✅ US-050: Configure notification email addresses **NEW**
-✅ US-051: Email notifications for critical events **NEW**
-✅ US-052: View real-time kiosk status **NEW**
-✅ US-053: View error logs through web portal **NEW**
+✅ US-051: Email notifications for critical events
+✅ US-052: View real-time kiosk status
+✅ US-053: View error logs through web portal
+✅ US-054: Database storage capacity notification **NEW**
+✅ US-055: Automated backup confirmation notifications **NEW**
+✅ US-056: Test email notifications on demand **NEW**
+
+### System/Technical Stories (6 tests) **NEW**
+✅ US-057: QR code generation performance (<1 second) **NEW**
+✅ US-058: Kiosk display update performance (<300ms) **NEW**
 
 ## Test Infrastructure
 
