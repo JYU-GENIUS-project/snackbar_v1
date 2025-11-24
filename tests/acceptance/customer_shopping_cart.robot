@@ -365,7 +365,7 @@ Get Product Quantity In Cart
     ...    xpath=//div[@data-product-name='${product_name}']//span[@class='quantity-value']
     ${qty}=    Get Text    ${qty_element}
     Press Keys    None    ESCAPE
-    [Return]    ${qty}
+    RETURN    ${qty}
 
 Get Product Subtotal In Cart
     [Arguments]    ${product_name}
@@ -376,7 +376,7 @@ Get Product Subtotal In Cart
     ...    xpath=//div[@data-product-name='${product_name}']//span[@class='item-subtotal']
     ${subtotal}=    Get Text    ${subtotal_element}
     Press Keys    None    ESCAPE
-    [Return]    ${subtotal}
+    RETURN    ${subtotal}
 
 Click Plus Button For Product
     [Arguments]    ${product_name}
