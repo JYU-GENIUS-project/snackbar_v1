@@ -11,6 +11,7 @@ Documentation       System Integration & Communication User Stories (US-064 to U
 
 Library             SeleniumLibrary
 Resource            ../resources/common.robot
+Resource            ../resources/system_integration_keywords.robot
 
 Suite Setup         Setup Test Environment
 Suite Teardown      Teardown Test Environment
