@@ -12,11 +12,15 @@ This repository contains requirements engineering documentation and automated ac
 - **[Test Cases](reqeng/Test_Cases_v1.1.md)** - Comprehensive test cases for all requirements
 
 ### Automated Acceptance Tests
-- **[Robot Framework Tests](tests/)** - 37 automated acceptance tests in Robot Framework format
-  - Customer user stories (21 tests)
-  - Administrator user stories (16 tests)
-  - Edge cases, performance, and security tests
+- **[Robot Framework Tests](tests/)** - 160 automated acceptance tests in Robot Framework format across 12 test suites
+  - Customer user stories (30 tests): Product browsing, shopping cart, payment/checkout, system status
+  - Administrator user stories (100 tests): Authentication, product/category/inventory management, transactions, statistics, system configuration, monitoring
+  - System/technical user stories (30 tests): Performance, security, integration, and communication
+  - Edge cases, performance, accessibility, and security tests included
   - See [Test Summary](tests/TEST_SUMMARY.md) for details
+
+### Audits & Compliance
+- **[Traceability Audit Report](docs/audits/traceability_audit_report.md)** - 100% coverage audit confirming all 68 user stories have corresponding test cases
 
 ## Technology Stack
 - **Backend**: Node.js 24.11 LTS with Express.js 5.1
@@ -50,7 +54,8 @@ See [tests/README.md](tests/README.md) for detailed testing documentation.
 - ✅ Requirements documentation complete (v1.2)
 - ✅ User stories defined (68 stories)
 - ✅ Test cases documented (180+ test cases)
-- ✅ Automated acceptance tests created (37 tests)
+- ✅ Automated acceptance tests created (160 tests across 12 test suites)
+- ✅ Traceability audit completed (100% coverage - all 68 user stories covered)
 - 🚧 Implementation in progress
 
 ## License
