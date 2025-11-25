@@ -12,10 +12,10 @@ This repository contains requirements engineering documentation and automated ac
 - **[Test Cases](reqeng/Test_Cases_v1.1.md)** - Comprehensive test cases for all requirements
 
 ### Automated Acceptance Tests
-- **[Robot Framework Tests](tests/)** - 139 automated acceptance tests in Robot Framework format across 12 test suites
+- **[Robot Framework Tests](tests/)** - 160 automated acceptance tests in Robot Framework format across 12 test suites
   - Customer user stories (30 tests): Product browsing, shopping cart, payment/checkout, system status
-  - Administrator user stories (94 tests): Authentication, product/category/inventory management, transactions, statistics, system configuration, monitoring
-  - System/technical user stories (15 tests): Performance, security, integration, and communication
+  - Administrator user stories (100 tests): Authentication, product/category/inventory management, transactions, statistics, system configuration, monitoring
+  - System/technical user stories (30 tests): Performance, security, integration, and communication
   - Edge cases, performance, accessibility, and security tests included
   - See [Test Summary](tests/TEST_SUMMARY.md) for details
 
@@ -54,7 +54,7 @@ See [tests/README.md](tests/README.md) for detailed testing documentation.
 - ✅ Requirements documentation complete (v1.2)
 - ✅ User stories defined (68 stories)
 - ✅ Test cases documented (180+ test cases)
-- ✅ Automated acceptance tests created (139 tests across 12 test suites)
+- ✅ Automated acceptance tests created (160 tests across 12 test suites)
 - ✅ Traceability audit completed (100% coverage - all 68 user stories covered)
 - 🚧 Implementation in progress
 
