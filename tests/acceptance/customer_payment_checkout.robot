@@ -31,7 +31,7 @@ US-012: Pay Using MobilePay By Scanning QR Code
     When the customer scans the QR code with MobilePay
     And completes the payment in MobilePay
     Then the kiosk should receive payment confirmation
-    And a success message should be displayed
+    And payment success message should be displayed
     And the transaction should be logged as COMPLETED
 
 
@@ -104,18 +104,6 @@ Setup Payment Test
     Wait For Page Load Complete
     Clear Shopping Cart If Not Empty
 
-Clear Shopping Cart If Not Empty
-    [Documentation]    Clears cart if it contains items
-    ${has_items}=    Run Keyword And Return Status    
-    ...    Element Should Be Visible    id=cart-badge
-    IF    ${has_items}
-        ${count}=    Get Text    id=cart-badge
-        ${num}=    Convert To Integer    ${count}
-        IF    ${num} > 0
-            Clear Shopping Cart
-        END
-    END
-
 The cart contains items totaling ${total}€
     [Documentation]    Sets up cart with items totaling specified amount
     # Add items to reach desired total
@@ -178,8 +166,8 @@ The kiosk should receive payment confirmation
     [Documentation]    Verifies kiosk received payment confirmation
     Wait Until Element Is Visible    id=payment-success-message    timeout=10s
 
-A success message should be displayed
-    [Documentation]    Verifies success message appears
+Payment Success Message Should Be Displayed
+    [Documentation]    Verifies payment success message appears
     Element Should Be Visible    id=payment-success-message
 
 The transaction should be logged as COMPLETED

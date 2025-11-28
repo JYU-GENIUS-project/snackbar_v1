@@ -433,12 +433,6 @@ Transactions should show transaction ID, date, items, quantities, amount, status
     Page Should Contain Element    css=th:contains('Amount')
     Page Should Contain Element    css=th:contains('Status')
 
-The admin filters by date range
-    [Documentation]    Applies date range filter
-    Click Element    id=date-range-filter
-    Click Element    css=option[value='last-30-days']
-    Wait For Page Load Complete
-
 Only transactions within that range should be shown
     [Documentation]    Verifies filtered results
     # Would verify dates are within range
@@ -711,12 +705,6 @@ The admin attempts to reconcile without notes
     Selects "Confirmed" as the resolution
     Clicks "Save Reconciliation"
 
-An error should indicate "${message}"
-    [Documentation]    Verifies validation error
-    Wait Until Element Is Visible    css=.error-message    timeout=5s
-    ${error}=    Get Text    css=.error-message
-    Should Contain    ${error}    ${message}
-
 The admin enters notes with only ${count} characters
     [Documentation]    Enters short notes
     ${short_notes}=    Evaluate    'AB'
@@ -732,11 +720,6 @@ The reconciliation should be accepted
     [Documentation]    Verifies successful reconciliation
     Clicks "Save Reconciliation"
     Wait Until Page Contains    Reconciliation saved    timeout=5s
-
-The admin is on system configuration page
-    [Documentation]    Navigates to system config
-    Click Element    id=settings-menu
-    Wait Until Page Contains Element    id=system-configuration-page    timeout=10s
 
 The data retention policy should be displayed
     [Documentation]    Verifies retention policy shown
@@ -912,10 +895,6 @@ Number of transactions should be shown
 Average transaction value should be calculated
     [Documentation]    Verifies average shown
     Element Should Be Visible    id=average-transaction-value
-
-The admin clicks "Export to CSV"
-    [Documentation]    Initiates CSV export
-    Click Button    id=export-csv-button
 
 A CSV file should be downloaded
     [Documentation]    Verifies download initiated
@@ -1194,12 +1173,6 @@ The admin selects a date range exceeding 3 years
     [Documentation]    Very large date range
     Input Text    id=start-date-input    2020-01-01
     Input Text    id=end-date-input    2024-12-31
-
-A warning should display "${message}"
-    [Documentation]    Verifies warning shown
-    Element Should Be Visible    css=.warning-message
-    ${warning}=    Get Text    css=.warning-message
-    Should Contain    ${warning}    ${message}
 
 The range should still be allowed
     [Documentation]    Range not blocked

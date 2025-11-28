@@ -174,12 +174,6 @@ The category should appear in the category list
     Wait Until Page Contains Element    css=.category-list-item:contains('Energy Drinks')    timeout=5s
     Element Should Be Visible    css=.category-list-item
 
-A success message should be displayed
-    [Documentation]    Verifies success message
-    Element Should Be Visible    id=success-message
-    ${message}=    Get Text    id=success-message
-    Should Contain    ${message}    created successfully
-
 The category should be available for product assignment
     [Documentation]    Verifies category can be used for products
     Click Element    id=products-menu
@@ -195,13 +189,6 @@ The admin is creating a new category
 The admin enters an empty category name
     [Documentation]    Leaves category name empty
     Clear Element Text    id=category-name-input
-
-An error should indicate "${message}"
-    [Documentation]    Verifies validation error message
-    Click Button    id=save-category-button
-    Wait Until Element Is Visible    id=category-name-error    timeout=5s
-    ${error}=    Get Text    id=category-name-error
-    Should Contain    ${error}    ${message}
 
 The admin enters a name with ${count} characters
     [Documentation]    Enters name of specific length
@@ -261,11 +248,6 @@ Changes the name to "${new_name}"
     Clear Element Text    id=category-name-input
     Input Text    id=category-name-input    ${new_name}
 
-Clicks "Save Changes"
-    [Documentation]    Saves category edit
-    Click Button    id=save-category-button
-    Wait Until Page Contains    Category updated    timeout=5s
-
 The category name should be updated to "${name}"
     [Documentation]    Verifies category renamed
     Page Should Contain Element    xpath=//tr[contains(., '${name}')]
@@ -278,10 +260,6 @@ The admin clicks "Delete" for "${name}"
     [Documentation]    Clicks delete button for category
     Click Element    xpath=//tr[contains(., '${name}')]//button[contains(., 'Delete')]
     Wait Until Element Is Visible    id=confirm-delete-dialog    timeout=5s
-
-Confirms the deletion
-    [Documentation]    Confirms deletion in dialog
-    Click Button    id=confirm-delete-button
 
 The category should be deleted
     [Documentation]    Verifies category deleted
@@ -303,11 +281,6 @@ The admin attempts to delete "${name}"
 The deletion should be prevented
     [Documentation]    Verifies deletion blocked
     Wait Until Element Is Visible    id=delete-error-dialog    timeout=5s
-
-A warning should display "${message}"
-    [Documentation]    Verifies specific warning message
-    ${warning}=    Get Text    id=delete-error-dialog
-    Should Contain    ${warning}    ${message}
 
 The message should advise "${advice}"
     [Documentation]    Verifies advisory message
@@ -363,11 +336,6 @@ The admin selects category "${category_name}"
 Also selects category "${category_name}"
     [Documentation]    Selects additional category
     The admin selects category "${category_name}"
-
-Saves the product
-    [Documentation]    Saves product form
-    Click Button    id=save-product-button
-    Wait Until Page Contains    Product saved    timeout=5s
 
 The product should be assigned to all ${count} categories
     [Documentation]    Verifies multiple category assignments

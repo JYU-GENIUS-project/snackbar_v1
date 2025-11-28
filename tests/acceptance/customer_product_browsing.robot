@@ -121,11 +121,6 @@ Navigate To Kiosk Home
     Go To    ${KIOSK_URL}
     Wait For Page Load Complete
 
-The kiosk is operational
-    [Documentation]    Verifies kiosk is in operational state
-    Page Should Contain Element    id=product-grid
-    Element Should Be Visible    id=product-grid
-
 The customer views the home screen
     [Documentation]    Customer is on the home screen viewing products
     Wait Until Page Contains Element    id=product-grid    timeout=10s
@@ -271,11 +266,6 @@ The product should still be selectable
     [Documentation]    Verifies product can still be added to cart
     Element Should Be Visible    id=add-to-cart-button
     Element Should Be Enabled    id=add-to-cart-button
-
-Inventory tracking is enabled
-    [Documentation]    Precondition: Inventory tracking is on
-    # This would be verified through admin settings or API
-    Log    Assuming inventory tracking is enabled
 
 A product has stock quantity of zero
     [Documentation]    Precondition: Out-of-stock product exists

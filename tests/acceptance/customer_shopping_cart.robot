@@ -116,23 +116,6 @@ Setup Cart Test
     Wait For Page Load Complete
     Clear Shopping Cart If Not Empty
 
-The kiosk is operational
-    [Documentation]    Verifies kiosk is in operational state
-    Page Should Contain Element    id=product-grid
-    Element Should Be Visible    id=product-grid
-
-Clear Shopping Cart If Not Empty
-    [Documentation]    Clears cart if it contains items
-    ${cart_count}=    Run Keyword And Return Status    
-    ...    Page Should Contain Element    id=cart-badge
-    IF    ${cart_count}
-        ${badge_text}=    Get Text    id=cart-badge
-        ${count}=    Convert To Integer    ${badge_text}
-        IF    ${count} > 0
-            Clear Shopping Cart
-        END
-    END
-
 The customer adds "${product_name}" to the cart
     [Documentation]    Adds specified product to cart
     Add Product To Cart    ${product_name}
