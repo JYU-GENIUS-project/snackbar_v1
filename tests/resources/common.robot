@@ -202,9 +202,10 @@ The Admin Is On System Configuration Page
 
 The Admin Is Editing A Product
     [Documentation]    Opens any product for editing in admin portal
+    [Arguments]    ${product_name}=${TEST_PRODUCT_NAME}
     Click Element    id=products-menu
     Wait Until Element Is Visible    id=product-list    timeout=10s
-    Click Element    xpath=//tr[contains(., '${TEST_PRODUCT_NAME}')]//button[contains(., 'Edit')]
+    Click Element    xpath=//tr[contains(., '${product_name}')]//button[contains(., 'Edit')]
     Wait Until Element Is Visible    id=product-form    timeout=5s
 
 Saves The Product
