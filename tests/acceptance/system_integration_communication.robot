@@ -243,8 +243,4 @@ US-068: Comprehensive Payment Debug Information - Comprehensive Test
     And logs should be write-only and immutable (cannot be edited or deleted)
 
 *** Keywords ***
-Setup Test Environment
-    Log    Setting up test environment for integration and communication tests
-
-Teardown Test Environment
-    Log    Tearing down test environment for integration and communication tests
+# Using shared keywords from common.robot for Setup Test Environment and Teardown Test Environment

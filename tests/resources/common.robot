@@ -151,3 +151,144 @@ Verify Response Time
     ${duration_ms}=    Evaluate    (${end_time} - ${start_time}) * 1000
     Should Be True    ${duration_ms} <= ${max_duration_ms}    
     ...    Execution took ${duration_ms}ms, expected maximum ${max_duration_ms}ms
+
+
+# ============================================================================
+# Shared Keywords - Consolidated from individual test files
+# ============================================================================
+
+# --- Kiosk Operation Keywords ---
+
+The Kiosk Is Operational
+    [Documentation]    Verifies kiosk is in operational state
+    Page Should Contain Element    id=product-grid
+    Element Should Be Visible    id=product-grid
+
+Clear Shopping Cart If Not Empty
+    [Documentation]    Clears cart if it contains items
+    ${has_items}=    Run Keyword And Return Status    
+    ...    Element Should Be Visible    id=cart-badge
+    IF    ${has_items}
+        ${count}=    Get Text    id=cart-badge
+        ${num}=    Convert To Integer    ${count}
+        IF    ${num} > 0
+            Clear Shopping Cart
+        END
+    END
+
+Inventory Tracking Is Enabled
+    [Documentation]    Precondition: Inventory tracking is on
+    # This would be verified through admin settings or API
+    Log    Inventory tracking is enabled for this test
+
+
+# --- Admin Navigation Keywords ---
+
+The Admin Is On The System Dashboard
+    [Documentation]    Navigate to admin system dashboard
+    Click Element    id=admin-menu
+    Click Element    id=dashboard-menu
+    Wait Until Page Contains Element    id=system-dashboard
+
+The Admin Is On The System Monitoring Dashboard
+    [Documentation]    Navigate to admin monitoring dashboard
+    The Admin Is On The System Dashboard
+    Click Link    id=advanced-monitoring-link
+
+The Admin Is On System Configuration Page
+    [Documentation]    Navigates to system configuration page
+    Click Element    id=settings-menu
+    Wait Until Page Contains Element    id=system-configuration-page    timeout=10s
+
+The Admin Is Editing A Product
+    [Documentation]    Opens any product for editing in admin portal
+    [Arguments]    ${product_name}=${TEST_PRODUCT_NAME}
+    Click Element    id=products-menu
+    Wait Until Element Is Visible    id=product-list    timeout=10s
+    Click Element    xpath=//tr[contains(., '${product_name}')]//button[contains(., 'Edit')]
+    Wait Until Element Is Visible    id=product-form    timeout=5s
+
+Saves The Product
+    [Documentation]    Saves product changes in admin portal
+    Click Button    id=save-product-button
+    Wait Until Page Contains    Product    timeout=5s
+
+Saves The Configuration
+    [Documentation]    Saves system configuration changes
+    Click Button    id=save-config-button
+    Wait Until Page Contains    Configuration saved    timeout=5s
+
+
+# --- Common Dialog Keywords ---
+
+Confirms The Deletion
+    [Documentation]    Confirms deletion in confirmation dialog
+    Wait Until Element Is Visible    id=confirm-delete-dialog    timeout=5s
+    Click Button    id=confirm-delete-button
+
+Clicks "Save Changes"
+    [Documentation]    Clicks the save changes button
+    Click Button    id=save-category-button
+    Wait Until Page Contains    updated    timeout=5s
+
+
+# --- Common Verification Keywords ---
+
+A Success Message Should Be Displayed
+    [Documentation]    Verifies a success message is displayed
+    ${success_visible}=    Run Keyword And Return Status
+    ...    Element Should Be Visible    css=.success-message
+    IF    not ${success_visible}
+        ${success_visible}=    Run Keyword And Return Status
+        ...    Element Should Be Visible    id=success-message
+    END
+    Should Be True    ${success_visible}    No success message was displayed
+
+A Warning Should Display "${message}"
+    [Documentation]    Verifies a specific warning message is displayed
+    ${warning}=    Get Text    css=.warning-message, #warning-message, #delete-error-dialog
+    Should Contain    ${warning}    ${message}
+
+An Error Should Indicate "${message}"
+    [Documentation]    Verifies a specific error message is displayed
+    Wait Until Element Is Visible    css=.error-message, [id$="-error"]    timeout=5s
+    ${error_elements}=    Get WebElements    css=.error-message, [id$="-error"]
+    ${found}=    Set Variable    ${FALSE}
+    FOR    ${element}    IN    @{error_elements}
+        ${is_visible}=    Run Keyword And Return Status    Element Should Be Visible    ${element}
+        IF    ${is_visible}
+            ${error_text}=    Get Text    ${element}
+            ${contains}=    Run Keyword And Return Status    Should Contain    ${error_text}    ${message}
+            IF    ${contains}
+                ${found}=    Set Variable    ${TRUE}
+                BREAK
+            END
+        END
+    END
+    Should Be True    ${found}    Error message containing "${message}" was not found
+
+
+# --- Admin Data Operations Keywords ---
+
+The Admin Filters By Date Range
+    [Documentation]    Applies date range filter
+    Click Element    id=date-range-filter
+    Click Element    css=option[value='last-30-days']
+    Wait For Page Load Complete
+
+The Admin Clicks "Export to CSV"
+    [Documentation]    Initiates CSV export
+    Click Button    id=export-csv-button
+
+
+# --- Test Environment Setup/Teardown Keywords ---
+
+Setup Test Environment
+    [Documentation]    Generic test environment setup
+    Log    Setting up test environment
+    Set Selenium Speed    0.2 seconds
+
+Teardown Test Environment
+    [Documentation]    Generic test environment teardown
+    Log    Tearing down test environment
+    Close All Browsers

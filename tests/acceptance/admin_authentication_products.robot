@@ -430,10 +430,6 @@ The product should appear in the product list
     Wait Until Page Contains Element    id=product-list    timeout=10s
     Page Should Contain    Red Bull
 
-A success message should be displayed
-    [Documentation]    Verifies success feedback
-    Element Should Be Visible    css=.success-message
-
 The admin is adding a new product
     [Documentation]    Setup for image upload test
     The admin is on the product management page
@@ -550,11 +546,6 @@ A product exists that should be discontinued
 The admin clicks "Delete" for that product
     [Documentation]    Initiates product deletion
     Click Element    xpath=//tr[contains(., 'Old Product')]//button[contains(., 'Delete')]
-
-Confirms the deletion
-    [Documentation]    Confirms deletion in dialog
-    Wait Until Element Is Visible    id=confirm-delete-dialog    timeout=5s
-    Click Button    id=confirm-delete-button
 
 The product should be removed from the system
     [Documentation]    Verifies product deleted
@@ -905,23 +896,11 @@ Logs should be retained for at least 3 years
     Log    Audit log retention policy: minimum 3 years
 
 # US-026 Keywords
-The admin is editing a product
-    [Documentation]    Admin opens product edit form
-    Click Element    id=products-menu
-    Wait Until Element Is Visible    css=.product-list    timeout=5s
-    Click Element    css=.product-item:first-child .edit-button
-    Wait Until Element Is Visible    id=product-form    timeout=5s
-
 The admin sets purchase limit to ${limit}
     [Documentation]    Sets purchase limit for product
     Wait Until Element Is Visible    id=purchase-limit-input    timeout=5s
     Clear Element Text    id=purchase-limit-input
     Input Text    id=purchase-limit-input    ${limit}
-
-Saves the product
-    [Documentation]    Saves product changes
-    Click Button    id=save-product-button
-    Wait Until Page Contains    Product saved    timeout=5s
 
 The purchase limit should be saved
     [Documentation]    Verifies limit is persisted
@@ -989,8 +968,3 @@ The limit should be accepted
     [Documentation]    Verifies valid limit accepted
     Click Button    id=save-product-button
     Wait Until Page Contains    Product saved    timeout=5s
-
-An error should indicate "${message}"
-    [Documentation]    Verifies validation error message
-    ${error}=    Get Text    id=purchase-limit-error
-    Should Contain    ${error}    ${message}

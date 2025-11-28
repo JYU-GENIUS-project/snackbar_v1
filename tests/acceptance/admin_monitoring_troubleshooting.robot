@@ -39,7 +39,7 @@ US-053-Edge: Error Log Filtering And Export
     And searches for keyword "payment"
     Then only matching log entries should display
     And the filter count should show "X matching entries"
-    When the admin clicks "Export to CSV"
+    When the admin clicks "Export Logs to CSV"
     Then a CSV file should download with filtered logs
     And CSV should include all log fields
     And filename should include date range and filters applied
@@ -66,12 +66,6 @@ US-053-Comprehensive: Log Analysis And Trending
 
 
 *** Keywords ***
-The admin is on the system dashboard
-    [Documentation]    Navigate to dashboard
-    Click Element    id=admin-menu
-    Click Element    id=dashboard-menu
-    Wait Until Page Contains Element    id=system-dashboard
-
 The admin clicks "View Error Logs"
     [Documentation]    Opens error logs
     Click Button    id=view-error-logs-button
@@ -135,8 +129,8 @@ The filter count should show "${text}"
     [Documentation]    Result count display
     Element Should Contain    css=.filter-result-count    ${text}
 
-The admin clicks "Export to CSV"
-    [Documentation]    Export action
+The Admin Clicks "Export Logs to CSV"
+    [Documentation]    Export action for logs
     Click Button    id=export-logs-csv-button
 
 A CSV file should download with filtered logs
@@ -528,12 +522,6 @@ US-058-Comprehensive: Overall Kiosk Responsiveness
 
 
 # Additional Keywords for New Tests
-
-The admin is on the system monitoring dashboard
-    [Documentation]    Navigate to monitoring dashboard
-    Click Element    id=admin-menu
-    Click Element    id=monitoring-menu
-    Wait Until Page Contains Element    id=monitoring-dashboard
 
 The database storage reaches ${percentage}% capacity
     [Documentation]    Simulates storage reaching threshold

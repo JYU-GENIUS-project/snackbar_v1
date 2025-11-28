@@ -132,11 +132,6 @@ The admin toggles inventory tracking OFF
         Click Element    id=inventory-tracking-toggle
     END
 
-Saves the configuration
-    [Documentation]    Saves system configuration
-    Click Button    id=save-config-button
-    Wait Until Page Contains    Configuration saved    timeout=5s
-
 Inventory tracking should be disabled
     [Documentation]    Verifies inventory tracking is off
     ${checkbox}=    Get WebElement    id=inventory-tracking-toggle
@@ -253,22 +248,10 @@ The kiosk should show updated availability
     [Documentation]    Verifies kiosk reflects change
     Log    Kiosk reflects updated stock availability
 
-The admin is editing a product
-    [Documentation]    Opens product for editing
-    Click Element    id=products-menu
-    Wait Until Element Is Visible    id=product-list    timeout=10s
-    Click Element    xpath=//tr[contains(., 'Coca-Cola')]//button[contains(., 'Edit')]
-    Wait Until Element Is Visible    id=product-form    timeout=5s
-
 The admin sets low-stock threshold to ${threshold} units
     [Documentation]    Sets low-stock threshold
     Clear Element Text    id=low-stock-threshold
     Input Text    id=low-stock-threshold    ${threshold}
-
-Saves the product
-    [Documentation]    Saves product changes
-    Click Button    id=save-product-button
-    Wait Until Page Contains    Product updated    timeout=5s
 
 The threshold should be saved
     [Documentation]    Verifies threshold saved
@@ -322,11 +305,6 @@ A product has negative stock (${stock})
     [Documentation]    Precondition: Product with negative stock
     # Would set via API or database
     Log    Product stock: ${stock}
-
-Inventory tracking is enabled
-    [Documentation]    Precondition: Inventory tracking is on
-    # This would be verified through admin settings or API
-    Log    Inventory tracking is enabled for this test
 
 The admin views the inventory page
     [Documentation]    Views inventory management

@@ -34,7 +34,7 @@ US-048-Edge: Different Hours For Different Days
     When the admin sets weekday hours to "08:00-20:00"
     And sets Saturday hours to "10:00-18:00"
     And sets Sunday hours to "12:00-16:00"
-    And saves the configuration
+    And saves the operating hours configuration
     Then each day should have its own hours
     And the kiosk should respect day-specific hours
     And customers should see correct opening times for each day
@@ -319,8 +319,8 @@ Sets ${day} hours to "${hours}"
     The admin sets ${day} opening time to "${opening}"
     Sets ${day} closing time to "${closing}"
 
-Saves the configuration
-    [Documentation]    Saves config
+Saves The Operating Hours Configuration
+    [Documentation]    Saves config (operating hours)
     Saves the operating hours
 
 Each day should have its own hours
@@ -697,12 +697,6 @@ Alert history should be viewable in admin portal
     Element Should Be Visible    id=alert-history-link
 
 # US-052 Keywords
-The admin is on the system dashboard
-    [Documentation]    Navigate to dashboard
-    Click Element    id=admin-menu
-    Click Element    id=dashboard-menu
-    Wait Until Page Contains Element    id=system-dashboard
-
 The kiosk status should display prominently
     [Documentation]    Status visibility
     Element Should Be Visible    css=.kiosk-status-widget
@@ -764,11 +758,6 @@ The dashboard should highlight the offline status
 Suggested troubleshooting steps should be provided
     [Documentation]    Troubleshooting guidance
     Element Should Be Visible    css=.troubleshooting-panel
-
-The admin is on the system monitoring dashboard
-    [Documentation]    Monitoring dashboard
-    The admin is on the system dashboard
-    Click Link    id=advanced-monitoring-link
 
 The following metrics should be visible:
     [Documentation]    Metrics visibility check

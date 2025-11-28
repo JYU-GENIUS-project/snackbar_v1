@@ -203,13 +203,7 @@ US-063: Secure Payment Data Transmission - Comprehensive Test
     And PCI-DSS compliance requirements should be met for payment data handling
 
 *** Keywords ***
-Setup Test Environment
-    Log    Setting up system technical and security test environment
-    Set Selenium Speed    0.2 seconds
-
-Teardown Test Environment
-    Log    Tearing down system technical and security test environment
-    Close All Browsers
+# Using shared keywords from common.robot for Setup Test Environment and Teardown Test Environment
 
 # Transaction Persistence Keywords (US-059)
 the system is operational
