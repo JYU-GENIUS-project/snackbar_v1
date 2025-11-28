@@ -4,13 +4,25 @@ This directory contains Robot Framework acceptance tests for the Snackbar Self-S
 
 ## Overview
 
-The tests are organized by functional areas and user story categories:
+The tests are organized by functional areas and user story categories across **12 test suites** with **175 test cases**:
 
-- **customer_product_browsing.robot** - Product browsing and discovery (US-001 to US-005)
-- **customer_shopping_cart.robot** - Shopping cart management (US-006 to US-010)
-- **customer_payment_checkout.robot** - Payment and checkout (US-011 to US-015)
-- **admin_authentication_products.robot** - Admin authentication and product management (US-019 to US-028)
-- **admin_inventory_management.robot** - Inventory management (US-032 to US-038)
+### Customer Test Suites (40 tests)
+- **customer_product_browsing.robot** - Product browsing and discovery (US-001 to US-005) - 8 tests
+- **customer_shopping_cart.robot** - Shopping cart management (US-006 to US-010) - 7 tests
+- **customer_payment_checkout.robot** - Payment and checkout (US-011 to US-015) - 7 tests
+- **customer_system_status.robot** - System status and availability (US-016 to US-018) - 18 tests
+
+### Administrator Test Suites (105 tests)
+- **admin_authentication_products.robot** - Admin authentication and product management (US-019 to US-028) - 18 tests
+- **admin_category_management.robot** - Category management (US-029 to US-031) - 9 tests
+- **admin_inventory_management.robot** - Inventory management (US-032 to US-038) - 7 tests
+- **admin_transactions_statistics.robot** - Transaction history and statistics (US-039 to US-047) - 33 tests
+- **admin_system_configuration.robot** - System configuration (US-048 to US-052) - 17 tests
+- **admin_monitoring_troubleshooting.robot** - Monitoring and troubleshooting (US-053 to US-058) - 21 tests
+
+### System/Technical Test Suites (30 tests)
+- **system_technical_security.robot** - Technical and security requirements (US-059 to US-063) - 15 tests
+- **system_integration_communication.robot** - Integration and communication (US-064 to US-068) - 15 tests
 
 ## Prerequisites
 
@@ -148,8 +160,8 @@ US-001: View Products In Grid Layout
 ### Test Data
 
 Sample test data files are located in `/tests/data/`:
-- `test_product.jpg` - Sample product image for testing uploads
-- `large_test_image.jpg` - Large image for testing optimization
+- See the `data/README.md` for instructions on creating required test images
+- Test images are not included in version control for security reasons
 
 ## Test Coverage
 
@@ -159,18 +171,28 @@ Sample test data files are located in `/tests/data/`:
 - **US-001 to US-005**: Product browsing and discovery
 - **US-006 to US-010**: Shopping cart management
 - **US-011 to US-015**: Payment and checkout
+- **US-016 to US-018**: System status and availability
 
 #### Administrator Stories (Admin Portal)
-- **US-019 to US-020**: Authentication and session management
+- **US-019 to US-022**: Authentication and session management
 - **US-023 to US-028**: Product management
+- **US-029 to US-031**: Category management
 - **US-032 to US-038**: Inventory management
+- **US-039 to US-047**: Transaction management and statistics
+- **US-048 to US-052**: System configuration
+- **US-053 to US-058**: Monitoring and troubleshooting
+
+#### System/Technical Stories
+- **US-059 to US-063**: Technical and security requirements
+- **US-064 to US-068**: Integration and communication
 
 ### Total Test Cases
 
-- **25+ acceptance test cases** covering high-priority user stories
+- **175 acceptance test cases** covering all 68 user stories
 - **Edge cases** included for critical scenarios
-- **Performance tests** for QR code generation and real-time updates
-- **Security tests** for authentication and session management
+- **Performance tests** for QR code generation, real-time updates, and response times
+- **Security tests** for authentication, session management, and data protection
+- **Accessibility tests** for WCAG AA compliance
 
 ## Continuous Integration
 
