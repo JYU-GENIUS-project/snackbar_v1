@@ -19,6 +19,9 @@ This repository contains requirements engineering documentation and automated ac
   - Edge cases, performance, accessibility, and security tests included
   - See [Test Summary](tests/TEST_SUMMARY.md) for details
 
+### Architecture Documentation
+- **[C4 Architecture](docs/architecture/C4_Architecture.md)** - High-level architecture following C4 model with system context and container diagrams, Docker deployment configuration
+
 ### Audits & Compliance
 - **[Traceability Audit Report](docs/audits/traceability_audit_report.md)** - 100% coverage audit confirming all 68 user stories have corresponding test cases
 
@@ -56,6 +59,7 @@ See [tests/README.md](tests/README.md) for detailed testing documentation.
 - ✅ Test cases documented (180+ test cases)
 - ✅ Automated acceptance tests created (160 tests across 12 test suites)
 - ✅ Traceability audit completed (100% coverage - all 68 user stories covered)
+- ✅ C4 Architecture documentation complete
 - 🚧 Implementation in progress
 
 ## License
