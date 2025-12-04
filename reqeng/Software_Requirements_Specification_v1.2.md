@@ -1,4 +1,5 @@
 # Software Requirements Specification (SRS)
+
 ## Self-Service Snack Bar Kiosk System
 
 **Project:** snackbar  
@@ -17,6 +18,7 @@
 | 1.2 | 2025-11-12 | Requirements Engineering Team | Added PERN stack technology specifications, PostgreSQL data types, deployment requirements |
 
 ### Major Changes in v1.2
+
 - Specified PERN stack (PostgreSQL, Express.js, React, Node.js) as core technology
 - Added detailed technology stack specification with exact versions (Section 16)
 - Specified PostgreSQL-specific data types (UUID, DECIMAL, TIMESTAMP WITH TIME ZONE, JSONB, ENUM)
@@ -26,6 +28,7 @@
 - Added development tools and optional TypeScript support
 
 ### Major Changes in v1.1
+
 - Specified concrete performance metrics (replaced "as quickly as possible")
 - Defined data retention policy (replaced "indefinitely")
 - Clarified out-of-stock inventory handling with negative stock support
@@ -42,14 +45,18 @@
 ## 1. Introduction
 
 ### 1.1 Purpose
+
 This document specifies the functional and non-functional requirements for a self-service kiosk system that enables student members to purchase snacks and drinks from a cabinet in the student lounge.
 
 ### 1.2 Scope
+
 The system consists of two main components:
+
 1. **Kiosk Interface** - A tablet/touchscreen application for customers to browse and purchase products
 2. **Admin Web Portal** - A remote management system for inventory control, statistics, and system configuration
 
 ### 1.3 Definitions, Acronyms, and Abbreviations
+
 - **Kiosk** - The customer-facing touchscreen interface
 - **Admin Portal** - Web-based administrative interface
 - **SKU** - Stock Keeping Unit (individual product)
@@ -65,11 +72,13 @@ The system consists of two main components:
 ## 2. Overall Description
 
 ### 2.1 Product Perspective
+
 The system operates as a trust-based, self-service solution where customers select products from a physical cabinet and complete payment through a kiosk interface. The system requires constant internet connectivity and operates during configured hours (default: 08:00-19:00).
 
 ### 2.2 User Classes and Characteristics
 
 #### 2.2.1 Customer (Student Member)
+
 - **Technical Expertise:** Minimal
 - **Frequency of Use:** Occasional (daily to weekly)
 - **Key Activities:** Browse products, add to cart, complete payment
@@ -77,12 +86,14 @@ The system operates as a trust-based, self-service solution where customers sele
 - **Success Criteria:** 90% of first-time users complete purchase within 60 seconds without assistance
 
 #### 2.2.2 Administrator
+
 - **Technical Expertise:** Moderate
 - **Frequency of Use:** Regular (for restocking and monitoring)
 - **Key Activities:** Manage inventory, configure system, view statistics, generate reports
 - **Authentication:** Username/password (Google OAuth optional)
 
 ### 2.3 Operating Environment
+
 - **Kiosk Device:** Tablet or touchscreen device with minimum 10" display
 - **Connectivity:** Requires internet connection (minimum 5 Mbps recommended)
 - **Operating Hours:** Configurable (default 08:00-19:00)
@@ -90,6 +101,7 @@ The system operates as a trust-based, self-service solution where customers sele
 - **Expected Transaction Volume:** 50-100 transactions per day
 
 ### 2.4 Design and Implementation Constraints
+
 - Trust-based system (no physical locking mechanisms)
 - Integration with MobilePay API
 - Web-based or application-based (customer-agnostic)
@@ -108,9 +120,11 @@ The system operates as a trust-based, self-service solution where customers sele
 ### 3.1 Kiosk Interface (Customer-Facing)
 
 #### 3.1.1 Product Display
+
 **FR-1.1:** The system SHALL display products in a grid layout with images.
 
 **FR-1.2:** Each product display SHALL include:
+
 - Product name (minimum 16px font size)
 - Price clearly displayed (minimum 18px font size, bold)
 - Product image (800x600px or default placeholder)
@@ -118,6 +132,7 @@ The system operates as a trust-based, self-service solution where customers sele
 - Availability status (Available, Out of Stock)
 
 **FR-1.3:** The system SHALL provide category filtering functionality with the following categories:
+
 - All Products (default)
 - Drinks
 - Snacks
@@ -131,15 +146,18 @@ The system operates as a trust-based, self-service solution where customers sele
 > "⚠️ Inventory tracking is disabled. Please verify that items exist in the cabinet before completing payment."
 
 **FR-1.6:** When inventory tracking is enabled and a product is out of stock, the system SHALL:
+
 - Display the product as "Out of Stock" with visual indicator (red badge)
 - Allow product to remain visible but visually distinguished (greyed out)
 - Allow purchase after customer confirms they can see the item in the cabinet
 - Display confirmation prompt: "This item shows as out of stock. Can you see it in the cabinet? [Yes, I see it] [No, go back]"
 
 #### 3.1.2 Shopping Cart
+
 **FR-2.1:** The system SHALL provide a shopping cart where customers can add multiple items.
 
 **FR-2.2:** The shopping cart SHALL display:
+
 - Individual items with product names and thumbnail images
 - Quantity for each item (editable via +/- buttons)
 - Price per item
@@ -151,6 +169,7 @@ The system operates as a trust-based, self-service solution where customers sele
 **FR-2.3:** The system SHALL enforce item-specific purchase limits configured by admin.
 
 **FR-2.4:** When a customer attempts to exceed purchase limits, the system SHALL:
+
 - Prevent adding additional items beyond the limit
 - Display message: "Maximum [X] of this item per purchase"
 - Disable the "+" button when limit reached
@@ -164,6 +183,7 @@ The system operates as a trust-based, self-service solution where customers sele
 **FR-2.5.3:** The system MAY display a countdown or warning 30 seconds before cart clears (optional).
 
 #### 3.1.3 Payment Process
+
 **FR-3.1:** Upon checkout confirmation, the system SHALL generate a unique QR code for the transaction within 1 second.
 
 **FR-3.2:** The system SHALL integrate with MobilePay API for payment processing.
@@ -171,6 +191,7 @@ The system operates as a trust-based, self-service solution where customers sele
 **FR-3.3:** The system SHALL support NFC payment options where applicable.
 
 **FR-3.4:** Upon successful payment, the system SHALL:
+
 - Display on-screen confirmation message for minimum 3 seconds: "✅ Payment Complete! You can now take your items."
 - Show purchased items and total amount
 - Deduct purchased items from inventory (if tracking enabled), including allowing negative stock
@@ -184,6 +205,7 @@ The system operates as a trust-based, self-service solution where customers sele
 **FR-3.4.3:** The system SHALL display success message using green color (meeting WCAG AA contrast ratio 4.5:1).
 
 **FR-3.5:** Upon payment failure or timeout, the system SHALL:
+
 - Display failure message to customer for minimum 5 seconds: "❌ Payment Failed. Please try again or contact support at [admin email]."
 - NOT deduct items from inventory
 - Maintain cart contents
@@ -193,18 +215,21 @@ The system operates as a trust-based, self-service solution where customers sele
 **FR-3.5.1:** If MobilePay indicates timeout (no response after 60 seconds), display: "⏱️ Payment timed out. Please try again."
 
 **FR-3.5.2:** For edge case where customer was charged but system doesn't receive confirmation:
+
 - Display message: "⚠️ Payment processor error. If you were charged, you may take your items. Contact [admin email] if charged incorrectly."
 - Log transaction as "PAYMENT_UNCERTAIN"
 - Do NOT deduct inventory automatically
 - Admin can reconcile these transactions manually (see FR-8.2.4)
 
 **FR-3.6:** MobilePay API unavailability handling:
+
 - If MobilePay API is unreachable for more than 30 seconds, display error: "🚫 Payment system temporarily unavailable. Please try again later or contact [admin email]."
 - Log API downtime incidents with timestamp
 - Admin receives email notification if API is down for more than 15 minutes
 - Kiosk remains accessible for browsing (checkout button disabled)
 
 #### 3.1.4 System Status Display
+
 **FR-4.1:** During non-operating hours, the kiosk SHALL display a "Closed" message: "🔒 Closed - Open [start time] to [end time]"
 
 **FR-4.2:** When in maintenance mode, the kiosk SHALL display a "Maintenance" message: "🔧 System Under Maintenance - Check back soon"
@@ -212,6 +237,7 @@ The system operates as a trust-based, self-service solution where customers sele
 **FR-4.2.1:** Maintenance mode takes precedence over operating hours (can be enabled during operating hours).
 
 **FR-4.3:** The kiosk interface SHALL be optimized for accessibility:
+
 - Minimum 16px font size for body text
 - Minimum 24px font size for headings
 - Minimum 44x44px touch targets for all interactive elements
@@ -223,11 +249,13 @@ The system operates as a trust-based, self-service solution where customers sele
 ### 3.2 Admin Web Portal
 
 #### 3.2.1 Authentication & Access Control
+
 **FR-5.1:** The system SHALL require authentication via username and password.
 
 **FR-5.2:** The system MAY support Google OAuth authentication as an alternative login method.
 
 **FR-5.3:** The system SHALL support multiple administrator accounts:
+
 - Each admin has unique username (email) and password
 - All admins have identical permissions (no role hierarchy)
 - Primary admin can create and delete other admin accounts
@@ -248,7 +276,9 @@ The system operates as a trust-based, self-service solution where customers sele
 **FR-5.4.3:** System MAY offer "Remember this device for 30 days" option to reduce login frequency (optional).
 
 #### 3.2.2 Product Management
+
 **FR-6.1:** Admins SHALL be able to add new products with the following attributes:
+
 - **Product name** (required, 1-100 characters)
 - **Price** (required, range: 0.01 to 999.99 EUR, 2 decimal places)
 - **Product image** (optional, with default placeholder)
@@ -258,12 +288,14 @@ The system operates as a trust-based, self-service solution where customers sele
 - **Purchase limit per transaction** (optional, range: 1-50 items, default: unlimited)
 
 **FR-6.1.1:** Price validation:
+
 - Must be between 0.01 and 999.99 EUR
 - Must have exactly 2 decimal places
 - Cannot be negative or zero
 - Display error message if validation fails: "Price must be between 0.01€ and 999.99€"
 
 **FR-6.1.2:** Purchase limit validation:
+
 - If set, must be between 1 and 50
 - Default value: null (unlimited)
 - Display on product card as: "Maximum [X] per purchase"
@@ -281,6 +313,7 @@ The system operates as a trust-based, self-service solution where customers sele
 **FR-6.4:** Admins SHALL be able to upload product images through the web portal.
 
 **FR-6.4.1:** Image upload requirements:
+
 - Accepted formats: JPEG (.jpg, .jpeg), PNG (.png), WebP (.webp), GIF (.gif, non-animated only)
 - Maximum file size: 10MB per upload
 - File extension validation against whitelist
@@ -289,11 +322,13 @@ The system operates as a trust-based, self-service solution where customers sele
 - Display clear error message if rejected: "Invalid file type. Please upload JPEG, PNG, WebP, or GIF (max 10MB)"
 
 **FR-6.4.2:** Image security:
+
 - Strip EXIF metadata from uploaded images
 - Maximum filename length: 255 characters
 - Sanitize filenames (remove special characters except - and _)
 
 **FR-6.5:** Product images SHALL be automatically processed upon upload:
+
 - Resized to 800x600px (landscape aspect ratio, center-cropped if needed)
 - Compressed to target size < 200KB
 - Converted to WebP format for kiosk display (JPEG fallback generated for compatibility)
@@ -303,9 +338,11 @@ The system operates as a trust-based, self-service solution where customers sele
 **FR-6.6:** Products without uploaded images SHALL display a default placeholder image (generic snack/drink icon).
 
 #### 3.2.3 Category Management
+
 **FR-7.1:** Admins SHALL be able to create custom product categories.
 
 **FR-7.1.1:** Category name requirements:
+
 - 1-50 characters
 - Must be unique
 - Cannot contain special characters except spaces and hyphens
@@ -319,6 +356,7 @@ The system operates as a trust-based, self-service solution where customers sele
 **FR-7.3:** Products MAY belong to multiple categories simultaneously.
 
 **FR-7.4:** The system SHALL include default categories pre-configured:
+
 - Drinks
 - Snacks
 - Hot Drinks
@@ -329,9 +367,11 @@ The system operates as a trust-based, self-service solution where customers sele
 **FR-7.5:** Category changes SHALL update product filtering on kiosk immediately (within 5 seconds).
 
 #### 3.2.4 Inventory Management
+
 **FR-8.1:** Admins SHALL be able to enable or disable inventory tracking system-wide via toggle switch.
 
 **FR-8.1.1:** When inventory tracking is DISABLED:
+
 - Stock quantity fields hidden in admin portal
 - Low-stock threshold settings hidden
 - No inventory deductions occur on purchases
@@ -341,6 +381,7 @@ The system operates as a trust-based, self-service solution where customers sele
 - All products show as available on kiosk
 
 **FR-8.1.2:** When inventory tracking is ENABLED:
+
 - All inventory features become active
 - Admin can view and edit stock quantities
 - Automatic deductions occur on successful purchases
@@ -350,6 +391,7 @@ The system operates as a trust-based, self-service solution where customers sele
 **FR-8.1.3:** When re-enabling inventory tracking, system SHALL preserve last known stock quantities.
 
 **FR-8.2:** When inventory tracking is enabled, admins SHALL be able to:
+
 - View current stock quantities for all products in a sortable table
 - Manually update stock quantities (for restocking) with +/- buttons or direct input
 - Set low-stock notification thresholds per product (range: 1-99, default: 5)
@@ -362,6 +404,7 @@ The system operates as a trust-based, self-service solution where customers sele
 **FR-8.2.3:** Admin can reset negative stock to zero or positive value with "Adjust Stock" button.
 
 **FR-8.2.4:** Admin manual reconciliation for uncertain payments:
+
 - Admin can view "Uncertain Payments" report showing transactions with status "PAYMENT_UNCERTAIN"
 - Admin can mark transactions as "CONFIRMED" (deduct inventory) or "REFUNDED" (no action)
 - Admin can manually adjust inventory after verification with MobilePay logs
@@ -379,6 +422,7 @@ The system operates as a trust-based, self-service solution where customers sele
 **FR-8.4.2:** No repeat notification until stock is replenished above threshold (prevents email spam).
 
 **FR-8.4.3:** Email content includes:
+
 - Product name
 - Current stock quantity
 - Configured threshold
@@ -386,12 +430,15 @@ The system operates as a trust-based, self-service solution where customers sele
 - Link to admin portal inventory page
 
 **FR-8.5:** Low-stock thresholds:
+
 - Default threshold: 5 units (applied to all new products)
 - Admin can override per product (range: 1-99)
 - Different categories MAY have different default thresholds (configurable)
 
 #### 3.2.5 Transaction History & Reporting
+
 **FR-9.1:** The system SHALL maintain a transaction log containing:
+
 - Transaction ID (unique UUID)
 - Date and time (ISO 8601 format)
 - Items purchased (product names and IDs)
@@ -403,6 +450,7 @@ The system operates as a trust-based, self-service solution where customers sele
 **FR-9.2:** Transaction history SHALL NOT include individual customer identification (no names, phone numbers, or personal data).
 
 **FR-9.3:** Data retention policy:
+
 - The system SHALL retain transaction history for a minimum of 3 years from transaction date
 - After 3 years, data MAY be archived to cold storage or deleted at admin discretion
 - System SHALL alert admin when database size reaches 80% of storage capacity
@@ -416,13 +464,16 @@ The system operates as a trust-based, self-service solution where customers sele
 **FR-9.4.2:** Transaction history SHALL be sortable by date, amount, status.
 
 **FR-9.4.3:** Transaction history SHALL be filterable by:
+
 - Date range
 - Payment status
 - Product
 - Amount range
 
 #### 3.2.6 Statistics & Analytics
+
 **FR-10.1:** The system SHALL display statistics showing:
+
 - **Most popular products** ranked by quantity sold (top 10)
 - **Revenue by time period** with the following views:
   - Daily view (bar chart showing revenue per day)
@@ -434,6 +485,7 @@ The system operates as a trust-based, self-service solution where customers sele
 - **Average transaction value** (total revenue / number of transactions)
 
 **FR-10.1.1:** Date range selector SHALL:
+
 - Provide preset options: "Today", "This Week", "This Month", "Last 30 Days", "Last 3 Months"
 - Support custom date range with visual calendar picker
 - Default to "Last 7 Days"
@@ -447,6 +499,7 @@ The system operates as a trust-based, self-service solution where customers sele
 **FR-10.2:** Admins SHALL be able to export statistics and transaction data in CSV format.
 
 **FR-10.2.1:** CSV export SHALL include:
+
 - Transaction ID
 - Date and time (YYYY-MM-DD HH:MM:SS format)
 - Items purchased (comma-separated list)
@@ -461,7 +514,9 @@ The system operates as a trust-based, self-service solution where customers sele
 **FR-10.3:** JSON export format is deferred to v1.1+ (not required for v1.0).
 
 #### 3.2.7 System Configuration
+
 **FR-11.1:** Admins SHALL be able to configure the following settings through the web portal:
+
 - **Operating hours** (start time and end time, 24-hour format)
 - **Email address(es) for notifications** (comma-separated list, up to 5 addresses)
 - **Enable/disable inventory tracking** (toggle switch)
@@ -474,6 +529,7 @@ The system operates as a trust-based, self-service solution where customers sele
 **FR-11.1.3:** System SHALL validate email addresses using RFC 5322 standard.
 
 **FR-11.2:** Admins SHALL receive email notifications for:
+
 - Low stock alerts (when threshold reached)
 - System errors (uncaught exceptions, API failures)
 - Payment failures (FAILED or PAYMENT_UNCERTAIN transactions)
@@ -481,12 +537,14 @@ The system operates as a trust-based, self-service solution where customers sele
 - Database storage reaching 80% capacity
 
 **FR-11.2.1:** Email delivery requirements:
+
 - Successfully deliver 95% of notifications within 5 minutes
 - Retry failed sends up to 3 times (exponential backoff: 1 min, 5 min, 15 min)
 - Log all notification attempts (success/failure) with timestamps
 - Alert admin via alternate mechanism if email service is down for > 1 hour
 
 **FR-11.3:** Admins SHALL be able to view kiosk system status indicator:
+
 - Online (green indicator, last activity timestamp)
 - Offline (red indicator, time since last activity)
 - Maintenance Mode (yellow indicator)
@@ -494,12 +552,15 @@ The system operates as a trust-based, self-service solution where customers sele
 **FR-11.3.1:** Status SHALL update in real-time using WebSocket connection or 10-second polling.
 
 #### 3.2.8 Pricing Management
+
 **FR-12.1:** Admins SHALL have full control over product pricing with the following constraints:
+
 - Range: 0.01 to 999.99 EUR
 - 2 decimal places required
 - Price changes effective immediately on kiosk
 
 **FR-12.2:** The system does NOT require support for:
+
 - Discounts or promotional pricing
 - Special pricing tiers (member vs non-member)
 - Time-based pricing (happy hour, etc.)
@@ -512,6 +573,7 @@ The system operates as a trust-based, self-service solution where customers sele
 ## 4. Non-Functional Requirements
 
 ### 4.1 Performance Requirements
+
 **NFR-1:** The kiosk interface SHALL meet the following performance targets:
 
 **NFR-1.1:** Filter/category changes SHALL update product display within 300ms (90th percentile).
@@ -527,6 +589,7 @@ The system operates as a trust-based, self-service solution where customers sele
 **NFR-2:** The system SHALL support one concurrent user (single kiosk deployment).
 
 **NFR-3:** Product images SHALL be optimized for display:
+
 - Resized to maximum 800x600px
 - Compressed to < 200KB per image
 - Served in WebP format (with JPEG fallback)
@@ -534,6 +597,7 @@ The system operates as a trust-based, self-service solution where customers sele
 - Cached locally in browser for 24 hours
 
 ### 4.2 Reliability & Availability
+
 **NFR-4:** The system SHALL be available during configured operating hours (default 08:00-19:00).
 
 **NFR-4.1:** Target uptime during operating hours: 99% (allows ~2.5 hours downtime per month).
@@ -543,6 +607,7 @@ The system operates as a trust-based, self-service solution where customers sele
 **NFR-6:** Transaction data SHALL be persisted to database immediately (within 1 second) to prevent data loss.
 
 **NFR-7:** The system SHALL implement automatic backups:
+
 - Daily full backup at 02:00 (during non-operating hours)
 - Retain last 30 daily backups
 - Weekly backup retained for 12 weeks
@@ -553,14 +618,17 @@ The system operates as a trust-based, self-service solution where customers sele
 **NFR-7.1:** Backup storage requirement: Minimum 10GB (sufficient for ~50,000 transactions with images).
 
 ### 4.3 Security Requirements
+
 **NFR-8:** Admin authentication SHALL use secure password storage (bcrypt or Argon2, minimum 12 rounds).
 
 **NFR-8.1:** Password requirements:
+
 - Minimum 8 characters
 - Must contain at least one uppercase letter, one lowercase letter, one number
 - No common passwords (check against top 10,000 common passwords list)
 
 **NFR-8.2:** Image upload security SHALL include:
+
 - File extension whitelist validation
 - File content validation (magic number check)
 - EXIF metadata stripping
@@ -568,6 +636,7 @@ The system operates as a trust-based, self-service solution where customers sele
 - Virus/malware scanning (optional, recommended for production)
 
 **NFR-9:** Payment processing SHALL be handled through MobilePay API with appropriate security measures:
+
 - All communication over HTTPS/TLS 1.2+
 - API credentials stored in environment variables (not hardcoded)
 - Payment data never stored in system (only transaction IDs and status)
@@ -579,13 +648,16 @@ The system operates as a trust-based, self-service solution where customers sele
 **NFR-11.1:** Transaction logs are anonymous by design (no customer identification).
 
 ### 4.4 Usability Requirements
+
 **NFR-12:** The kiosk interface SHALL be usable such that:
+
 - 90% of first-time users can complete a purchase without assistance within 60 seconds
 - Task success rate > 95% in usability testing (n=10 test users)
 - No more than 2 screens needed to go from product selection to payment
 - All primary actions visible without scrolling on home screen
 
 **NFR-13:** The kiosk interface SHALL be optimized for touchscreen interaction:
+
 - All interactive elements minimum 44x44px touch target (per Apple/Android HIG)
 - 8px minimum spacing between adjacent touch targets
 - Visual feedback on touch (ripple effect or color change)
@@ -593,6 +665,7 @@ The system operates as a trust-based, self-service solution where customers sele
 - Scrolling uses momentum/kinetic scrolling
 
 **NFR-14:** The admin portal SHALL be accessible from standard web browsers:
+
 - Chrome 90+
 - Firefox 88+
 - Safari 14+
@@ -601,6 +674,7 @@ The system operates as a trust-based, self-service solution where customers sele
 **NFR-14.1:** Admin portal SHALL be responsive (works on desktop 1024px+ and tablet 768px+).
 
 **NFR-15:** Error and confirmation messages SHALL:
+
 - Use minimum 18px font size (24px for headings)
 - Display for minimum 3 seconds (dismissible after 2 seconds for confirmations)
 - Use color coding:
@@ -612,15 +686,18 @@ The system operates as a trust-based, self-service solution where customers sele
 - Include actionable next steps
 
 ### 4.5 Maintainability Requirements
+
 **NFR-16:** The system SHALL implement logging for troubleshooting purposes.
 
 **NFR-16.1:** Logging levels:
+
 - ERROR: System errors, API failures, payment failures
 - WARN: Low stock, API slowness, configuration changes
 - INFO: Successful transactions, admin logins, inventory updates
 - DEBUG: Request/response details (disabled in production)
 
 **NFR-16.2:** Logs SHALL include:
+
 - Timestamp (ISO 8601 format)
 - Log level
 - Component/module name
@@ -634,6 +711,7 @@ The system operates as a trust-based, self-service solution where customers sele
 **NFR-17.2:** Logs SHALL be searchable by date, level, component.
 
 **NFR-18:** The codebase SHALL follow standard coding conventions:
+
 - Consistent naming conventions (camelCase for variables, PascalCase for classes)
 - Maximum function length: 50 lines
 - Maximum file length: 500 lines
@@ -641,6 +719,7 @@ The system operates as a trust-based, self-service solution where customers sele
 - API documentation (OpenAPI/Swagger)
 
 ### 4.6 Scalability
+
 **NFR-19:** The system is designed for a single kiosk deployment and does NOT require multi-kiosk scalability in v1.0.
 
 **NFR-19.1:** Architecture SHOULD be designed to support future multi-kiosk expansion (separation of concerns, stateless API).
@@ -654,6 +733,7 @@ The system operates as a trust-based, self-service solution where customers sele
 ### 5.1 User Interfaces
 
 #### 5.1.1 Kiosk Interface
+
 The kiosk interface SHALL provide the following screens:
 
 1. **Home/Product Grid Screen:**
@@ -698,6 +778,7 @@ The kiosk interface SHALL provide the following screens:
    - Estimated return time (if maintenance, optional)
 
 #### 5.1.2 Admin Web Portal
+
 The admin portal SHALL provide the following pages:
 
 1. **Login Page:**
@@ -759,6 +840,7 @@ The admin portal SHALL provide the following pages:
    - Backup status
 
 ### 5.2 Hardware Interfaces
+
 - **Touchscreen tablet or display device:** Minimum 10" display, resolution 1280x800px or higher
 - **Network interface:** Wi-Fi or Ethernet for internet connectivity (minimum 5 Mbps recommended)
 - **QR code display capability:** Color display supporting 200x200px minimum QR codes
@@ -767,6 +849,7 @@ The admin portal SHALL provide the following pages:
 ### 5.3 Software Interfaces
 
 #### 5.3.1 PostgreSQL Database
+
 - **Purpose:** Primary data storage for all application data
 - **Connection Library:** node-postgres (pg) version 8.11.x
 - **Connection Method:** Connection pooling with pg.Pool
@@ -791,6 +874,7 @@ The admin portal SHALL provide the following pages:
 - **Security:** SSL/TLS encrypted connections, credentials in environment variables
 
 #### 5.3.2 MobilePay API
+
 - **Purpose:** Payment processing
 - **Integration Method:** RESTful API
 - **Authentication:** API key in Authorization header
@@ -811,6 +895,7 @@ The admin portal SHALL provide the following pages:
 - **Security:** HTTPS/TLS 1.2+, API credentials in environment variables
 
 #### 5.3.3 Email Service
+
 - **Purpose:** Admin notifications
 - **Integration Method:** SMTP or API (e.g., SendGrid, AWS SES, Mailgun)
 - **Requirements:**
@@ -829,6 +914,7 @@ The admin portal SHALL provide the following pages:
   - Logging of all send attempts
 
 #### 5.3.4 Authentication Service (Optional)
+
 - **Purpose:** Google OAuth integration
 - **Requirements:** Google OAuth 2.0 API
 - **Usage:** Alternative admin login method
@@ -837,6 +923,7 @@ The admin portal SHALL provide the following pages:
 - **Optional Feature:** Can be omitted in v1.0
 
 ### 5.4 Communication Interfaces
+
 - **HTTPS:** All web communications use TLS 1.2+ encryption
 - **RESTful API:** Communication between kiosk and backend server
   - JSON request/response format
@@ -853,6 +940,7 @@ The admin portal SHALL provide the following pages:
 ## 6. System Features Priority
 
 ### 6.1 High Priority (Must Have for v1.0)
+
 - Product display and browsing with category filtering
 - Shopping cart functionality with 5-minute timeout
 - MobilePay payment integration with QR code
@@ -869,6 +957,7 @@ The admin portal SHALL provide the following pages:
 - Operating hours and maintenance mode
 
 ### 6.2 Medium Priority (Should Have)
+
 - Category management (create/edit/delete)
 - Allergen information display
 - Multiple admin accounts with audit trail
@@ -879,6 +968,7 @@ The admin portal SHALL provide the following pages:
 - Email notification configuration UI
 
 ### 6.3 Low Priority (Nice to Have for v1.1+)
+
 - JSON export functionality
 - Google OAuth authentication
 - Shopping cart timeout configuration
@@ -894,6 +984,7 @@ The admin portal SHALL provide the following pages:
 ## 7. Use Cases
 
 ### 7.1 Customer Purchase Flow (Happy Path)
+
 1. Customer approaches kiosk during operating hours
 2. Customer browses products in grid view
 3. Customer optionally filters by category (e.g., "Drinks")
@@ -918,6 +1009,7 @@ The admin portal SHALL provide the following pages:
 ---
 
 ### 7.2 Alternate Flow - Payment Failure
+
 **Divergence Point:** Step 13 in main flow
 
 13a. Payment fails or times out in MobilePay  
@@ -925,6 +1017,7 @@ The admin portal SHALL provide the following pages:
 13c. Cart contents retained  
 13d. Transaction logged as "FAILED"  
 13e. Customer can:
+
 - Tap "Try Again" → Returns to step 11 (new QR code generated)
 - Tap "Cancel" → Returns to step 8 (cart view)
 - Wait 5 minutes → Cart auto-clears, returns to home screen
@@ -932,6 +1025,7 @@ The admin portal SHALL provide the following pages:
 ---
 
 ### 7.3 Alternate Flow - Out of Stock with Confirmation
+
 **Divergence Point:** Step 5 in main flow
 
 5a. Product shows "Out of Stock" badge  
@@ -946,6 +1040,7 @@ The admin portal SHALL provide the following pages:
 ---
 
 ### 7.4 Alternate Flow - Cart Timeout
+
 **Divergence Point:** Any point after step 6
 
 6a. Customer stops interacting for 5 minutes  
@@ -956,6 +1051,7 @@ The admin portal SHALL provide the following pages:
 ---
 
 ### 7.5 Alternate Flow - Payment Uncertain
+
 **Divergence Point:** Step 14 in main flow
 
 14a. System does not receive confirmation from MobilePay within 60 seconds  
@@ -967,6 +1063,7 @@ The admin portal SHALL provide the following pages:
 ---
 
 ### 7.6 Admin Inventory Management
+
 1. Admin navigates to admin portal URL
 2. Admin logs in with username and password
 3. System displays dashboard
@@ -984,6 +1081,7 @@ The admin portal SHALL provide the following pages:
 ---
 
 ### 7.7 Admin Payment Reconciliation
+
 1. Admin logs into admin portal
 2. Admin receives email notification: "Uncertain payment detected"
 3. Admin clicks "Uncertain Payments" report
@@ -1002,6 +1100,7 @@ The admin portal SHALL provide the following pages:
 ---
 
 ### 7.8 Admin Product Addition
+
 1. Admin logs into web portal
 2. Admin navigates to "Product Management"
 3. Admin clicks "Add New Product" button
@@ -1029,6 +1128,7 @@ The admin portal SHALL provide the following pages:
 ---
 
 ### 7.9 Admin Statistics Export
+
 1. Admin logs into web portal
 2. Admin navigates to "Statistics & Reporting"
 3. Admin selects date range: "Last 30 Days" (preset button)
@@ -1052,12 +1152,14 @@ The admin portal SHALL provide the following pages:
 ### 8.1 Data Entities
 
 **PostgreSQL-Specific Features:**
+
 - **Data Types:** UUID (via uuid-ossp extension), DECIMAL for monetary values, TIMESTAMP WITH TIME ZONE for accurate datetime, JSONB for flexible JSON storage, ENUM for status fields
 - **Indexing:** B-tree indexes on frequently queried columns, partial indexes for active records
 - **Foreign Keys:** CASCADE on delete for dependent data, RESTRICT for reference data
 - **Connection Pooling:** pg-pool for efficient connection management
 
 #### 8.1.1 Product
+
 ```sql
 ProductID: UUID PRIMARY KEY DEFAULT uuid_generate_v4()
 Name: VARCHAR(100) NOT NULL
@@ -1082,6 +1184,7 @@ INDEX idx_product_categories ON Product USING GIN(Categories)  -- GIN index for 
 ```
 
 #### 8.1.2 Category
+
 ```sql
 CategoryID: UUID PRIMARY KEY DEFAULT uuid_generate_v4()
 CategoryName: VARCHAR(50) NOT NULL UNIQUE
@@ -1094,6 +1197,7 @@ INDEX idx_category_display_order ON Category(DisplayOrder)
 ```
 
 #### 8.1.3 Transaction
+
 ```sql
 TransactionID: UUID PRIMARY KEY DEFAULT uuid_generate_v4()
 Timestamp: TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
@@ -1120,6 +1224,7 @@ INDEX idx_transaction_date_status ON Transaction(Timestamp DESC, PaymentStatus) 
 ```
 
 #### 8.1.4 TransactionItem
+
 ```sql
 TransactionItemID: UUID PRIMARY KEY DEFAULT uuid_generate_v4()
 TransactionID: UUID NOT NULL REFERENCES Transaction(TransactionID) ON DELETE CASCADE
@@ -1135,6 +1240,7 @@ INDEX idx_transaction_item_product ON TransactionItem(ProductID)
 ```
 
 #### 8.1.5 SystemConfiguration
+
 ```sql
 ConfigID: UUID PRIMARY KEY DEFAULT uuid_generate_v4()
 OperatingHoursStart: TIME DEFAULT '08:00'
@@ -1149,6 +1255,7 @@ UpdatedBy: UUID REFERENCES Admin(AdminID) ON DELETE SET NULL
 ```
 
 #### 8.1.6 Admin
+
 ```sql
 AdminID: UUID PRIMARY KEY DEFAULT uuid_generate_v4()
 Username: VARCHAR(100) NOT NULL UNIQUE  -- Email format
@@ -1165,6 +1272,7 @@ INDEX idx_admin_active ON Admin(IsActive) WHERE IsActive = TRUE
 ```
 
 #### 8.1.7 AuditLog
+
 ```sql
 AuditLogID: UUID PRIMARY KEY DEFAULT uuid_generate_v4()
 AdminID: UUID NOT NULL REFERENCES Admin(AdminID) ON DELETE CASCADE
@@ -1183,6 +1291,7 @@ INDEX idx_audit_log_entity ON AuditLog(EntityType, EntityID)
 ```
 
 #### 8.1.8 ErrorLog
+
 ```sql
 ErrorLogID: UUID PRIMARY KEY DEFAULT uuid_generate_v4()
 Timestamp: TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
@@ -1204,6 +1313,7 @@ INDEX idx_error_log_component ON ErrorLog(Component)
 ### 8.2 Data Storage
 
 #### 8.2.1 Retention Policies
+
 - **Transaction history:** Minimum 3 years, then archive/delete at admin discretion
 - **Error logs:** 30 days
 - **Audit logs:** 1 year
@@ -1211,6 +1321,7 @@ INDEX idx_error_log_component ON ErrorLog(Component)
 - **Images:** Original images backed up, optimized versions cached
 
 #### 8.2.2 Backup Strategy
+
 - **Daily full backup:** 02:00 (non-operating hours)
 - **Retention:** Last 30 daily backups, last 12 weekly backups
 - **Storage location:** Separate from primary database (cloud storage or external drive)
@@ -1218,6 +1329,7 @@ INDEX idx_error_log_component ON ErrorLog(Component)
 - **Alert:** Email notification if backup fails
 
 #### 8.2.3 Storage Capacity Planning
+
 - **Expected annual transaction volume:** 18,000-25,000 (50-100 per day × 250 operating days)
 - **Database size estimate:**
   - Transactions: ~5KB each × 25,000 = ~125MB/year
@@ -1233,6 +1345,7 @@ INDEX idx_error_log_component ON ErrorLog(Component)
 ## 9. Assumptions and Dependencies
 
 ### 9.1 Assumptions
+
 - MobilePay merchant account and API access are already available and configured
 - Students will act honestly in the trust-based system (occasional discrepancies expected and acceptable)
 - Network connectivity is reliable during operating hours (5 Mbps minimum, 10 Mbps recommended)
@@ -1247,17 +1360,20 @@ INDEX idx_error_log_component ON ErrorLog(Component)
 ### 9.2 Dependencies
 
 #### 9.2.1 External Services
+
 - **MobilePay API:** Availability and reliability (SLA not specified by vendor)
 - **Email service:** SMTP server or API (SendGrid, AWS SES, Mailgun, etc.)
 - **Internet connectivity:** ISP uptime and bandwidth
 - **DNS and network infrastructure:** Organization's network availability
 
 #### 9.2.2 Hardware
+
 - **Tablet/touchscreen device:** Must be procured and configured
 - **Physical snack cabinet:** Must be available and accessible in student lounge
 - **Network equipment:** Wi-Fi access point or Ethernet connection
 
 #### 9.2.3 Organizational
+
 - **Admin availability:** Someone must monitor notifications and restock inventory
 - **MobilePay merchant account:** Must remain active with sufficient balance/credit
 - **Email account:** Admin email address for notifications must be monitored
@@ -1286,12 +1402,14 @@ INDEX idx_error_log_component ON ErrorLog(Component)
 ## 11. Future Enhancements (Out of Scope for v1.0)
 
 ### Planned for v1.1
+
 - Shopping cart timeout configuration (admin-settable 1-10 minutes)
 - JSON export format for transaction data
 - Google OAuth authentication for admins
 - Improved statistics with trend analysis
 
 ### Planned for v1.2+
+
 - Card payment integration (fallback for MobilePay issues)
 - Multi-kiosk support (central inventory management)
 - Mobile app for admins (iOS/Android)
@@ -1313,6 +1431,7 @@ INDEX idx_error_log_component ON ErrorLog(Component)
 The system will be considered complete and ready for production when:
 
 ### Functional Acceptance
+
 1. ✅ Customers can browse products by category on the kiosk with response time < 300ms
 2. ✅ Customers can add multiple items to a cart with running total displayed
 3. ✅ Customers can complete purchases using MobilePay via QR code
@@ -1335,6 +1454,7 @@ The system will be considered complete and ready for production when:
 20. ✅ Inventory can go negative to track discrepancies
 
 ### Performance Acceptance
+
 21. ✅ Filter changes update display within 300ms (90th percentile)
 22. ✅ Cart operations reflect within 200ms (90th percentile)
 23. ✅ Product grid loads within 2 seconds (95th percentile)
@@ -1342,12 +1462,14 @@ The system will be considered complete and ready for production when:
 25. ✅ Statistics queries return within 2 seconds for up to 10,000 transactions
 
 ### Security Acceptance
+
 26. ✅ Admin passwords are hashed with bcrypt/Argon2 (minimum 12 rounds)
 27. ✅ All communication uses HTTPS/TLS 1.2+
 28. ✅ Image uploads are validated and sanitized
 29. ✅ Admin sessions timeout after 30 minutes inactivity
 
 ### Data & Reliability Acceptance
+
 30. ✅ Transactions are logged immediately (within 1 second)
 31. ✅ Transaction history retained for minimum 3 years
 32. ✅ Daily automated backups at 02:00 with email confirmation
@@ -1355,12 +1477,14 @@ The system will be considered complete and ready for production when:
 34. ✅ Database alerts at 80% capacity
 
 ### Usability Acceptance
+
 35. ✅ 90% of test users (n=10) complete purchase within 60 seconds without assistance
 36. ✅ All interactive elements are minimum 44x44px touch targets
 37. ✅ Error messages meet WCAG AA contrast ratios (4.5:1)
 38. ✅ Admin portal works in Chrome 90+, Firefox 88+, Safari 14+, Edge 90+
 
 ### Edge Case Acceptance
+
 39. ✅ Payment uncertainty is handled (PAYMENT_UNCERTAIN status, admin reconciliation)
 40. ✅ MobilePay API unavailability displays appropriate error message
 41. ✅ Multiple admin accounts supported (up to 10) with audit trail
@@ -1392,27 +1516,32 @@ The system will be considered complete and ready for production when:
 ## 14. Testing Requirements
 
 ### 14.1 Unit Testing
+
 - All business logic functions must have unit tests
 - Minimum 80% code coverage for backend
 - Test edge cases (negative stock, price validation, etc.)
 
 ### 14.2 Integration Testing
+
 - MobilePay API integration (use test/sandbox environment)
 - Email service integration (verify email delivery)
 - Database operations (CRUD for all entities)
 
 ### 14.3 Performance Testing
+
 - Load test with 100 concurrent product views (simulated)
 - Verify response times meet NFR-1 targets
 - Test statistics queries with 10,000+ transactions
 
 ### 14.4 Usability Testing
+
 - Recruit 10 test users (students)
 - Observe first-time purchase attempts
 - Measure task completion time and success rate
 - Goal: 90% success within 60 seconds
 
 ### 14.5 Security Testing
+
 - Password strength validation
 - SQL injection attempts
 - XSS (Cross-Site Scripting) attempts
@@ -1420,6 +1549,7 @@ The system will be considered complete and ready for production when:
 - Session timeout verification
 
 ### 14.6 Acceptance Testing
+
 - Verify all 42 acceptance criteria (Section 12)
 - End-to-end purchase flow (happy path)
 - Admin workflow testing (all major features)
@@ -1430,7 +1560,9 @@ The system will be considered complete and ready for production when:
 ## 15. Deployment Requirements
 
 ### 15.1 Production Environment
+
 **PERN Stack Deployment:**
+
 - **Application Server:** Node.js 24.11 LTS with Express.js 5.1
 - **Database:** PostgreSQL 18 with connection pooling (pg-pool)
   - **Connection Pool Configuration:**
@@ -1453,7 +1585,7 @@ The system will be considered complete and ready for production when:
   - Load balancing with cluster mode (2-4 instances)
   - Log management and rotation
   - Zero-downtime deployments
-- **Storage:** 
+- **Storage:**
   - Minimum 10GB database storage
   - Minimum 20GB for product images and backups
   - SSD recommended for database performance
@@ -1466,7 +1598,9 @@ The system will be considered complete and ready for production when:
 - **Optional:** Docker containerization for easier deployment and scaling
 
 ### 15.2 Configuration
+
 - **Environment Variables:** (stored in .env file, never committed to version control)
+
   ```
   # Node.js Application
   NODE_ENV=production
@@ -1502,8 +1636,10 @@ The system will be considered complete and ready for production when:
   # Application Settings
   ADMIN_NOTIFICATION_EMAILS=admin@example.com
   ```
+
 - **HTTPS Certificate:** Let's Encrypt or commercial SSL (configured in Nginx)
 - **Nginx Configuration Example:**
+
   ```nginx
   upstream nodejs_backend {
       server localhost:3000;
@@ -1548,9 +1684,10 @@ The system will be considered complete and ready for production when:
   ```
 
 ### 15.3 Monitoring
+
 - **Server uptime monitoring:** UptimeRobot, Pingdom, or similar service
 - **Application error tracking:** Sentry, Rollbar, or built-in logging with PM2
-- **Database performance monitoring:** 
+- **Database performance monitoring:**
   - PostgreSQL built-in statistics (pg_stat_statements extension)
   - Query performance monitoring
   - Connection pool monitoring
@@ -1571,6 +1708,7 @@ This section provides comprehensive details on all technologies, frameworks, lib
 ### 16.1 Core Stack (PERN)
 
 #### 16.1.1 Database Layer
+
 - **PostgreSQL:** Version 18
   - Primary relational database with advanced features
   - UUID support via uuid-ossp extension
@@ -1580,6 +1718,7 @@ This section provides comprehensive details on all technologies, frameworks, lib
   - Transactional integrity with ACID compliance
 
 #### 16.1.2 Backend Layer
+
 - **Node.js:** Version 24.11 LTS
   - JavaScript runtime built on Chrome's V8 engine
   - Long-term support for stability
@@ -1593,6 +1732,7 @@ This section provides comprehensive details on all technologies, frameworks, lib
   - Easy integration with third-party libraries
 
 #### 16.1.3 Frontend Layer
+
 - **React:** Version 19.2
   - Modern UI library with declarative component model
   - Functional components with hooks (useState, useEffect, useContext, etc.)
@@ -1603,6 +1743,7 @@ This section provides comprehensive details on all technologies, frameworks, lib
 ### 16.2 Backend Dependencies
 
 #### 16.2.1 Database & Data Access
+
 - **pg (node-postgres):** Version 8.11.x
   - PostgreSQL client for Node.js
   - Connection pooling support
@@ -1611,6 +1752,7 @@ This section provides comprehensive details on all technologies, frameworks, lib
   - Prepared statements for performance
 
 #### 16.2.2 Security
+
 - **bcrypt:** Version 5.1.x
   - Password hashing with automatic salt generation
   - Configurable rounds (default: 12)
@@ -1632,6 +1774,7 @@ This section provides comprehensive details on all technologies, frameworks, lib
   - Credentials support for authenticated requests
 
 #### 16.2.3 Validation & Data Processing
+
 - **express-validator:** Version 7.0.x
   - Request validation and sanitization
   - Chain validation rules
@@ -1644,6 +1787,7 @@ This section provides comprehensive details on all technologies, frameworks, lib
   - Never commit sensitive data to version control
 
 #### 16.2.4 Communication
+
 - **nodemailer:** Version 6.9.x
   - Email sending library
   - SMTP and API-based email services support
@@ -1652,6 +1796,7 @@ This section provides comprehensive details on all technologies, frameworks, lib
   - Template integration
 
 #### 16.2.5 Logging & Performance
+
 - **morgan:** Version 1.10.x
   - HTTP request logger middleware
   - Customizable log formats
@@ -1667,6 +1812,7 @@ This section provides comprehensive details on all technologies, frameworks, lib
 ### 16.3 Frontend Dependencies
 
 #### 16.3.1 Routing & Navigation
+
 - **react-router-dom:** Version 6.20.x
   - Declarative routing for React applications
   - Browser history management
@@ -1675,6 +1821,7 @@ This section provides comprehensive details on all technologies, frameworks, lib
   - Navigation hooks (useNavigate, useParams, useLocation)
 
 #### 16.3.2 HTTP Client
+
 - **axios:** Version 1.6.x
   - Promise-based HTTP client
   - Request/response interceptors
@@ -1683,9 +1830,11 @@ This section provides comprehensive details on all technologies, frameworks, lib
   - Browser and Node.js compatible
 
 #### 16.3.3 UI Component Libraries
+
 **Choose one of the following:**
 
 **Option A: Material-UI (MUI)**
+
 - **@mui/material:** Version 5.14.x
 - **@mui/icons-material:** Version 5.14.x
 - Google Material Design implementation
@@ -1695,6 +1844,7 @@ This section provides comprehensive details on all technologies, frameworks, lib
 - Responsive by default
 
 **Option B: Chakra UI**
+
 - **@chakra-ui/react:** Version 2.8.x
 - **@emotion/react:** Version 11.11.x (peer dependency)
 - **@emotion/styled:** Version 11.11.x (peer dependency)
@@ -1704,9 +1854,11 @@ This section provides comprehensive details on all technologies, frameworks, lib
 - Responsive utilities
 
 #### 16.3.4 Date & Time Handling
+
 **Choose one of the following:**
 
 **Option A: date-fns**
+
 - **date-fns:** Version 2.30.x
 - Modern JavaScript date utility library
 - Tree-shakable (only import what you use)
@@ -1714,6 +1866,7 @@ This section provides comprehensive details on all technologies, frameworks, lib
 - i18n support
 
 **Option B: Day.js**
+
 - **dayjs:** Version 1.11.x
 - Lightweight alternative to Moment.js
 - Similar API to Moment.js
@@ -1723,6 +1876,7 @@ This section provides comprehensive details on all technologies, frameworks, lib
 ### 16.4 Development Tools
 
 #### 16.4.1 Build Tools
+
 - **Vite:** Version 5.0.x
   - Next-generation frontend build tool
   - Fast Hot Module Replacement (HMR)
@@ -1731,6 +1885,7 @@ This section provides comprehensive details on all technologies, frameworks, lib
   - React plugin support (@vitejs/plugin-react)
 
 #### 16.4.2 Code Quality
+
 - **ESLint:** Version 8.x
   - JavaScript and React linting
   - Customizable rules
@@ -1746,7 +1901,9 @@ This section provides comprehensive details on all technologies, frameworks, lib
   - Configuration: .prettierrc
 
 #### 16.4.3 Testing
+
 **Backend Testing:**
+
 - **Jest:** Version 29.x
   - JavaScript testing framework
   - Unit and integration tests
@@ -1761,6 +1918,7 @@ This section provides comprehensive details on all technologies, frameworks, lib
   - Chai-like assertions
 
 **Frontend Testing:**
+
 - **React Testing Library:** Version 14.x
   - User-centric testing approach
   - DOM testing utilities
@@ -1774,6 +1932,7 @@ This section provides comprehensive details on all technologies, frameworks, lib
 ### 16.5 Optional but Recommended
 
 #### 16.5.1 TypeScript
+
 - **TypeScript:** Version 5.3.x
   - Static type checking for JavaScript
   - Enhanced IDE support and autocomplete
@@ -1783,18 +1942,21 @@ This section provides comprehensive details on all technologies, frameworks, lib
   - Type definitions: @types/node, @types/express, @types/react, @types/react-dom
 
 **Benefits:**
+
 - Reduced runtime errors
 - Better refactoring support
 - Improved team collaboration
 - Self-documenting code
 
 **Configuration files:**
+
 - `tsconfig.json` for TypeScript compiler options
 - Strict mode recommended for new projects
 
 ### 16.6 Deployment & DevOps
 
 #### 16.6.1 Process Management
+
 - **PM2:** Version 2.5.x
   - Production process manager for Node.js
   - Process clustering and load balancing
@@ -1805,6 +1967,7 @@ This section provides comprehensive details on all technologies, frameworks, lib
   - Startup script generation
 
 **PM2 Configuration (ecosystem.config.js):**
+
 ```javascript
 module.exports = {
   apps: [{
@@ -1826,6 +1989,7 @@ module.exports = {
 ```
 
 #### 16.6.2 Web Server
+
 - **Nginx:** Version 1.24+
   - High-performance HTTP server and reverse proxy
   - SSL/TLS termination
@@ -1836,6 +2000,7 @@ module.exports = {
   - Security headers
 
 #### 16.6.3 Containerization (Optional)
+
 - **Docker:** Version 24.x (optional)
   - Containerization platform
   - Consistent environments across dev/staging/prod
@@ -1843,11 +2008,13 @@ module.exports = {
   - Docker Compose for multi-container setup
   
 **Docker Files:**
+
 - `Dockerfile` for Node.js application
 - `Dockerfile.postgres` for PostgreSQL (or use official image)
 - `docker-compose.yml` for orchestration
 
 **Example docker-compose.yml:**
+
 ```yaml
 version: '3.8'
 
@@ -1881,16 +2048,19 @@ volumes:
 ### 16.7 Version Control & Package Management
 
 #### 16.7.1 Package Managers
+
 - **npm:** Version 10.x (bundled with Node.js 24.11)
   - Default Node.js package manager
   - Lock file: package-lock.json
   - Scripts for build, test, start
   
 **Alternative:**
+
 - **pnpm:** Version 8.x (optional, more efficient disk usage)
 - **yarn:** Version 4.x (optional, alternative to npm)
 
 #### 16.7.2 Version Control
+
 - **Git:** Version 2.40+
   - Distributed version control
   - .gitignore configuration to exclude:
@@ -1903,6 +2073,7 @@ volumes:
 ### 16.8 Development Environment Setup
 
 #### 16.8.1 Prerequisites
+
 ```bash
 # Install Node.js 24.11 LTS
 # Install PostgreSQL 18
@@ -1916,6 +2087,7 @@ git --version   # Should show 2.40+
 ```
 
 #### 16.8.2 Initial Setup
+
 ```bash
 # Clone repository
 git clone https://github.com/org/snackbar.git
@@ -1951,6 +2123,7 @@ cd client && npm run dev
 ### 16.9 Package.json Scripts
 
 #### Backend (server/package.json)
+
 ```json
 {
   "scripts": {
@@ -1966,6 +2139,7 @@ cd client && npm run dev
 ```
 
 #### Frontend (client/package.json)
+
 ```json
 {
   "scripts": {
@@ -1984,6 +2158,7 @@ cd client && npm run dev
 ### 16.10 Additional Considerations
 
 #### 16.10.1 Image Processing (for product images)
+
 - **sharp:** Version 0.33.x
   - High-performance image processing
   - Resize, compress, format conversion
@@ -1991,6 +2166,7 @@ cd client && npm run dev
   - EXIF metadata stripping
 
 #### 16.10.2 API Documentation
+
 - **Swagger/OpenAPI:** Version 3.0
   - API specification format
   - Interactive documentation
@@ -1998,12 +2174,14 @@ cd client && npm run dev
   - **swagger-jsdoc:** Version 6.2.x for generating from comments
 
 #### 16.10.3 Rate Limiting
+
 - **express-rate-limit:** Version 7.1.x
   - Prevent brute-force attacks
   - API abuse protection
   - Configurable windows and limits
 
 #### 16.10.4 Session Management
+
 - **express-session:** Version 1.17.x
   - Session middleware for Express
   - PostgreSQL session store (connect-pg-simple)
@@ -2012,7 +2190,8 @@ cd client && npm run dev
 ---
 
 **Document Status:** APPROVED - Ready for Development  
-**Next Steps:** 
+**Next Steps:**
+
 1. Technical architecture design
 2. Database schema implementation
 3. API specification (OpenAPI/Swagger)

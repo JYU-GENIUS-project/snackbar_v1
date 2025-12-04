@@ -12,6 +12,7 @@
 This document defines the high-level architecture for the Self-Service Snack Bar Kiosk System following the C4 model. The architecture is based on the PERN stack (PostgreSQL, Express.js, React, Node.js) as specified in the SRS document.
 
 ### Architecture Principles
+
 - **Separation of Concerns:** Clear boundaries between presentation, business logic, and data layers
 - **Stateless API:** RESTful API design for future multi-kiosk scalability
 - **Security First:** HTTPS/TLS, secure authentication, input validation
