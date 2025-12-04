@@ -21,6 +21,10 @@ This repository contains requirements engineering documentation and automated ac
 
 ### Architecture Documentation
 - **[C4 Architecture](docs/architecture/C4_Architecture.md)** - High-level architecture following C4 model with system context and container diagrams, Docker deployment configuration
+- **[Architecture Decision Records](docs/architecture/decisions/)** - Formalized technical decisions:
+  - [ADR-001: Containerization Strategy](docs/architecture/decisions/ADR-001-containerization-strategy.md) - Docker and Docker Compose
+  - [ADR-002: PostgreSQL Database](docs/architecture/decisions/ADR-002-postgresql-database.md) - Primary database selection
+  - [ADR-003: PERN Technology Stack](docs/architecture/decisions/ADR-003-pern-technology-stack.md) - Full stack technology selection
 
 ### Audits & Compliance
 - **[Traceability Audit Report](docs/audits/traceability_audit_report.md)** - 100% coverage audit confirming all 68 user stories have corresponding test cases
@@ -28,7 +32,7 @@ This repository contains requirements engineering documentation and automated ac
 ## Technology Stack
 - **Backend**: Node.js 24.11 LTS with Express.js 5.1
 - **Frontend**: React 19.2
-- **Database**: PostgreSQL 16+
+- **Database**: PostgreSQL 18
 - **Payment**: MobilePay API integration
 - **Testing**: Robot Framework with SeleniumLibrary
 
@@ -60,6 +64,7 @@ See [tests/README.md](tests/README.md) for detailed testing documentation.
 - ✅ Automated acceptance tests created (160 tests across 12 test suites)
 - ✅ Traceability audit completed (100% coverage - all 68 user stories covered)
 - ✅ C4 Architecture documentation complete
+- ✅ Architecture Decision Records (ADRs) documented
 - 🚧 Implementation in progress
 
 ## License
