@@ -1,0 +1,166 @@
+# =============================================================================
+# Docker Compose Configuration for Self-Service Snack Bar Kiosk System
+# =============================================================================
+# 
+# Based on C4 Architecture specification (docs/architecture/C4_Architecture.md)
+# and ADR-001 Containerization Strategy
+#
+# Usage:
+#   Development: docker-compose up -d
+#   Production:  docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#   Logs:        docker-compose logs -f api
+#   Stop:        docker-compose down
+#   Stop+Clean:  docker-compose down -v
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # PostgreSQL Database
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:18
+    container_name: snackbar-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-snackbar_prod}
+      POSTGRES_USER: ${DB_USER:-snackbar_app}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d:ro
+      - backups:/backups
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-snackbar_app} -d ${DB_NAME:-snackbar_prod}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - snackbar-network
+
+  # ---------------------------------------------------------------------------
+  # Node.js API Server (with PM2)
+  # ---------------------------------------------------------------------------
+  api:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: snackbar-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-snackbar_prod}
+      DB_USER: ${DB_USER:-snackbar_app}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_SSL: ${DB_SSL:-disable}
+      POOL_MIN: ${POOL_MIN:-2}
+      POOL_MAX: ${POOL_MAX:-10}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET is required}
+      BCRYPT_ROUNDS: ${BCRYPT_ROUNDS:-12}
+      SESSION_TIMEOUT_MS: ${SESSION_TIMEOUT_MS:-1800000}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-24h}
+      MOBILEPAY_API_URL: ${MOBILEPAY_API_URL:-https://api.mobilepay.dk}
+      MOBILEPAY_API_KEY: ${MOBILEPAY_API_KEY:-}
+      MOBILEPAY_MERCHANT_ID: ${MOBILEPAY_MERCHANT_ID:-}
+      MOBILEPAY_WEBHOOK_SECRET: ${MOBILEPAY_WEBHOOK_SECRET:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      ADMIN_NOTIFICATION_EMAILS: ${ADMIN_NOTIFICATION_EMAILS:-}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    volumes:
+      - uploads:/app/uploads
+      - logs:/app/logs
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - snackbar-network
+
+  # ---------------------------------------------------------------------------
+  # Nginx Reverse Proxy
+  # ---------------------------------------------------------------------------
+  nginx:
+    image: nginx:1.24-alpine
+    container_name: snackbar-nginx
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./client/dist:/usr/share/nginx/html:ro
+      - uploads:/usr/share/nginx/uploads:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - snackbar-network
+
+  # ---------------------------------------------------------------------------
+  # Backup Service (runs nightly at 02:00)
+  # ---------------------------------------------------------------------------
+  backup:
+    image: postgres:18
+    container_name: snackbar-backup
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGPORT: 5432
+      PGDATABASE: ${DB_NAME:-snackbar_prod}
+      PGUSER: ${DB_USER:-snackbar_app}
+      PGPASSWORD: ${DB_PASSWORD}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-90}
+    volumes:
+      - backups:/backups
+      - ./init-db/backup.sh:/backup.sh:ro
+    entrypoint: ["/bin/sh", "-c", "echo 'Backup container ready. Run: docker-compose run backup /backup.sh'"]
+    networks:
+      - snackbar-network
+    profiles:
+      - backup
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  postgres_data:
+    driver: local
+  uploads:
+    driver: local
+  logs:
+    driver: local
+  backups:
+    driver: local
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  snackbar-network:
+    driver: bridge
