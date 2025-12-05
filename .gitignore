@@ -21,3 +21,51 @@ __pycache__/
 # OS
 .DS_Store
 Thumbs.db
+
+# =============================================================================
+# Application-specific ignores
+# =============================================================================
+
+# Environment files (contain secrets - NEVER commit)
+.env
+.env.local
+.env.*.local
+
+# Node.js dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build artifacts
+dist/
+build/
+*.tgz
+
+# Logs
+logs/
+*.log
+
+# Coverage reports
+coverage/
+.nyc_output/
+
+# Docker
+*.pem
+nginx/ssl/*.pem
+nginx/ssl/*.key
+nginx/ssl/*.crt
+
+# Database
+*.sql
+!init-db/*.sql
+
+# Uploads (user-generated content)
+uploads/
+
+# Backups
+backups/
+
+# Temporary files
+tmp/
+temp/
