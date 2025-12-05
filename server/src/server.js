@@ -15,6 +15,7 @@ const morgan = require('morgan');
 
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 const { requestLogger } = require('./middleware/requestLogger');
+const { rateLimiters } = require('./middleware/rateLimiter');
 const healthRoutes = require('./routes/health');
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admins');
@@ -84,14 +85,14 @@ app.set('trust proxy', 1);
 // API Routes
 // =============================================================================
 
-// Health check endpoints
+// Health check endpoints (no rate limiting needed)
 app.use('/api', healthRoutes);
 
-// Authentication routes
-app.use('/api/auth', authRoutes);
+// Authentication routes (stricter rate limiting)
+app.use('/api/auth', rateLimiters.auth, authRoutes);
 
-// Admin management routes
-app.use('/api/admins', adminRoutes);
+// Admin management routes (standard API rate limiting)
+app.use('/api/admins', rateLimiters.api, adminRoutes);
 
 // =============================================================================
 // Error Handling

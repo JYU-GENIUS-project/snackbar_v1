@@ -60,7 +60,7 @@ const authenticate = async (req, res, next) => {
     // Check for session timeout due to inactivity (30 minutes)
     const lastActivity = new Date(session.last_activity_at);
     const now = new Date();
-    const inactivityMs = now - lastActivity;
+    const inactivityMs = now.getTime() - lastActivity.getTime();
 
     if (inactivityMs > SESSION_TIMEOUT_MS) {
       // Delete expired session

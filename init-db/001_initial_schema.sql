@@ -236,10 +236,11 @@ CREATE TRIGGER update_transactions_updated_at
 -- =============================================================================
 -- Transaction Number Generation Function
 -- =============================================================================
+-- Uses timestamp + 8-character random UUID suffix for uniqueness and unpredictability
 CREATE OR REPLACE FUNCTION generate_transaction_number()
 RETURNS TRIGGER AS $$
 BEGIN
-    NEW.transaction_number := 'TXN-' || TO_CHAR(CURRENT_TIMESTAMP, 'YYYYMMDD-HH24MISS') || '-' || UPPER(SUBSTRING(uuid_generate_v4()::text, 1, 4));
+    NEW.transaction_number := 'TXN-' || TO_CHAR(CURRENT_TIMESTAMP, 'YYYYMMDD-HH24MISS') || '-' || UPPER(SUBSTRING(uuid_generate_v4()::text, 1, 8));
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;

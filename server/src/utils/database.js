@@ -29,7 +29,13 @@ const pool = new Pool({
   connectionTimeoutMillis: 5000,
 
   // SSL configuration
-  ssl: process.env.DB_SSL === 'require' ? { rejectUnauthorized: false } : false
+  // In production, set DB_SSL=require and ensure proper certificate validation
+  // rejectUnauthorized: false is only safe for development environments
+  ssl: process.env.DB_SSL === 'require'
+    ? {
+      rejectUnauthorized: process.env.NODE_ENV === 'production'
+    }
+    : false
 });
 
 // =============================================================================

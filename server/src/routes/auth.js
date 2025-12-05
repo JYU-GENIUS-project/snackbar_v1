@@ -14,6 +14,7 @@ const adminService = require('../services/adminService');
 const { createAuditLog, AuditActions, EntityTypes } = require('../services/auditService');
 const { authenticate } = require('../middleware/auth');
 const { ApiError } = require('../middleware/errorHandler');
+const { rateLimiters } = require('../middleware/rateLimiter');
 
 // =============================================================================
 // Validation Rules
@@ -35,8 +36,9 @@ const loginValidation = [
 /**
  * POST /api/auth/login
  * Authenticate admin and create session
+ * Has stricter rate limiting (5 attempts per hour per IP)
  */
-router.post('/login', loginValidation, async (req, res, next) => {
+router.post('/login', rateLimiters.login, loginValidation, async (req, res, next) => {
   try {
     // Validate input
     const errors = validationResult(req);
