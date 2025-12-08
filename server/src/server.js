@@ -19,6 +19,7 @@ const { rateLimiters } = require('./middleware/rateLimiter');
 const healthRoutes = require('./routes/health');
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admins');
+const { ensureStorageStructure } = require('./utils/mediaStorage');
 
 // =============================================================================
 // Application Setup
@@ -26,6 +27,9 @@ const adminRoutes = require('./routes/admins');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Ensure upload directories are present before handling any requests
+ensureStorageStructure();
 
 // =============================================================================
 // Security Middleware
