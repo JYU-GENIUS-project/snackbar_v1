@@ -3,7 +3,7 @@
 // =============================================================================
 
 // Mock bcrypt
-jest.mock('bcrypt', () => ({
+jest.mock('@node-rs/bcrypt', () => ({
   hash: jest.fn().mockResolvedValue('$2b$12$hashedpassword'),
   compare: jest.fn().mockResolvedValue(true)
 }));
@@ -31,7 +31,7 @@ describe('Auth Service', () => {
 
   describe('hashPassword', () => {
     it('should hash a password using bcrypt', async () => {
-      const bcrypt = require('bcrypt');
+      const bcrypt = require('@node-rs/bcrypt');
       const { hashPassword } = require('../services/authService');
 
       const password = 'TestPassword123!';
@@ -44,7 +44,7 @@ describe('Auth Service', () => {
 
   describe('verifyPassword', () => {
     it('should verify password against hash', async () => {
-      const bcrypt = require('bcrypt');
+      const bcrypt = require('@node-rs/bcrypt');
       const { verifyPassword } = require('../services/authService');
 
       const password = 'TestPassword123!';
@@ -56,7 +56,7 @@ describe('Auth Service', () => {
     });
 
     it('should return false for incorrect password', async () => {
-      const bcrypt = require('bcrypt');
+      const bcrypt = require('@node-rs/bcrypt');
       bcrypt.compare.mockResolvedValueOnce(false);
 
       const { verifyPassword } = require('../services/authService');

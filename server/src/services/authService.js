@@ -5,7 +5,7 @@
 // Based on SRS FR-5.1 (Authentication), US-061 (bcrypt hashing)
 // =============================================================================
 
-const bcrypt = require('bcrypt');
+const bcrypt = require('@node-rs/bcrypt');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const crypto = require('crypto');
