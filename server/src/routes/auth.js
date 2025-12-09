@@ -16,6 +16,20 @@ const { authenticate } = require('../middleware/auth');
 const { ApiError } = require('../middleware/errorHandler');
 const { rateLimiters } = require('../middleware/rateLimiter');
 
+const isProduction = process.env.NODE_ENV === 'production';
+
+const resolveClientIdentifier = (req) => {
+  const forwarded = req.get('X-Forwarded-For');
+  if (forwarded) {
+    const [first] = forwarded.split(',');
+    if (first) {
+      return first.trim();
+    }
+  }
+
+  return req.ip || req.connection?.remoteAddress || 'unknown';
+};
+
 // =============================================================================
 // Validation Rules
 // =============================================================================
@@ -124,6 +138,13 @@ router.post('/login', rateLimiters.login, loginValidation, async (req, res, next
       ipAddress,
       userAgent
     });
+
+    if (typeof rateLimiters.reset === 'function') {
+      const limiterIdentifier = req.rateLimitState?.login?.identifier || resolveClientIdentifier(req);
+      if (limiterIdentifier) {
+        rateLimiters.reset('login', limiterIdentifier);
+      }
+    }
 
     // Return token and user info
     res.status(200).json({
