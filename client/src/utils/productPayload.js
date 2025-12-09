@@ -45,11 +45,15 @@ const extractPrimaryImageUrl = (product) => {
 
 export const normalizeProductPayload = (formValues) => {
   const metadata = parseMetadata(formValues.metadata);
+  const normalizedCategoryIds = Array.isArray(formValues.categoryIds)
+    ? Array.from(new Set(formValues.categoryIds.filter(Boolean)))
+    : [];
 
   return {
     name: formValues.name?.trim(),
     description: formValues.description?.trim() || null,
-    categoryId: formValues.categoryId || null,
+    categoryIds: normalizedCategoryIds,
+    categoryId: normalizedCategoryIds[0] || formValues.categoryId || null,
     price: numberOrNull(formValues.price),
     currency: formValues.currency || 'EUR',
     status: formValues.status || 'draft',
@@ -81,14 +85,22 @@ export const productToFormState = (product) => {
       metadata: '{}',
       displayOrder: 0,
       isActive: true,
-      imagePreviewUrl: ''
+      imagePreviewUrl: '',
+      categoryIds: []
     };
   }
+
+  const existingCategoryIds = Array.isArray(product.categoryIds)
+    ? product.categoryIds.filter(Boolean)
+    : Array.isArray(product.categories)
+      ? product.categories.map((category) => category.id).filter(Boolean)
+      : [];
 
   return {
     name: product.name || '',
     description: product.description || '',
-    categoryId: product.categoryId || '',
+    categoryId: existingCategoryIds[0] || product.categoryId || '',
+    categoryIds: existingCategoryIds,
     price: product.price ?? '',
     currency: product.currency || 'EUR',
     status: product.status || 'draft',
@@ -105,11 +117,23 @@ export const productToFormState = (product) => {
 };
 
 export const ensureMinimumProductShape = (product) => {
+  const categoryIds = Array.isArray(product.categoryIds)
+    ? product.categoryIds.filter(Boolean)
+    : product.categoryId
+      ? [product.categoryId]
+      : [];
   return {
     id: product.id,
     name: product.name,
     description: product.description ?? null,
-    categoryId: product.categoryId ?? null,
+    categoryId: product.categoryId ?? categoryIds[0] ?? null,
+    categoryIds,
+    categories: Array.isArray(product.categories)
+      ? product.categories.map((category) => ({
+          id: category.id,
+          name: category.name
+        }))
+      : categoryIds.map((id) => ({ id, name: null })),
     price: typeof product.price === 'number' ? product.price : numberOrNull(product.price),
     currency: product.currency || 'EUR',
     status: product.status || 'draft',

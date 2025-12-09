@@ -51,9 +51,42 @@ const ProductForm = ({
 
   const handleChange = (event) => {
     const { name, type, value, checked } = event.target;
+    if (name === 'categoryIds' || name === 'primaryCategory') {
+      return;
+    }
     setFormValues((current) => ({
       ...current,
       [name]: type === 'checkbox' ? checked : value
+    }));
+  };
+
+  const handlePrimaryCategoryChange = (event) => {
+    const selected = event.target.value;
+    setFormValues((current) => {
+      if (!selected) {
+        return {
+          ...current,
+          categoryId: '',
+          categoryIds: []
+        };
+      }
+
+      const filtered = (current.categoryIds || []).filter((id) => id && id !== selected);
+      return {
+        ...current,
+        categoryId: selected,
+        categoryIds: [selected, ...filtered]
+      };
+    });
+  };
+
+  const handleCategorySelection = (event) => {
+    const options = Array.from(event.target.selectedOptions || []);
+    const selectedIds = options.map((option) => option.value).filter(Boolean);
+    setFormValues((current) => ({
+      ...current,
+      categoryIds: selectedIds,
+      categoryId: selectedIds[0] || ''
     }));
   };
 
@@ -211,12 +244,12 @@ const ProductForm = ({
           />
         </div>
         <div className="form-field">
-          <label htmlFor="product-category">Category</label>
+          <label htmlFor="category-select">Primary category</label>
           <select
-            id="product-category"
-            name="categoryId"
-            value={formValues.categoryId}
-            onChange={handleChange}
+            id="category-select"
+            name="primaryCategory"
+            value={formValues.categoryIds?.[0] || ''}
+            onChange={handlePrimaryCategoryChange}
             disabled={categoriesLoading}
           >
             <option value="">{categoriesLoading ? 'Loading categories…' : 'Select category'}</option>
@@ -227,6 +260,25 @@ const ProductForm = ({
             ))}
           </select>
           {categoriesError && <span className="helper error">Unable to load categories.</span>}
+        </div>
+        <div className="form-field">
+          <label htmlFor="category-multiselect">Additional categories</label>
+          <select
+            id="category-multiselect"
+            name="categoryIds"
+            multiple
+            value={formValues.categoryIds || []}
+            onChange={handleCategorySelection}
+            disabled={categoriesLoading}
+            size={Math.min(Math.max((categories || []).length, 4), 10)}
+          >
+            {(categories || []).map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.name}
+              </option>
+            ))}
+          </select>
+          <span className="helper">Hold Ctrl (Windows) or ⌘ (Mac) to select multiple categories.</span>
         </div>
       </div>
 

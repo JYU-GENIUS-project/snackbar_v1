@@ -19,6 +19,8 @@ const { rateLimiters } = require('./middleware/rateLimiter');
 const healthRoutes = require('./routes/health');
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admins');
+const categoryRoutes = require('./routes/categories');
+const productRoutes = require('./routes/products');
 const { ensureStorageStructure } = require('./utils/mediaStorage');
 
 // =============================================================================
@@ -97,6 +99,12 @@ app.use('/api/auth', rateLimiters.auth, authRoutes);
 
 // Admin management routes (standard API rate limiting)
 app.use('/api/admins', rateLimiters.api, adminRoutes);
+
+// Category management routes
+app.use('/api/categories', rateLimiters.api, categoryRoutes);
+
+// Product catalog routes
+app.use('/api/products', rateLimiters.api, productRoutes);
 
 // =============================================================================
 // Error Handling

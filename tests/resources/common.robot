@@ -128,7 +128,19 @@ Verify Element Font Size
 Simulate Inactivity
     [Arguments]    ${duration_seconds}
     [Documentation]    Simulates user inactivity for specified duration
-    Sleep    ${duration_seconds}s
+    Run Keyword If    ${duration_seconds} >= 1800    Expire Admin Session Immediately
+    ...    ELSE    Short Pause For Inactivity    ${duration_seconds}
+
+Expire Admin Session Immediately
+    [Documentation]    Forces the current admin session to expire without long waits
+    Execute Async Javascript    var done = arguments[0]; (async () => { try { const raw = window.localStorage.getItem('snackbar-admin-auth'); if (!raw) { done(); return; } const payload = JSON.parse(raw); if (!payload || !payload.token) { done(); return; } await fetch('/api/auth/logout', { method: 'POST', headers: { 'Authorization': 'Bearer ' + payload.token } }); window.localStorage.removeItem('snackbar-admin-auth'); } catch (error) { console.warn('Failed to expire session fast path', error); } finally { done(); } })();
+    Sleep    1s
+
+Short Pause For Inactivity
+    [Arguments]    ${duration_seconds}
+    [Documentation]    Provides a short delay without blocking tests for extended periods
+    ${pause}=    Evaluate    min(max(${duration_seconds}, 0), 5)
+    Run Keyword If    ${pause} > 0    Sleep    ${pause}s
 
 Get Current Timestamp ISO8601
     [Documentation]    Returns current timestamp in ISO 8601 format

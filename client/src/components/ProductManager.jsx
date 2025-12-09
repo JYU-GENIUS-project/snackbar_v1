@@ -5,9 +5,15 @@ import ProductTable from './ProductTable.jsx';
 import ProductForm from './ProductForm.jsx';
 import ProductMediaManager from './ProductMediaManager.jsx';
 import KioskPreview from './KioskPreview.jsx';
+import CategoryManager from './CategoryManager.jsx';
 import { normalizeProductPayload, productToFormState } from '../utils/productPayload.js';
 import { useUploadProductMedia } from '../hooks/useProductMedia.js';
-import { useCategories } from '../hooks/useCategories.js';
+import {
+  useCategories,
+  useCreateCategory,
+  useDeleteCategory,
+  useUpdateCategory
+} from '../hooks/useCategories.js';
 
 const DEFAULT_LIMIT = 50;
 
@@ -43,6 +49,9 @@ const ProductManager = ({ auth }) => {
     isLoading: categoriesLoading,
     error: categoriesError
   } = useCategories(auth.token);
+  const createCategoryMutation = useCreateCategory(auth.token);
+  const updateCategoryMutation = useUpdateCategory(auth.token);
+  const deleteCategoryMutation = useDeleteCategory(auth.token);
 
   const products = useMemo(() => data?.data ?? [], [data]);
   const meta = data?.meta;
@@ -70,6 +79,10 @@ const ProductManager = ({ auth }) => {
 
   const handleShowProducts = () => {
     setActiveSection('products');
+  };
+
+  const handleShowCategories = () => {
+    setActiveSection('categories');
   };
 
   const handleCreate = async (values) => {
@@ -190,6 +203,14 @@ const ProductManager = ({ auth }) => {
           onClick={handleShowProducts}
         >
           Products
+        </button>
+        <button
+          id="categories-menu"
+          className={`button secondary${activeSection === 'categories' ? '' : ' muted'}`}
+          type="button"
+          onClick={handleShowCategories}
+        >
+          Categories
         </button>
         <button id="inventory-menu" className="button secondary muted" type="button" disabled>
           Inventory
@@ -322,6 +343,21 @@ const ProductManager = ({ auth }) => {
           productName={editingProduct.name}
           token={auth.token}
           ref={mediaManagerRef}
+        />
+      )}
+
+      {activeSection === 'categories' && (
+        <CategoryManager
+          categories={categories}
+          isLoading={categoriesLoading}
+          error={categoriesError}
+          onCreate={createCategoryMutation.mutateAsync}
+          onUpdate={updateCategoryMutation.mutateAsync}
+          onDelete={deleteCategoryMutation.mutateAsync}
+          isCreating={createCategoryMutation.isPending}
+          isUpdating={updateCategoryMutation.isPending}
+          isDeleting={deleteCategoryMutation.isPending}
+          deletePendingId={deleteCategoryMutation.variables?.id ?? null}
         />
       )}
     </div>
