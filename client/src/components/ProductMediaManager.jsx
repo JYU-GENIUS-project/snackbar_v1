@@ -145,7 +145,7 @@ const ProductMediaManager = forwardRef(({ productId, token, productName }, ref) 
                       <td>{item.createdAt ? new Date(item.createdAt).toLocaleString() : '—'}</td>
                       <td>
                         <div className="inline" style={{ gap: '0.5rem' }}>
-                          {!markedPrimary && (
+                          {!markedPrimary && item.variant === 'display' && (
                             <button
                               className="button secondary"
                               type="button"

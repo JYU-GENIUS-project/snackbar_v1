@@ -226,6 +226,7 @@ module.exports = {
   ALLOWED_FORMATS,
   MAX_SIZE_BYTES,
   MIN_SIZE_BYTES,
+  getBaseDirectory,
   ensureStorageStructure,
   persistMedia,
   deleteMedia,

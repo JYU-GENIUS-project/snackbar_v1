@@ -1,6 +1,7 @@
 const db = require('../utils/database');
 const { ApiError } = require('../middleware/errorHandler');
 const { createAuditLog, AuditActions, EntityTypes } = require('./auditService');
+const productMediaService = require('./productMediaService');
 
 const ALLOWED_STATUSES = new Set(['draft', 'active', 'archived']);
 
@@ -44,6 +45,22 @@ const mapProductRow = (row) => {
     })),
     media: []
   };
+};
+
+const attachMediaToProducts = async (products, { client } = {}) => {
+  if (!Array.isArray(products) || products.length === 0) {
+    return products;
+  }
+
+  const mediaMap = await productMediaService.listMediaForProducts(
+    products.map((product) => product.id),
+    { client }
+  );
+
+  return products.map((product) => ({
+    ...product,
+    media: mediaMap.get(product.id) || []
+  }));
 };
 
 const productSelectBase = `
@@ -105,7 +122,10 @@ const getProductById = async (id, { includeArchived = true, client = null } = {}
     return null;
   }
 
-  return mapProductRow(result.rows[0]);
+  const product = mapProductRow(result.rows[0]);
+  product.media = await productMediaService.listProductMedia(product.id, { client });
+
+  return product;
 };
 
 const normalizeMetadata = (metadata) => {
@@ -286,8 +306,10 @@ const listProducts = async ({ includeArchived = false, search = '', limit = 50, 
 
   const total = parseInt(countResult.rows[0]?.total || '0', 10);
 
+  const products = await attachMediaToProducts(dataResult.rows.map(mapProductRow));
+
   return {
-    data: dataResult.rows.map(mapProductRow),
+    data: products,
     meta: {
       total,
       limit,
@@ -458,10 +480,60 @@ const archiveProduct = async (id, actor) => {
   return updated;
 };
 
+const getProductFeed = async () => {
+  const result = await db.query(
+    `${productSelectBase}
+     WHERE p.deleted_at IS NULL AND p.status = 'active' AND p.is_active = TRUE
+     GROUP BY p.id
+     ORDER BY p.display_order ASC, p.name ASC`
+  );
+
+  const products = await attachMediaToProducts(result.rows.map(mapProductRow));
+
+  return products.map((product) => {
+    const primaryMedia =
+      product.media.find((item) => item.isPrimary) ||
+      product.media.find((item) => item.variant === 'display') ||
+      null;
+
+    return {
+      id: product.id,
+      name: product.name,
+      description: product.description,
+      price: product.price,
+      currency: product.currency,
+      status: product.status,
+      available:
+        product.status === 'active' &&
+        product.isActive &&
+        (product.stockQuantity === null || product.stockQuantity > 0),
+      stockQuantity: product.stockQuantity,
+      purchaseLimit: product.purchaseLimit,
+      lowStockThreshold: product.lowStockThreshold,
+      allergens: product.allergens,
+      metadata: product.metadata || {},
+      imageAlt: product.imageAlt,
+      updatedAt: product.updatedAt,
+      displayOrder: product.displayOrder,
+      primaryMedia: primaryMedia
+        ? {
+          id: primaryMedia.id,
+          url: primaryMedia.url,
+          variant: primaryMedia.variant,
+          format: primaryMedia.format,
+          alt: product.imageAlt || product.name
+        }
+        : null,
+      media: product.media
+    };
+  });
+};
+
 module.exports = {
   listProducts,
   createProduct,
   updateProduct,
   archiveProduct,
-  getProductById
+  getProductById,
+  getProductFeed
 };

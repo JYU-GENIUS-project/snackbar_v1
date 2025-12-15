@@ -21,7 +21,8 @@ const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admins');
 const categoryRoutes = require('./routes/categories');
 const productRoutes = require('./routes/products');
-const { ensureStorageStructure } = require('./utils/mediaStorage');
+const feedRoutes = require('./routes/feed');
+const mediaStorage = require('./utils/mediaStorage');
 
 // =============================================================================
 // Application Setup
@@ -31,7 +32,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Ensure upload directories are present before handling any requests
-ensureStorageStructure();
+mediaStorage.ensureStorageStructure();
 
 // =============================================================================
 // Security Middleware
@@ -76,6 +77,18 @@ app.use(compression());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Serve media assets
+app.use(
+  '/uploads',
+  express.static(mediaStorage.getBaseDirectory(), {
+    index: false,
+    maxAge: '1h',
+    setHeaders: (res) => {
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+    }
+  })
+);
+
 // Request logging (Morgan)
 if (process.env.NODE_ENV !== 'test') {
   app.use(morgan(process.env.LOG_FORMAT === 'json' ? 'combined' : 'dev'));
@@ -105,6 +118,9 @@ app.use('/api/categories', rateLimiters.api, categoryRoutes);
 
 // Product catalog routes
 app.use('/api/products', rateLimiters.api, productRoutes);
+
+// Product feed routes
+app.use('/api/feed', rateLimiters.api, feedRoutes);
 
 // =============================================================================
 // Error Handling
