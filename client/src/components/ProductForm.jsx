@@ -50,6 +50,7 @@ const ProductForm = ({
     }
   }, [initialValues]);
 
+
   const handleChange = (event) => {
     const { name, type, value, checked } = event.target;
     if (name === 'categoryIds' || name === 'primaryCategory') {
@@ -144,6 +145,20 @@ const ProductForm = ({
     }
     if (formValues.price === '' || Number.isNaN(Number(formValues.price))) {
       setFormError('Price must be a numeric value.');
+      return;
+    }
+    const limitValue = formValues.purchaseLimit;
+    const parsedLimit = Number(limitValue);
+    if (limitValue === '' || Number.isNaN(parsedLimit)) {
+      setFormError('Purchase limit must be a numeric value.');
+      return;
+    }
+    if (parsedLimit < 1) {
+      setFormError('Minimum limit is 1');
+      return;
+    }
+    if (parsedLimit > 50) {
+      setFormError('Maximum limit is 50');
       return;
     }
 

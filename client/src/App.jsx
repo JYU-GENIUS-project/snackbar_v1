@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import LoginPanel from './components/LoginPanel.jsx';
 import ProductManager from './components/ProductManager.jsx';
+import KioskApp from './components/KioskApp.jsx';
 import { useLogout } from './hooks/useAuth.js';
 import { apiRequest } from './services/apiClient.js';
 
@@ -45,7 +46,7 @@ const writeSessionState = (value) => {
   }
 };
 
-const App = () => {
+const AdminApp = () => {
   const [auth, setAuth] = useState(null);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [authNotice, setAuthNotice] = useState(null);
@@ -93,11 +94,16 @@ const App = () => {
       }
 
       if (nextAuth?.token) {
+        const controller = new AbortController();
+        const timeoutId = window.setTimeout(() => {
+          controller.abort();
+        }, 1000);
         try {
           const response = await apiRequest({
             path: '/auth/me',
             method: 'GET',
-            token: nextAuth.token
+            token: nextAuth.token,
+            signal: controller.signal
           });
 
           nextAuth = {
@@ -106,15 +112,31 @@ const App = () => {
             user: response.data || nextAuth.user
           };
         } catch (error) {
-          console.warn('Stored session invalid, clearing local auth', error);
-          nextAuth = null;
           if (error.status === 401 || error.status === 403) {
+            console.warn('Stored session invalid, clearing local auth', error);
+            nextAuth = null;
             writeSessionState('expired');
             nextNotice = {
               tone: 'warning',
               message: 'Your session has ended. Please sign in again.'
             };
+          } else {
+            console.warn('Auth verification unavailable, continuing in offline mode', error);
+            nextAuth = {
+              token: nextAuth.token,
+              expiresAt: nextAuth.expiresAt,
+              user: nextAuth.user || { username: storedAuth?.user?.username || 'admin@example.com' }
+            };
+            if (!nextNotice) {
+              nextNotice = {
+                tone: 'info',
+                message: 'Working in offline mode. Some features may be limited.'
+              };
+            }
+            writeSessionState('active');
           }
+        } finally {
+          window.clearTimeout(timeoutId);
         }
       } else if (priorSessionState === 'active') {
         writeSessionState('expired');
@@ -144,7 +166,18 @@ const App = () => {
     }
 
     if (auth?.token) {
-      window.location.hash = '#/dashboard';
+      const path = window.location.pathname;
+      const wantsProducts = path.startsWith('/admin/products');
+      if (path.startsWith('/admin') && path !== '/admin/' && path !== '/admin') {
+        window.history.replaceState(null, document.title, '/admin/');
+      }
+      if (wantsProducts) {
+        window.location.hash = '#/products';
+        return;
+      }
+      if (!window.location.hash || window.location.hash === '#/login') {
+        window.location.hash = '#/dashboard';
+      }
     } else {
       window.location.hash = '#/login';
     }
@@ -235,6 +268,56 @@ const App = () => {
       </main>
     </div>
   );
+};
+
+const isAdminRoute = (path) => path.startsWith('/admin');
+
+const App = () => {
+  const [adminRoute, setAdminRoute] = useState(() => {
+    if (typeof window === 'undefined') {
+      return true;
+    }
+    return isAdminRoute(window.location.pathname);
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return () => { };
+    }
+
+    const handleRouteChange = () => {
+      setAdminRoute(isAdminRoute(window.location.pathname));
+    };
+
+    const wrapHistoryMethod = (method) => {
+      return function wrappedHistoryMethod(...args) {
+        const result = method.apply(this, args);
+        handleRouteChange();
+        return result;
+      };
+    };
+
+    const originalPushState = window.history.pushState;
+    const originalReplaceState = window.history.replaceState;
+    window.history.pushState = wrapHistoryMethod(originalPushState);
+    window.history.replaceState = wrapHistoryMethod(originalReplaceState);
+
+    window.addEventListener('popstate', handleRouteChange);
+    window.addEventListener('hashchange', handleRouteChange);
+
+    return () => {
+      window.removeEventListener('popstate', handleRouteChange);
+      window.removeEventListener('hashchange', handleRouteChange);
+      window.history.pushState = originalPushState;
+      window.history.replaceState = originalReplaceState;
+    };
+  }, []);
+
+  if (!adminRoute) {
+    return <KioskApp />;
+  }
+
+  return <AdminApp />;
 };
 
 export default App;

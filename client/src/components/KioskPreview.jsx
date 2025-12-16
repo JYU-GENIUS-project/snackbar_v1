@@ -67,6 +67,7 @@ const KioskPreview = () => {
           {products.map((product) => {
             const imageUrl = product.primaryMedia?.url;
             const imageAlt = product.primaryMedia?.alt || product.imageAlt || product.name;
+            const limit = Number.isFinite(product.purchaseLimit) ? Number(product.purchaseLimit) : null;
             return (
               <article key={product.id} style={cardStyles}>
                 {imageUrl ? (
@@ -77,11 +78,39 @@ const KioskPreview = () => {
                 <div>
                   <strong>{product.name}</strong>
                   <p className="helper" style={{ marginBottom: '0.25rem' }}>
-                    € {Number(product.price ?? 0).toFixed(2)} · {product.available ? 'Available' : 'Unavailable'}
+                    {Number(product.price ?? 0).toFixed(2)}€ · {product.available ? 'Available' : 'Unavailable'}
                   </p>
                   {product.metadata?.calories && (
                     <p className="helper">{product.metadata.calories} kcal</p>
                   )}
+                  <div className="preview-cart-controls" style={{ marginTop: '0.5rem' }}>
+                    <div className="cart-item-controls" style={{ gap: '0.5rem' }}>
+                      <button
+                        type="button"
+                        className="quantity-minus-button"
+                        disabled
+                        aria-label={`Decrease quantity for ${product.name}`}
+                        style={{ width: '48px', height: '48px' }}
+                      >
+                        −
+                      </button>
+                      <span className="quantity-value cart-item-quantity">{limit ?? 0}</span>
+                      <button
+                        type="button"
+                        className="quantity-plus-button"
+                        disabled={Boolean(limit)}
+                        aria-label={`Increase quantity for ${product.name}`}
+                        style={{ width: '48px', height: '48px' }}
+                      >
+                        +
+                      </button>
+                    </div>
+                    {limit && (
+                      <p className="helper" style={{ marginTop: '0.25rem' }}>
+                        Maximum {limit} of this item per purchase
+                      </p>
+                    )}
+                  </div>
                 </div>
               </article>
             );

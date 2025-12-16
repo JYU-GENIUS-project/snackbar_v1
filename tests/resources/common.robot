@@ -240,8 +240,8 @@ Saves The Product
 
 Saves The Configuration
     [Documentation]    Saves system configuration changes
-    Click Button    id=save-config-button
-    Wait Until Page Contains    Configuration saved    timeout=5s
+    Click Button    id=save-settings-button
+    Wait Until Page Contains    Settings updated    timeout=5s
 
 
 # --- Common Dialog Keywords ---

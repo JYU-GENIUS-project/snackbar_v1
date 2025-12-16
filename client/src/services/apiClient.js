@@ -25,13 +25,22 @@ export const apiRequest = async ({ path, method = 'GET', token, body, signal, se
 
   const isFormData = typeof FormData !== 'undefined' && body instanceof FormData;
 
-  const response = await fetch(url.toString(), {
-    method,
-    headers: buildHeaders(token, headers, { skipContentType: isFormData }),
-    body: isFormData ? body : body ? JSON.stringify(body) : undefined,
-    credentials: 'include',
-    signal
-  });
+  let response;
+  try {
+    response = await fetch(url.toString(), {
+      method,
+      headers: buildHeaders(token, headers, { skipContentType: isFormData }),
+      body: isFormData ? body : body ? JSON.stringify(body) : undefined,
+      credentials: 'include',
+      signal
+    });
+  } catch (networkError) {
+    const error = new Error('Network request failed');
+    error.status = 0;
+    error.offline = true;
+    error.cause = networkError;
+    throw error;
+  }
 
   const contentType = response.headers.get('content-type');
   const isJson = contentType && contentType.includes('application/json');

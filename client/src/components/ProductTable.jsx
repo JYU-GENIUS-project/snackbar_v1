@@ -53,7 +53,7 @@ const ProductTable = ({
                 : [];
               const primaryMedia = mediaItems.find((item) => item.isPrimary);
               return (
-                <tr key={product.id}>
+                <tr key={product.id} className="product-item" data-product-id={product.id}>
                   <td>
                     <strong>{product.name}</strong>
                     <div className="helper" style={{ maxWidth: '320px' }}>
@@ -103,12 +103,12 @@ const ProductTable = ({
                   </td>
                   <td>
                     <div className="inline">
-                      <button className="button secondary" type="button" onClick={() => onEdit(product)}>
+                      <button className="button secondary edit-button" type="button" onClick={() => onEdit(product)}>
                         Edit
                       </button>
                       {!product.deletedAt && (
                         <button
-                          className="button danger"
+                          className="button danger delete-button"
                           type="button"
                           onClick={() => onArchive(product)}
                           disabled={isArchiving}

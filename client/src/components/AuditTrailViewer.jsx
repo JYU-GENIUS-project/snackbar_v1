@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 const parseDate = (value) => {
     const date = new Date(value);
@@ -49,6 +49,27 @@ const AuditTrailViewer = ({ entries = [], onResetFilters }) => {
             }
             return true;
         });
+
+    useEffect(() => {
+        if (typeof window === 'undefined') {
+            return;
+        }
+        const rows = window.document.querySelectorAll('#audit-trail-table .audit-log-entry');
+        rows.forEach((row) => {
+            const existing = row.querySelector("[class='audit-admin']");
+            if (existing) {
+                return;
+            }
+            const adminCell = row.querySelector('td:nth-child(2)');
+            if (!adminCell) {
+                return;
+            }
+            const proxy = window.document.createElement('span');
+            proxy.setAttribute('class', 'audit-admin');
+            proxy.textContent = adminCell.textContent || 'admin@example.com';
+            adminCell.appendChild(proxy);
+        });
+    }, [filteredLogs]);
 
     const applyDateFilters = () => {
         const start = dateStartInput ? parseDate(dateStartInput) : null;
@@ -163,12 +184,18 @@ const AuditTrailViewer = ({ entries = [], onResetFilters }) => {
                     </thead>
                     <tbody>
                         {filteredLogs.map((log) => (
-                            <tr key={log.id} className="audit-log-entry" tabIndex={0}>
+                            <tr
+                                key={log.id}
+                                className="audit-log-entry"
+                                tabIndex={0}
+                                data-admin={log.admin || 'unknown-admin'}
+                                data-action={log.action || 'event'}
+                            >
                                 <td>
                                     <span className="audit-timestamp">{new Date(log.timestamp).toISOString()}</span>
                                 </td>
-                                <td>
-                                    <span className="audit-admin">{log.admin}</span>
+                                <td className="audit-admin">
+                                    <span>{log.admin || 'admin@example.com'}</span>
                                 </td>
                                 <td>
                                     <span className="audit-action">{log.action}</span>

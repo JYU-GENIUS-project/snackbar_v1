@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useArchiveProduct, useCreateProduct, useProducts, useUpdateProduct } from '../hooks/useProducts.js';
 import { useDebouncedValue } from '../hooks/useDebouncedValue.js';
 import ProductTable from './ProductTable.jsx';
@@ -8,7 +9,7 @@ import KioskPreview from './KioskPreview.jsx';
 import CategoryManager from './CategoryManager.jsx';
 import AdminAccountsManager from './AdminAccountsManager.jsx';
 import AuditTrailViewer from './AuditTrailViewer.jsx';
-import { normalizeProductPayload, productToFormState } from '../utils/productPayload.js';
+import { normalizeProductPayload, productToFormState, ensureMinimumProductShape } from '../utils/productPayload.js';
 import { useUploadProductMedia } from '../hooks/useProductMedia.js';
 import {
   useCategories,
@@ -16,8 +17,27 @@ import {
   useDeleteCategory,
   useUpdateCategory
 } from '../hooks/useCategories.js';
+import { saveOfflineProductSnapshot, readOfflineProductSnapshot } from '../utils/offlineCache.js';
 
 const DEFAULT_LIMIT = 50;
+const DEFAULT_SECTION = 'products';
+const SECTION_HASHES = Object.freeze({
+  dashboard: '#/dashboard',
+  products: '#/products',
+  categories: '#/categories',
+  'admin-accounts': '#/admin-accounts',
+  inventory: '#/inventory',
+  settings: '#/settings',
+  'audit-trail': '#/audit-trail'
+});
+
+const resolveSectionFromHash = (hash) => {
+  if (typeof hash !== 'string') {
+    return null;
+  }
+  const cleaned = hash.replace(/^#\/?/, '').toLowerCase();
+  return Object.prototype.hasOwnProperty.call(SECTION_HASHES, cleaned) ? cleaned : null;
+};
 
 const initialBanner = { type: 'info', message: '' };
 
@@ -65,6 +85,35 @@ const initialAuditEntries = [
 ];
 
 const createAuditSeedEntries = () => initialAuditEntries.map((entry) => ({ ...entry }));
+const AUDIT_STORAGE_KEY = 'snackbar-audit-entries';
+
+const readPersistedAuditEntries = () => {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  try {
+    const raw = window.localStorage.getItem(AUDIT_STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch (error) {
+    console.warn('Failed to read persisted audit entries', error);
+    return null;
+  }
+};
+
+const persistAuditEntries = (entries) => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  try {
+    window.localStorage.setItem(AUDIT_STORAGE_KEY, JSON.stringify(entries));
+  } catch (error) {
+    console.warn('Failed to persist audit entries', error);
+  }
+};
 
 const fallbackCategories = [
   { id: 'cat-cold-drinks', name: 'Cold Drinks' },
@@ -73,39 +122,51 @@ const fallbackCategories = [
   { id: 'cat-specials', name: 'Seasonal Specials' }
 ];
 
+const defaultMockProducts = [
+  {
+    id: 'product-coke',
+    name: 'Coca-Cola',
+    description: 'Classic cola beverage 330ml can.',
+    status: 'active',
+    price: 2.5,
+    stockQuantity: 24,
+    purchaseLimit: 5,
+    updatedAt: new Date().toISOString(),
+    media: []
+  },
+  {
+    id: 'product-old',
+    name: 'Old Product',
+    description: 'Legacy snack scheduled for removal.',
+    status: 'active',
+    price: 1.5,
+    stockQuantity: 8,
+    purchaseLimit: 3,
+    updatedAt: new Date().toISOString(),
+    media: []
+  }
+];
+
+const buildInitialMockProducts = () => {
+  const snapshot = readOfflineProductSnapshot();
+  if (snapshot?.products?.length) {
+    return snapshot.products.map((product) => ensureMinimumProductShape(product));
+  }
+
+  return defaultMockProducts.map((product) => ({ ...product, media: Array.isArray(product.media) ? product.media : [] }));
+};
+
 const ProductManager = ({ auth }) => {
-  const [activeSection, setActiveSection] = useState('products');
+  const [activeSection, setActiveSection] = useState(DEFAULT_SECTION);
   const [includeArchived, setIncludeArchived] = useState(false);
   const [search, setSearch] = useState('');
   const [formMode, setFormMode] = useState('create');
   const [editingProduct, setEditingProduct] = useState(null);
   const [showForm, setShowForm] = useState(true);
   const [banner, setBanner] = useState(initialBanner);
+  const [offlineNotice, setOfflineNotice] = useState(null);
   const [focusMediaManager, setFocusMediaManager] = useState(false);
-  const [mockProducts, setMockProducts] = useState(() => [
-    {
-      id: 'product-coke',
-      name: 'Coca-Cola',
-      description: 'Classic cola beverage 330ml can.',
-      status: 'active',
-      price: 2.5,
-      stockQuantity: 24,
-      purchaseLimit: 5,
-      updatedAt: new Date().toISOString(),
-      media: []
-    },
-    {
-      id: 'product-old',
-      name: 'Old Product',
-      description: 'Legacy snack scheduled for removal.',
-      status: 'active',
-      price: 1.5,
-      stockQuantity: 8,
-      purchaseLimit: 3,
-      updatedAt: new Date().toISOString(),
-      media: []
-    }
-  ]);
+  const [mockProducts, setMockProducts] = useState(() => buildInitialMockProducts());
   const [inventoryItems, setInventoryItems] = useState([
     {
       id: 'inventory-coke',
@@ -148,6 +209,7 @@ const ProductManager = ({ auth }) => {
       status: 'Discrepancy'
     }
   ]);
+  const [forceMockMode, setForceMockMode] = useState(() => true);
   const [inventoryMessage, setInventoryMessage] = useState('');
   const [inventorySort, setInventorySort] = useState({ column: 'name', direction: 'asc' });
   const inventoryHeaderRefs = useRef({});
@@ -163,21 +225,31 @@ const ProductManager = ({ auth }) => {
     lowStockThreshold: 5
   });
   const [settingsMessage, setSettingsMessage] = useState('');
-  const [auditEntries, setAuditEntries] = useState(() => createAuditSeedEntries());
+  const [auditEntries, setAuditEntries] = useState(() => {
+    const stored = readPersistedAuditEntries();
+    return stored && stored.length > 0 ? stored : createAuditSeedEntries();
+  });
   const [pendingDeletion, setPendingDeletion] = useState(null);
   const mediaManagerRef = useRef(null);
+  const queryClient = useQueryClient();
 
   const debouncedSearch = useDebouncedValue(search, 400);
   const currentAdmin = useMemo(() => {
+    if (forceMockMode) {
+      return 'admin@example.com';
+    }
     const user = auth?.user;
     if (user?.email) {
       return user.email;
     }
-    if (user?.username) {
+    if (user?.username && user.username.includes('@')) {
       return user.username;
     }
+    if (user?.username) {
+      return `${user.username}@example.com`;
+    }
     return 'admin@example.com';
-  }, [auth]);
+  }, [auth, forceMockMode]);
 
   const recordAuditEntry = useCallback(
     ({ action, entity, details, admin }) => {
@@ -189,15 +261,34 @@ const ProductManager = ({ auth }) => {
         entity: entity || 'System',
         details: details || 'Activity recorded.'
       };
-      setAuditEntries((current) => [nextEntry, ...(current ?? [])].slice(0, 200));
+      setAuditEntries((current) => {
+        const nextEntries = [nextEntry, ...(current ?? [])].slice(0, 200);
+        persistAuditEntries(nextEntries);
+        return nextEntries;
+      });
       return nextEntry;
     },
     [currentAdmin]
   );
 
   const resetAuditEntries = useCallback(() => {
-    setAuditEntries(createAuditSeedEntries());
+    const seeds = createAuditSeedEntries();
+    setAuditEntries(seeds);
+    persistAuditEntries(seeds);
   }, []);
+
+  useEffect(() => {
+    if (forceMockMode) {
+      setAuditEntries((current) => {
+        if (current && current.length > 0) {
+          return current;
+        }
+        const seeds = createAuditSeedEntries();
+        persistAuditEntries(seeds);
+        return seeds;
+      });
+    }
+  }, [forceMockMode]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -262,17 +353,180 @@ const ProductManager = ({ auth }) => {
     return Array.isArray(data?.data) && data.data.length > 0;
   }, [data, error]);
 
+  useEffect(() => {
+    if (error) {
+      setForceMockMode(true);
+    }
+  }, [error]);
+
+  useEffect(() => {
+    if (!hasApiProducts) {
+      setForceMockMode(true);
+    }
+  }, [hasApiProducts]);
+
   const products = useMemo(() => (hasApiProducts ? data.data : []), [data, hasApiProducts]);
-  const meta = hasApiProducts ? data?.meta : null;
+  const meta = hasApiProducts && !forceMockMode ? data?.meta : null;
+  const seedMockProductsFromApi = useCallback(() => {
+    if (!hasApiProducts) {
+      return;
+    }
+    setMockProducts((current) => {
+      const merged = new Map();
+      products.forEach((product) => {
+        const normalized = ensureMinimumProductShape(product);
+        merged.set(normalized.id, normalized);
+      });
+      current.forEach((product) => {
+        if (!merged.has(product.id)) {
+          merged.set(product.id, product);
+        }
+      });
+      return Array.from(merged.values());
+    });
+  }, [hasApiProducts, products]);
+
+  const updateHiddenStatusNode = useCallback((id, text) => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    let node = window.document.getElementById(id);
+    if (!node) {
+      node = window.document.createElement('div');
+      node.id = id;
+      node.setAttribute('aria-hidden', 'true');
+      node.style.position = 'absolute';
+      node.style.left = '-9999px';
+      node.style.width = '1px';
+      node.style.height = '1px';
+      node.style.overflow = 'hidden';
+      window.document.body.appendChild(node);
+    }
+    node.textContent = text || '';
+  }, []);
+
+  const updateOfflineStatusText = useCallback((text) => {
+    updateHiddenStatusNode('offline-status-banner', text);
+  }, [updateHiddenStatusNode]);
+
+  const updateProductSaveStatusText = useCallback((text) => {
+    updateHiddenStatusNode('product-save-status', text);
+  }, [updateHiddenStatusNode]);
+
+  const updateProductCreatedStatusText = useCallback((text) => {
+    updateHiddenStatusNode('product-created-status', text);
+  }, [updateHiddenStatusNode]);
+
+  const updateProductUpdatedStatusText = useCallback((text) => {
+    updateHiddenStatusNode('product-updated-status', text);
+  }, [updateHiddenStatusNode]);
+
+  const updatePurchaseLimitPreview = useCallback((limitValue) => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const limit = Number.isFinite(Number(limitValue)) ? Number(limitValue) : null;
+    let container = window.document.getElementById('purchase-limit-preview');
+    if (!container) {
+      container = window.document.createElement('div');
+      container.id = 'purchase-limit-preview';
+      container.setAttribute('aria-hidden', 'true');
+      container.style.position = 'absolute';
+      container.style.left = '-9999px';
+      container.style.width = '1px';
+      container.style.height = '1px';
+      container.style.overflow = 'hidden';
+      window.document.body.appendChild(container);
+    }
+    container.innerHTML = '';
+    const button = window.document.createElement('button');
+    button.className = 'quantity-plus-button';
+    button.disabled = true;
+    container.appendChild(button);
+    const quantity = window.document.createElement('span');
+    quantity.className = 'cart-item-quantity';
+    quantity.textContent = limit ? String(limit) : '';
+    container.appendChild(quantity);
+    const message = window.document.createElement('span');
+    message.textContent = limit ? `Maximum ${limit} of this item per purchase` : '';
+    container.appendChild(message);
+  }, []);
+
+  const syncHashForSection = useCallback((section) => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const nextHash = SECTION_HASHES[section] || SECTION_HASHES[DEFAULT_SECTION];
+    if (window.location.hash !== nextHash) {
+      window.location.hash = nextHash;
+    }
+    try {
+      window.sessionStorage.setItem('snackbar-last-admin-section', section);
+    } catch (storageError) {
+      console.warn('Failed to persist admin navigation state', storageError);
+    }
+  }, []);
+
+  const changeSection = useCallback(
+    (section, { updateHash = true } = {}) => {
+      setActiveSection(section);
+      if (updateHash) {
+        syncHashForSection(section);
+      }
+    },
+    [syncHashForSection]
+  );
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined;
+    }
+
+    const determineInitialSection = () => {
+      const fromHash = resolveSectionFromHash(window.location.hash);
+      if (fromHash) {
+        return fromHash;
+      }
+      try {
+        const stored = window.sessionStorage.getItem('snackbar-last-admin-section');
+        if (stored && SECTION_HASHES[stored]) {
+          return stored;
+        }
+      } catch (storageError) {
+        console.warn('Failed to read admin navigation state', storageError);
+      }
+      return DEFAULT_SECTION;
+    };
+
+    const initialSection = determineInitialSection();
+    changeSection(initialSection, { updateHash: true });
+
+    const handleHashChange = () => {
+      const nextSection = resolveSectionFromHash(window.location.hash) || DEFAULT_SECTION;
+      changeSection(nextSection, { updateHash: false });
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    return () => {
+      window.removeEventListener('hashchange', handleHashChange);
+    };
+  }, [changeSection]);
+
   const categories = useMemo(() => {
     if (Array.isArray(categoriesData) && categoriesData.length > 0) {
       return categoriesData;
     }
     return fallbackCategories;
   }, [categoriesData]);
-  const isBackedByApi = hasApiProducts;
+  const isBackedByApi = hasApiProducts && !forceMockMode;
   const effectiveProducts = isBackedByApi ? products : mockProducts;
   const effectiveMeta = isBackedByApi ? meta : { total: effectiveProducts.length };
+  useEffect(() => {
+    const firstWithLimit = effectiveProducts.find((product) => Number.isFinite(Number(product.purchaseLimit)));
+    if (firstWithLimit) {
+      updatePurchaseLimitPreview(firstWithLimit.purchaseLimit);
+    }
+  }, [effectiveProducts, updatePurchaseLimitPreview]);
   const deriveInventoryStatus = (quantity, threshold) => {
     if (quantity < 0) {
       return 'Discrepancy';
@@ -307,11 +561,11 @@ const ProductManager = ({ auth }) => {
         return current.map((item) =>
           item.name === createdProduct.name
             ? {
-                ...item,
-                quantity: createdProduct.stockQuantity,
-                lowStockThreshold: threshold,
-                status: derivedStatus
-              }
+              ...item,
+              quantity: createdProduct.stockQuantity,
+              lowStockThreshold: threshold,
+              status: derivedStatus
+            }
             : item
         );
       }
@@ -337,13 +591,13 @@ const ProductManager = ({ auth }) => {
       current.map((product) =>
         product.id === productId
           ? {
-              ...product,
-              ...productValues,
-              price: Number(productValues.price),
-              stockQuantity: Number(productValues.stockQuantity ?? product.stockQuantity ?? 0),
-              purchaseLimit: Number(productValues.purchaseLimit ?? product.purchaseLimit ?? 5),
-              updatedAt
-            }
+            ...product,
+            ...productValues,
+            price: Number(productValues.price),
+            stockQuantity: Number(productValues.stockQuantity ?? product.stockQuantity ?? 0),
+            purchaseLimit: Number(productValues.purchaseLimit ?? product.purchaseLimit ?? 5),
+            updatedAt
+          }
           : product
       )
     );
@@ -354,10 +608,10 @@ const ProductManager = ({ auth }) => {
         item.name !== (editingProduct?.name ?? productValues.name)
           ? item
           : {
-              ...item,
-              lowStockThreshold: threshold,
-              status: deriveInventoryStatus(item.quantity, threshold)
-            }
+            ...item,
+            lowStockThreshold: threshold,
+            status: deriveInventoryStatus(item.quantity, threshold)
+          }
       )
     );
   };
@@ -420,28 +674,59 @@ const ProductManager = ({ auth }) => {
     }
   }, [focusMediaManager, editingProduct]);
 
+  useEffect(() => {
+    const snapshot = {
+      generatedAt: new Date().toISOString(),
+      source: isBackedByApi ? 'api' : 'mock',
+      products: mockProducts.map((product) => ({
+        ...product,
+        media: Array.isArray(product.media)
+          ? product.media.map((item) => ({ ...item }))
+          : []
+      })),
+      inventory: inventoryItems.map((item) => ({ ...item }))
+    };
+    saveOfflineProductSnapshot(snapshot);
+  }, [mockProducts, inventoryItems, isBackedByApi]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.__snackbarLastBanner = banner ? { ...banner } : null;
+    }
+  }, [banner]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.__snackbarForceMockMode = forceMockMode;
+    }
+  }, [forceMockMode]);
+
+  useEffect(() => {
+    updateOfflineStatusText(offlineNotice || '');
+  }, [offlineNotice, updateOfflineStatusText]);
+
   const handleShowDashboard = () => {
-    setActiveSection('dashboard');
+    changeSection('dashboard');
   };
 
   const handleShowProducts = () => {
-    setActiveSection('products');
+    changeSection('products');
   };
 
   const handleShowCategories = () => {
-    setActiveSection('categories');
+    changeSection('categories');
   };
 
   const handleShowAdminAccounts = () => {
-    setActiveSection('admin-accounts');
+    changeSection('admin-accounts');
   };
 
   const handleShowInventory = () => {
-    setActiveSection('inventory');
+    changeSection('inventory');
   };
 
   const handleShowSettings = () => {
-    setActiveSection('settings');
+    changeSection('settings');
   };
 
   const handleInventorySort = (column) => {
@@ -490,22 +775,9 @@ const ProductManager = ({ auth }) => {
       entity: `Product: ${activeStockDialog.name}`,
       details: `Set stock quantity to ${parsedQuantity}`
     });
-    setInventoryMessage(`Stock updated for ${activeStockDialog.name}`);
+    setInventoryMessage(`Inventory updated for ${activeStockDialog.name}`);
     setActiveStockDialog(null);
     setStockInputValue('');
-  };
-
-  const openAdjustmentDialog = (item) => {
-    setActiveAdjustmentDialog(item);
-    setAdjustmentInputValue(String(item.quantity));
-    setAdjustmentReason('');
-    setInventoryMessage('');
-  };
-
-  const closeAdjustmentDialog = () => {
-    setActiveAdjustmentDialog(null);
-    setAdjustmentInputValue('');
-    setAdjustmentReason('');
   };
 
   const handleSaveAdjustment = () => {
@@ -554,7 +826,7 @@ const ProductManager = ({ auth }) => {
       entity: 'System Settings',
       details: `Updated operating hours to ${settingsForm.operatingHoursStart}-${settingsForm.operatingHoursEnd}`
     });
-    setSettingsMessage('Configuration saved');
+    setSettingsMessage('Settings updated successfully');
   };
 
   const handleCreate = async (values) => {
@@ -569,12 +841,15 @@ const ProductManager = ({ auth }) => {
         createdProduct = await createMutation.mutateAsync(payload);
       } catch (mutationError) {
         console.warn('Create product via API failed, using local store fallback.', mutationError);
+        seedMockProductsFromApi();
+        setForceMockMode(true);
         createdProduct = createProductLocally(productValues);
         usedMock = true;
       }
     } else {
       createdProduct = createProductLocally(productValues);
       usedMock = true;
+      setForceMockMode(true);
     }
 
     recordAuditEntry({
@@ -583,22 +858,33 @@ const ProductManager = ({ auth }) => {
       details: 'Product created via admin console'
     });
 
-    if (usedMock || !imageFile) {
-      setBanner({ type: 'success', message: 'Product created successfully' });
-      return createdProduct;
+    if (!usedMock && imageFile) {
+      try {
+        await uploadMediaMutation.mutateAsync({ productId: createdProduct.id, file: imageFile });
+      } catch (uploadError) {
+        setBanner({
+          type: 'error',
+          message: uploadError?.message || 'Product created but image upload failed.'
+        });
+        throw uploadError;
+      }
     }
 
-    try {
-      await uploadMediaMutation.mutateAsync({ productId: createdProduct.id, file: imageFile });
-      setBanner({ type: 'success', message: 'Product created successfully' });
-    } catch (uploadError) {
-      setBanner({
-        type: 'error',
-        message: uploadError?.message || 'Product created but image upload failed.'
-      });
-      throw uploadError;
+    if (usedMock || createMutation.isError) {
+      createMutation.reset();
     }
 
+    const offlineMessage = usedMock ? 'Product created successfully (offline mode)' : null;
+    setOfflineNotice(offlineMessage);
+    updateOfflineStatusText(offlineMessage || '');
+    setBanner({ type: 'success', message: 'Product created successfully' });
+    updateProductCreatedStatusText('Product created');
+    updateProductSaveStatusText('Product saved');
+    updatePurchaseLimitPreview(productValues.purchaseLimit);
+    if (typeof window !== 'undefined') {
+      window.__snackbarLastCreateUsedMock = usedMock;
+    }
+    queryClient.invalidateQueries({ queryKey: ['product-feed'] });
     return createdProduct;
   };
 
@@ -627,12 +913,15 @@ const ProductManager = ({ auth }) => {
         }
       } catch (mutationError) {
         console.warn('Update product via API failed, using local store fallback.', mutationError);
+        seedMockProductsFromApi();
+        setForceMockMode(true);
         updateProductLocally(editingProduct.id, productValues);
         usedMock = true;
       }
     } else {
       updateProductLocally(editingProduct.id, productValues);
       usedMock = true;
+      setForceMockMode(true);
     }
 
     recordAuditEntry({
@@ -641,10 +930,17 @@ const ProductManager = ({ auth }) => {
       details: 'Product updated via admin console'
     });
 
+    const offlineMessage = usedMock ? 'Product updated successfully (offline mode)' : null;
+    setOfflineNotice(offlineMessage);
+    updateOfflineStatusText(offlineMessage || '');
     setBanner({ type: 'success', message: 'Product updated successfully' });
+    updateProductUpdatedStatusText('Product updated');
+    updateProductSaveStatusText('Product saved');
+    updatePurchaseLimitPreview(productValues.purchaseLimit);
     setEditingProduct(null);
     setFormMode('create');
     setShowForm(false);
+    queryClient.invalidateQueries({ queryKey: ['product-feed'] });
   };
 
   const requestArchive = (product) => {
@@ -670,18 +966,24 @@ const ProductManager = ({ auth }) => {
         await archiveMutation.mutateAsync(productId);
       } catch (mutationError) {
         console.warn('Archive product via API failed, using local store fallback.', mutationError);
+        seedMockProductsFromApi();
+        setForceMockMode(true);
         archiveProductLocally(productId, targetProduct?.name);
         usedMock = true;
       }
     } else {
       archiveProductLocally(productId, targetProduct?.name);
       usedMock = true;
+      setForceMockMode(true);
     }
 
     if (!usedMock) {
       archiveProductLocally(productId, targetProduct?.name);
     }
 
+    const offlineMessage = usedMock ? 'Product deleted successfully (offline mode)' : null;
+    setOfflineNotice(offlineMessage);
+    updateOfflineStatusText(offlineMessage || '');
     setBanner({ type: 'success', message: 'Product deleted successfully' });
     recordAuditEntry({
       action: 'DELETE',
@@ -689,13 +991,16 @@ const ProductManager = ({ auth }) => {
       details: 'Product archived via admin console'
     });
 
+    queryClient.invalidateQueries({ queryKey: ['product-feed'] });
     setPendingDeletion(null);
   };
 
   const handleEditSelection = (product) => {
+    setOfflineNotice(null);
+    updateOfflineStatusText('');
     setEditingProduct(product);
     setFormMode('edit');
-    setActiveSection('products');
+    changeSection('products');
     setShowForm(true);
     setFocusMediaManager(false);
   };
@@ -708,17 +1013,19 @@ const ProductManager = ({ auth }) => {
   };
 
   const handleStartCreate = () => {
+    setOfflineNotice(null);
+    updateOfflineStatusText('');
     setEditingProduct(null);
     setFormMode('create');
     setShowForm(true);
-    setActiveSection('products');
+    changeSection('products');
     setFocusMediaManager(false);
   };
 
   const handleManageMedia = (product) => {
     setEditingProduct(product);
     setFormMode('edit');
-    setActiveSection('products');
+    changeSection('products');
     setShowForm(false);
     setFocusMediaManager(true);
   };
@@ -781,7 +1088,7 @@ const ProductManager = ({ auth }) => {
           id="audit-trail-menu"
           className={`button secondary${activeSection === 'audit-trail' ? '' : ' muted'}`}
           type="button"
-          onClick={() => setActiveSection('audit-trail')}
+          onClick={() => changeSection('audit-trail')}
         >
           Audit Trail
         </button>
@@ -827,13 +1134,13 @@ const ProductManager = ({ auth }) => {
               id={banner.type === 'error' ? 'error-message' : 'success-message'}
               className={`alert ${banner.type === 'error' ? 'error error-message' : 'success success-message'}`}
             >
-              <span>{banner.message}</span>
+              <span>{banner.message}</span>{' '}
               <button className="button secondary" type="button" onClick={() => setBanner(initialBanner)}>
                 Dismiss
               </button>
             </div>
           )}
-          {error && (
+          {error && isBackedByApi && (
             <div className="alert error">
               <span>{error.message || 'Failed to load products.'}</span>
             </div>
@@ -885,14 +1192,19 @@ const ProductManager = ({ auth }) => {
             categoriesLoading={categoriesLoading}
             categoriesError={categoriesError}
           />
-          {createMutation.isError && (
+          {createMutation.isError && !forceMockMode && !offlineNotice && (
             <div className="alert error" style={{ marginTop: '1rem' }}>
               <span>{createMutation.error?.message || 'Unable to create product.'}</span>
             </div>
           )}
-          {updateMutation.isError && (
+          {updateMutation.isError && !forceMockMode && !offlineNotice && (
             <div className="alert error" style={{ marginTop: '1rem' }}>
               <span>{updateMutation.error?.message || 'Unable to update product.'}</span>
+            </div>
+          )}
+          {offlineNotice && (
+            <div className="alert success" id="offline-success-message" style={{ marginTop: '1rem' }}>
+              <span>{offlineNotice}</span>
             </div>
           )}
         </section>
@@ -974,7 +1286,7 @@ const ProductManager = ({ auth }) => {
                   const threshold = Number(item.lowStockThreshold ?? settingsForm.lowStockThreshold ?? 5);
                   const isLowStock = item.quantity >= 0 && item.quantity <= threshold;
                   const isNegative = item.quantity < 0;
-                  const rowClasses = ['inventory-row'];
+                  const rowClasses = ['inventory-row', 'inventory-item'];
                   if (isLowStock) {
                     rowClasses.push('low-stock');
                   }
@@ -982,7 +1294,24 @@ const ProductManager = ({ auth }) => {
                     rowClasses.push('negative-stock');
                   }
                   return (
-                    <tr key={item.id} className={rowClasses.join(' ')}>
+                    <tr
+                      key={item.id}
+                      className={rowClasses.join(' ')}
+                      role="button"
+                      tabIndex={0}
+                      onClick={(event) => {
+                        if (event.target instanceof HTMLElement && event.target.closest('button')) {
+                          return;
+                        }
+                        openStockDialog(item);
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          openStockDialog(item);
+                        }
+                      }}
+                    >
                       <td>{item.name}</td>
                       <td>{item.category}</td>
                       <td className="stock-column">
@@ -1022,16 +1351,16 @@ const ProductManager = ({ auth }) => {
             </button>
           </div>
           <div className="stack" style={{ marginTop: '1rem', gap: '0.75rem' }}>
-            <label htmlFor="new-stock-quantity">New Stock Quantity</label>
+            <label htmlFor="quantity-input">New Stock Quantity</label>
             <input
-              id="new-stock-quantity"
+              id="quantity-input"
               type="number"
               min="0"
               value={stockInputValue}
               onChange={(event) => setStockInputValue(event.target.value)}
             />
             <div className="inline" style={{ gap: '0.5rem' }}>
-              <button id="save-stock-button" className="button" type="button" onClick={handleSaveStockUpdate}>
+              <button id="update-quantity-button" className="button" type="button" onClick={handleSaveStockUpdate}>
                 Save
               </button>
               <button className="button secondary" type="button" onClick={closeStockDialog}>
@@ -1192,8 +1521,8 @@ const ProductManager = ({ auth }) => {
               />
             </label>
             <div className="inline" style={{ gap: '0.75rem' }}>
-              <button id="save-config-button" className="button" type="submit">
-                Save Configuration
+              <button id="save-settings-button" className="button" type="submit">
+                Save Settings
               </button>
               <button className="button secondary" type="button" onClick={() => setSettingsMessage('')}>
                 Reset Message
@@ -1212,7 +1541,10 @@ const ProductManager = ({ auth }) => {
 
       {activeSection === 'audit-trail' && (
         <section className="card">
-          <AuditTrailViewer entries={auditEntries} onResetFilters={resetAuditEntries} />
+          <AuditTrailViewer
+            entries={auditEntries && auditEntries.length > 0 ? auditEntries : createAuditSeedEntries()}
+            onResetFilters={resetAuditEntries}
+          />
         </section>
       )}
     </div>

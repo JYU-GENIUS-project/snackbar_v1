@@ -19,5 +19,15 @@ Capture Banner After Product Save
     Log    Success message text: ${success_text}
     ${alerts}=    Execute Javascript    return Array.from(document.querySelectorAll('.alert')).map(a => a.textContent.trim());
     Log    Alerts: ${alerts}
+    ${banner_state}=    Execute Javascript    return window.__snackbarLastBanner || null
+    Log    Banner state: ${banner_state}
+    ${mock_flag}=    Execute Javascript    return window.__snackbarForceMockMode
+    Log    Force mock mode: ${mock_flag}
+    ${used_mock}=    Execute Javascript    return window.__snackbarLastCreateUsedMock
+    Log    Create used mock: ${used_mock}
+    ${offline_success}=    Execute Javascript    var node = document.getElementById('offline-success-message'); return node ? node.textContent : 'missing'
+    Log    Offline success div: ${offline_success}
+    ${hidden_offline}=    Execute Javascript    var node = document.getElementById('offline-status-banner'); return node ? node.textContent : 'missing'
+    Log    Hidden offline status: ${hidden_offline}
     ${banner_text}=    Execute Javascript    return document.body.innerText
     Log    ===BANNER=== ${banner_text}
