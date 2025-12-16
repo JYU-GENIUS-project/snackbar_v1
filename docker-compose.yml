@@ -82,6 +82,7 @@ services:
     volumes:
       - uploads:/app/uploads
       - logs:/app/logs
+      - ./client/dist:/client/dist:ro
     ports:
       - "3000:3000"
     healthcheck:

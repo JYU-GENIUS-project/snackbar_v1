@@ -38,6 +38,7 @@ const ProductForm = ({
   const [imagePreviewUrl, setImagePreviewUrl] = useState(initialValues?.imagePreviewUrl || '');
   const [imageFileName, setImageFileName] = useState('');
   const fileInputRef = useRef(null);
+  const disableCategorySelection = categoriesLoading && (!(Array.isArray(categories) && categories.length > 0));
 
   useEffect(() => {
     setFormValues(initialValues);
@@ -210,9 +211,9 @@ const ProductForm = ({
           />
         </div>
         <div className="form-field">
-          <label htmlFor="product-purchaseLimit">Purchase limit</label>
+          <label htmlFor="purchase-limit-input">Purchase limit</label>
           <input
-            id="product-purchaseLimit"
+            id="purchase-limit-input"
             name="purchaseLimit"
             type="number"
             min="1"
@@ -244,13 +245,13 @@ const ProductForm = ({
           />
         </div>
         <div className="form-field">
-          <label htmlFor="category-select">Primary category</label>
+          <label htmlFor="product-category">Primary category</label>
           <select
-            id="category-select"
+            id="product-category"
             name="primaryCategory"
             value={formValues.categoryIds?.[0] || ''}
             onChange={handlePrimaryCategoryChange}
-            disabled={categoriesLoading}
+            disabled={disableCategorySelection}
           >
             <option value="">{categoriesLoading ? 'Loading categories…' : 'Select category'}</option>
             {(categories || []).map((category) => (
@@ -269,8 +270,8 @@ const ProductForm = ({
             multiple
             value={formValues.categoryIds || []}
             onChange={handleCategorySelection}
-            disabled={categoriesLoading}
-            size={Math.min(Math.max((categories || []).length, 4), 10)}
+            disabled={disableCategorySelection}
+            size={Math.max(Math.min((categories || []).length || 4, 10), 4)}
           >
             {(categories || []).map((category) => (
               <option key={category.id} value={category.id}>

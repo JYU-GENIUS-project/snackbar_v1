@@ -5,7 +5,12 @@
 // Based on C4 Architecture and ADR-003 PERN Technology Stack
 // =============================================================================
 
-require('dotenv').config();
+const path = require('path');
+const dotenv = require('dotenv');
+
+// Load environment variables from project root (fallback to local .env)
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+dotenv.config();
 
 const express = require('express');
 const helmet = require('helmet');
@@ -30,6 +35,7 @@ const mediaStorage = require('./utils/mediaStorage');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const CLIENT_DIST_DIR = path.resolve(__dirname, '../../client/dist');
 
 // Ensure upload directories are present before handling any requests
 mediaStorage.ensureStorageStructure();
@@ -76,6 +82,21 @@ app.use(compression());
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Serve admin portal static assets
+app.use('/admin', express.static(CLIENT_DIST_DIR, { index: false }));
+
+// SPA fallback for admin routes
+const serveAdminApp = (req, res, next) => {
+  try {
+    res.sendFile(path.join(CLIENT_DIST_DIR, 'index.html'));
+  } catch (error) {
+    next(error);
+  }
+};
+
+app.get('/admin', serveAdminApp);
+app.get(/\/admin\/.*/, serveAdminApp);
 
 // Serve media assets
 app.use(

@@ -287,6 +287,7 @@ US-027: Remove Products From System
 *** Keywords ***
 The admin portal login page is displayed
     [Documentation]    Verifies admin login page is shown
+    Ensure Admin Login Page Is Visible
     Page Should Contain Element    id=login-form
     Element Should Be Visible    id=username
     Element Should Be Visible    id=password
@@ -405,7 +406,7 @@ Enters price "${price}"
 
 Uploads product image
     [Documentation]    Uploads an image file
-    ${image_path}=    Set Variable    ${CURDIR}/../../data/test_product.jpg
+    ${image_path}=    Normalize Path    ${CURDIR}/../../data/test_product.jpg
     Choose File    id=product-image    ${image_path}
 
 Selects category "${category}"
@@ -437,7 +438,7 @@ The admin is adding a new product
 
 The admin uploads a product image (2MB JPEG)
     [Documentation]    Uploads test image
-    ${image_path}=    Set Variable    ${CURDIR}/../../data/large_test_image.jpg
+    ${image_path}=    Normalize Path    ${CURDIR}/../../data/large_test_image.jpg
     ${start_time}=    Get Time    epoch
     Set Test Variable    ${UPLOAD_START}    ${start_time}
     Choose File    id=product-image    ${image_path}
@@ -625,8 +626,9 @@ All admins should have identical permissions
 
 Multiple admin accounts exist
     [Documentation]    Precondition: Multiple admins in system
-    # Would create via API or verify existing accounts
-    Log    Multiple admin accounts exist for testing
+    The admin navigates to admin account management
+    ${admin_count}=    Get Element Count    css=.admin-list-item
+    Should Be True    ${admin_count} >= 2
 
 The primary admin selects an admin account
     [Documentation]    Selects an admin from the list
@@ -658,7 +660,9 @@ The deleted admin cannot log in
 
 10 admin accounts already exist
     [Documentation]    Precondition: Maximum admins exist
-    # Would verify via API or admin list count
+    Execute Javascript    window.sessionStorage.setItem('snackbar-admin-accounts-seed', 'max')
+    The admin navigates to admin account management
+    Execute Javascript    if (window.snackbarAdminAccounts && typeof window.snackbarAdminAccounts.seed === 'function') { window.snackbarAdminAccounts.seed('max'); }
     ${admin_count}=    Get Element Count    css=.admin-list-item
     Should Be Equal As Numbers    ${admin_count}    10
 
