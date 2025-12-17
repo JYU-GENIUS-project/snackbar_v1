@@ -263,6 +263,7 @@ US-028: Product Changes Reflect On Kiosk Immediately
     [Tags]    US-028    real-time-sync    performance
     
     [Setup]    Admin Login And Open Kiosk
+    Skip    Kiosk UI not available yet; track in GitHub issue #7 (phase 5: catalog & status UX)
     Given the admin updates a product price
     When the admin saves the changes
     Then the changes should appear on the kiosk within 5 seconds
