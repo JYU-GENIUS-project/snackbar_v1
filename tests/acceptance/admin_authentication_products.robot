@@ -715,6 +715,7 @@ When the admin updates an existing product
 
 Deletes a product
     [Documentation]    Admin deletes a product (triggers audit log)
+    Wait Until Element Is Visible    css=.product-item:first-child .delete-button    timeout=5s
     Click Element    css=.product-item:first-child .delete-button
     Wait Until Element Is Visible    id=confirm-delete-dialog    timeout=5s
     Click Button    id=confirm-delete-button
@@ -758,33 +759,35 @@ Each action should be logged in the audit trail
 The log should record admin username
     [Documentation]    Verifies admin identity in log
     ${first_log}=    Get WebElement    css=.audit-log-entry:first-child
-    ${admin_name}=    Get Text    ${first_log}/descendant::*[@class='audit-admin']
+    ${admin_name}=    Get Element Attribute    ${first_log}    data-admin
     Should Not Be Empty    ${admin_name}
 
 The log should record timestamp
     [Documentation]    Verifies timestamp in log
     ${first_log}=    Get WebElement    css=.audit-log-entry:first-child
-    ${timestamp}=    Get Text    ${first_log}/descendant::*[@class='audit-timestamp']
+    ${timestamp}=    Get Element Attribute    ${first_log}    data-timestamp
     Should Match Regexp    ${timestamp}    \\d{4}-\\d{2}-\\d{2}
 
 The log should record action type
     [Documentation]    Verifies action type recorded
     ${first_log}=    Get WebElement    css=.audit-log-entry:first-child
-    ${action}=    Get Text    ${first_log}/descendant::*[@class='audit-action']
+    ${action}=    Get Element Attribute    ${first_log}    data-action
     Should Not Be Empty    ${action}
 
 The log should record entity affected
     [Documentation]    Verifies entity information in log
     ${first_log}=    Get WebElement    css=.audit-log-entry:first-child
-    ${entity}=    Get Text    ${first_log}/descendant::*[@class='audit-entity']
+    ${entity}=    Get Element Attribute    ${first_log}    data-entity
     Should Not Be Empty    ${entity}
 
 The log should record old and new values
     [Documentation]    Verifies before/after values logged
     ${first_log}=    Get WebElement    css=.audit-log-entry:first-child
-    ${details}=    Get Text    ${first_log}/descendant::*[@class='audit-details']
+    ${details}=    Get Element Attribute    ${first_log}    data-details
     # Should contain change information
     Log    Audit details: ${details}
+    Click Element    id=products-menu
+    Wait Until Element Is Visible    id=product-list    timeout=5s
 
 The action should be logged in the audit trail
     [Documentation]    Verifies action is logged
@@ -793,18 +796,26 @@ The action should be logged in the audit trail
 The update action should be logged
     [Documentation]    Verifies update action in audit trail
     Each action should be logged in the audit trail
+    Click Element    id=products-menu
+    Wait Until Element Is Visible    id=product-list    timeout=5s
 
 The delete action should be logged
     [Documentation]    Verifies delete action in audit trail
     Each action should be logged in the audit trail
+    Click Element    id=products-menu
+    Wait Until Element Is Visible    id=product-list    timeout=5s
 
 The inventory change should be logged
     [Documentation]    Verifies inventory change in audit trail
     Each action should be logged in the audit trail
+    Click Element    id=products-menu
+    Wait Until Element Is Visible    id=product-list    timeout=5s
 
 The settings change should be logged
     [Documentation]    Verifies settings change in audit trail
     Each action should be logged in the audit trail
+    Click Element    id=products-menu
+    Wait Until Element Is Visible    id=product-list    timeout=5s
 
 Audit logs contain multiple admin actions
     [Documentation]    Precondition: Audit trail has data
@@ -837,7 +848,7 @@ Only actions by that admin should be shown
     [Documentation]    Verifies filtered results
     ${filtered_logs}=    Get WebElements    css=.audit-log-entry
     FOR    ${log}    IN    @{filtered_logs}
-        ${admin}=    Get Text    ${log}/descendant::*[@class='audit-admin']
+        ${admin}=    Get Element Attribute    ${log}    data-admin
         Should Contain    ${admin}    admin@example.com
     END
 
@@ -851,7 +862,7 @@ Only actions within that range should be shown
     [Documentation]    Verifies date-filtered results
     ${filtered_logs}=    Get WebElements    css=.audit-log-entry
     FOR    ${log}    IN    @{filtered_logs}
-        ${timestamp}=    Get Text    ${log}/descendant::*[@class='audit-timestamp']
+        ${timestamp}=    Get Element Attribute    ${log}    data-timestamp
         # Would verify timestamp falls within range
         Log    Timestamp: ${timestamp}
     END
@@ -865,7 +876,7 @@ Only actions of that type should be shown
     [Documentation]    Verifies action-filtered results
     ${filtered_logs}=    Get WebElements    css=.audit-log-entry
     FOR    ${log}    IN    @{filtered_logs}
-        ${action}=    Get Text    ${log}/descendant::*[@class='audit-action']
+        ${action}=    Get Element Attribute    ${log}    data-action
         Should Contain    ${action}    CREATE
     END
 
