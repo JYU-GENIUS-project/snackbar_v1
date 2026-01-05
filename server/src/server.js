@@ -5,7 +5,12 @@
 // Based on C4 Architecture and ADR-003 PERN Technology Stack
 // =============================================================================
 
-require('dotenv').config();
+const path = require('path');
+const dotenv = require('dotenv');
+
+// Load environment variables from project root (fallback to local .env)
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+dotenv.config();
 
 const express = require('express');
 const helmet = require('helmet');
@@ -19,6 +24,10 @@ const { rateLimiters } = require('./middleware/rateLimiter');
 const healthRoutes = require('./routes/health');
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admins');
+const categoryRoutes = require('./routes/categories');
+const productRoutes = require('./routes/products');
+const feedRoutes = require('./routes/feed');
+const mediaStorage = require('./utils/mediaStorage');
 
 // =============================================================================
 // Application Setup
@@ -26,6 +35,10 @@ const adminRoutes = require('./routes/admins');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const CLIENT_DIST_DIR = path.resolve(__dirname, '../../client/dist');
+
+// Ensure upload directories are present before handling any requests
+mediaStorage.ensureStorageStructure();
 
 // =============================================================================
 // Security Middleware
@@ -70,6 +83,33 @@ app.use(compression());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Serve admin portal static assets
+app.use('/admin', express.static(CLIENT_DIST_DIR, { index: false }));
+
+// SPA fallback for admin routes
+const serveAdminApp = (req, res, next) => {
+  try {
+    res.sendFile(path.join(CLIENT_DIST_DIR, 'index.html'));
+  } catch (error) {
+    next(error);
+  }
+};
+
+app.get('/admin', serveAdminApp);
+app.get(/\/admin\/.*/, serveAdminApp);
+
+// Serve media assets
+app.use(
+  '/uploads',
+  express.static(mediaStorage.getBaseDirectory(), {
+    index: false,
+    maxAge: '1h',
+    setHeaders: (res) => {
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+    }
+  })
+);
+
 // Request logging (Morgan)
 if (process.env.NODE_ENV !== 'test') {
   app.use(morgan(process.env.LOG_FORMAT === 'json' ? 'combined' : 'dev'));
@@ -93,6 +133,15 @@ app.use('/api/auth', rateLimiters.auth, authRoutes);
 
 // Admin management routes (standard API rate limiting)
 app.use('/api/admins', rateLimiters.api, adminRoutes);
+
+// Category management routes
+app.use('/api/categories', rateLimiters.api, categoryRoutes);
+
+// Product catalog routes
+app.use('/api/products', rateLimiters.api, productRoutes);
+
+// Product feed routes
+app.use('/api/feed', rateLimiters.api, feedRoutes);
 
 // =============================================================================
 // Error Handling

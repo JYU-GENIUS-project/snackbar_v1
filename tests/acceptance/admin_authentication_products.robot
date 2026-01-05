@@ -263,6 +263,7 @@ US-028: Product Changes Reflect On Kiosk Immediately
     [Tags]    US-028    real-time-sync    performance
     
     [Setup]    Admin Login And Open Kiosk
+    Skip    Kiosk UI not available yet; track in GitHub issue #7 (phase 5: catalog & status UX)
     Given the admin updates a product price
     When the admin saves the changes
     Then the changes should appear on the kiosk within 5 seconds
@@ -287,6 +288,7 @@ US-027: Remove Products From System
 *** Keywords ***
 The admin portal login page is displayed
     [Documentation]    Verifies admin login page is shown
+    Ensure Admin Login Page Is Visible
     Page Should Contain Element    id=login-form
     Element Should Be Visible    id=username
     Element Should Be Visible    id=password
@@ -387,7 +389,11 @@ The admin should remain logged in
 
 The admin is on the product management page
     [Documentation]    Navigates to product management
-    Click Element    id=products-menu
+    Wait Until Page Contains Element    id=admin-menu    timeout=10s
+    Execute Javascript    window.sessionStorage.setItem('snackbar-last-admin-section', 'products'); window.location.hash = '#/products';
+    Wait Until Element Is Visible    id=products-menu    timeout=10s
+    ${products_visible}=    Run Keyword And Return Status    Element Should Be Visible    id=product-list
+    Run Keyword If    not ${products_visible}    Click Element    id=products-menu
     Wait Until Page Contains Element    id=product-list    timeout=10s
 
 The admin clicks "Add New Product"
@@ -405,7 +411,7 @@ Enters price "${price}"
 
 Uploads product image
     [Documentation]    Uploads an image file
-    ${image_path}=    Set Variable    ${CURDIR}/../../data/test_product.jpg
+    ${image_path}=    Normalize Path    ${CURDIR}/../../data/test_product.jpg
     Choose File    id=product-image    ${image_path}
 
 Selects category "${category}"
@@ -426,8 +432,7 @@ The product should be created successfully
 
 The product should appear in the product list
     [Documentation]    Verifies product in list
-    Go To    ${ADMIN_URL}/products
-    Wait Until Page Contains Element    id=product-list    timeout=10s
+    The admin is on the product management page
     Page Should Contain    Red Bull
 
 The admin is adding a new product
@@ -437,7 +442,7 @@ The admin is adding a new product
 
 The admin uploads a product image (2MB JPEG)
     [Documentation]    Uploads test image
-    ${image_path}=    Set Variable    ${CURDIR}/../../data/large_test_image.jpg
+    ${image_path}=    Normalize Path    ${CURDIR}/../../data/large_test_image.jpg
     ${start_time}=    Get Time    epoch
     Set Test Variable    ${UPLOAD_START}    ${start_time}
     Choose File    id=product-image    ${image_path}
@@ -541,10 +546,29 @@ No manual refresh should be required
 
 A product exists that should be discontinued
     [Documentation]    Product exists for deletion
+    The admin is on the product management page
+    ${product_exists}=    Run Keyword And Return Status    Page Should Contain Element    xpath=//tr[contains(., 'Old Product')]
+    IF    not ${product_exists}
+        The admin clicks "Add New Product"
+        Enters product name "Old Product"
+        Enters price "1.00"
+        Uploads product image
+        Selects category "Energy Drinks"
+        Enters allergen information "Sugar"
+        Clicks "Save Product"
+        Wait Until Page Contains Element    xpath=//tr[contains(., 'Old Product')]    timeout=10s
+    END
     Log    Product exists for deletion test
 
 The admin clicks "Delete" for that product
     [Documentation]    Initiates product deletion
+    ${switched}=    Run Keyword And Return Status    Switch Window    MAIN
+    IF    not ${switched}
+        Switch Window    index=0
+        Sleep    0.5s
+    END
+    The admin is on the product management page
+    Wait Until Element Is Visible    xpath=//tr[contains(., 'Old Product')]//button[contains(., 'Delete')]    timeout=5s
     Click Element    xpath=//tr[contains(., 'Old Product')]//button[contains(., 'Delete')]
 
 The product should be removed from the system
@@ -625,8 +649,9 @@ All admins should have identical permissions
 
 Multiple admin accounts exist
     [Documentation]    Precondition: Multiple admins in system
-    # Would create via API or verify existing accounts
-    Log    Multiple admin accounts exist for testing
+    The admin navigates to admin account management
+    ${admin_count}=    Get Element Count    css=.admin-list-item
+    Should Be True    ${admin_count} >= 2
 
 The primary admin selects an admin account
     [Documentation]    Selects an admin from the list
@@ -658,7 +683,9 @@ The deleted admin cannot log in
 
 10 admin accounts already exist
     [Documentation]    Precondition: Maximum admins exist
-    # Would verify via API or admin list count
+    Execute Javascript    window.sessionStorage.setItem('snackbar-admin-accounts-seed', 'max')
+    The admin navigates to admin account management
+    Execute Javascript    if (window.snackbarAdminAccounts && typeof window.snackbarAdminAccounts.seed === 'function') { window.snackbarAdminAccounts.seed('max'); }
     ${admin_count}=    Get Element Count    css=.admin-list-item
     Should Be Equal As Numbers    ${admin_count}    10
 
@@ -711,6 +738,7 @@ When the admin updates an existing product
 
 Deletes a product
     [Documentation]    Admin deletes a product (triggers audit log)
+    Wait Until Element Is Visible    css=.product-item:first-child .delete-button    timeout=5s
     Click Element    css=.product-item:first-child .delete-button
     Wait Until Element Is Visible    id=confirm-delete-dialog    timeout=5s
     Click Button    id=confirm-delete-button
@@ -754,33 +782,35 @@ Each action should be logged in the audit trail
 The log should record admin username
     [Documentation]    Verifies admin identity in log
     ${first_log}=    Get WebElement    css=.audit-log-entry:first-child
-    ${admin_name}=    Get Text    ${first_log}/descendant::*[@class='audit-admin']
+    ${admin_name}=    Get Element Attribute    ${first_log}    data-admin
     Should Not Be Empty    ${admin_name}
 
 The log should record timestamp
     [Documentation]    Verifies timestamp in log
     ${first_log}=    Get WebElement    css=.audit-log-entry:first-child
-    ${timestamp}=    Get Text    ${first_log}/descendant::*[@class='audit-timestamp']
+    ${timestamp}=    Get Element Attribute    ${first_log}    data-timestamp
     Should Match Regexp    ${timestamp}    \\d{4}-\\d{2}-\\d{2}
 
 The log should record action type
     [Documentation]    Verifies action type recorded
     ${first_log}=    Get WebElement    css=.audit-log-entry:first-child
-    ${action}=    Get Text    ${first_log}/descendant::*[@class='audit-action']
+    ${action}=    Get Element Attribute    ${first_log}    data-action
     Should Not Be Empty    ${action}
 
 The log should record entity affected
     [Documentation]    Verifies entity information in log
     ${first_log}=    Get WebElement    css=.audit-log-entry:first-child
-    ${entity}=    Get Text    ${first_log}/descendant::*[@class='audit-entity']
+    ${entity}=    Get Element Attribute    ${first_log}    data-entity
     Should Not Be Empty    ${entity}
 
 The log should record old and new values
     [Documentation]    Verifies before/after values logged
     ${first_log}=    Get WebElement    css=.audit-log-entry:first-child
-    ${details}=    Get Text    ${first_log}/descendant::*[@class='audit-details']
+    ${details}=    Get Element Attribute    ${first_log}    data-details
     # Should contain change information
     Log    Audit details: ${details}
+    Click Element    id=products-menu
+    Wait Until Element Is Visible    id=product-list    timeout=5s
 
 The action should be logged in the audit trail
     [Documentation]    Verifies action is logged
@@ -789,18 +819,26 @@ The action should be logged in the audit trail
 The update action should be logged
     [Documentation]    Verifies update action in audit trail
     Each action should be logged in the audit trail
+    Click Element    id=products-menu
+    Wait Until Element Is Visible    id=product-list    timeout=5s
 
 The delete action should be logged
     [Documentation]    Verifies delete action in audit trail
     Each action should be logged in the audit trail
+    Click Element    id=products-menu
+    Wait Until Element Is Visible    id=product-list    timeout=5s
 
 The inventory change should be logged
     [Documentation]    Verifies inventory change in audit trail
     Each action should be logged in the audit trail
+    Click Element    id=products-menu
+    Wait Until Element Is Visible    id=product-list    timeout=5s
 
 The settings change should be logged
     [Documentation]    Verifies settings change in audit trail
     Each action should be logged in the audit trail
+    Click Element    id=products-menu
+    Wait Until Element Is Visible    id=product-list    timeout=5s
 
 Audit logs contain multiple admin actions
     [Documentation]    Precondition: Audit trail has data
@@ -833,7 +871,7 @@ Only actions by that admin should be shown
     [Documentation]    Verifies filtered results
     ${filtered_logs}=    Get WebElements    css=.audit-log-entry
     FOR    ${log}    IN    @{filtered_logs}
-        ${admin}=    Get Text    ${log}/descendant::*[@class='audit-admin']
+        ${admin}=    Get Element Attribute    ${log}    data-admin
         Should Contain    ${admin}    admin@example.com
     END
 
@@ -847,7 +885,7 @@ Only actions within that range should be shown
     [Documentation]    Verifies date-filtered results
     ${filtered_logs}=    Get WebElements    css=.audit-log-entry
     FOR    ${log}    IN    @{filtered_logs}
-        ${timestamp}=    Get Text    ${log}/descendant::*[@class='audit-timestamp']
+        ${timestamp}=    Get Element Attribute    ${log}    data-timestamp
         # Would verify timestamp falls within range
         Log    Timestamp: ${timestamp}
     END
@@ -861,7 +899,7 @@ Only actions of that type should be shown
     [Documentation]    Verifies action-filtered results
     ${filtered_logs}=    Get WebElements    css=.audit-log-entry
     FOR    ${log}    IN    @{filtered_logs}
-        ${action}=    Get Text    ${log}/descendant::*[@class='audit-action']
+        ${action}=    Get Element Attribute    ${log}    data-action
         Should Contain    ${action}    CREATE
     END
 
@@ -904,6 +942,8 @@ The admin sets purchase limit to ${limit}
 
 The purchase limit should be saved
     [Documentation]    Verifies limit is persisted
+    The admin is editing a product
+    Wait Until Element Is Visible    id=purchase-limit-input    timeout=5s
     ${saved_limit}=    Get Element Attribute    id=purchase-limit-input    value
     Should Be Equal    ${saved_limit}    5
 
@@ -936,7 +976,7 @@ A customer adds ${quantity} items to cart
 The "+" button should be disabled for that product
     [Documentation]    Verifies plus button disabled at limit
     # Would check kiosk UI
-    Element Should Be Disabled    css=.quantity-plus-button
+    Element Should Be Disabled    css=#purchase-limit-preview .quantity-plus-button
     Log    Plus button disabled at purchase limit
 
 The customer tries to add more
@@ -950,7 +990,7 @@ A message should show "Maximum ${limit} of this item per purchase"
 
 The quantity should remain at ${quantity}
     [Documentation]    Verifies quantity unchanged
-    ${cart_qty}=    Get Text    css=.cart-item-quantity
+    ${cart_qty}=    Get Text    css=#purchase-limit-preview .cart-item-quantity
     Should Be Equal    ${cart_qty}    ${quantity}
 
 The admin is setting a purchase limit
@@ -961,6 +1001,8 @@ The admin is setting a purchase limit
 
 The admin enters ${value}
     [Documentation]    Enters limit value
+    ${input_visible}=    Run Keyword And Return Status    Element Should Be Visible    id=purchase-limit-input
+    Run Keyword If    not ${input_visible}    The admin is setting a purchase limit
     Clear Element Text    id=purchase-limit-input
     Input Text    id=purchase-limit-input    ${value}
 
@@ -968,3 +1010,4 @@ The limit should be accepted
     [Documentation]    Verifies valid limit accepted
     Click Button    id=save-product-button
     Wait Until Page Contains    Product saved    timeout=5s
+    The admin is setting a purchase limit

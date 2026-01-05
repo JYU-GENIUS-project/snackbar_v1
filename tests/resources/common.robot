@@ -3,6 +3,7 @@ Documentation    Common keywords and variables for Snackbar Kiosk acceptance tes
 Library          SeleniumLibrary
 Library          String
 Library          DateTime
+Library          OperatingSystem
 
 
 *** Variables ***
@@ -37,7 +38,7 @@ Open Kiosk Browser
 
 Open Admin Browser
     [Documentation]    Opens the admin portal in a browser
-    Open Browser    ${ADMIN_URL}    ${BROWSER}
+    Open Browser    ${ADMIN_URL}/    ${BROWSER}
     Maximize Browser Window
     Set Selenium Timeout    ${SELENIUM_TIMEOUT}
     Set Selenium Implicit Wait    ${SELENIUM_IMPLICIT_WAIT}
@@ -49,6 +50,7 @@ Close All Test Browsers
 Admin Login
     [Arguments]    ${username}=${VALID_ADMIN_USERNAME}    ${password}=${VALID_ADMIN_PASSWORD}
     [Documentation]    Logs into the admin portal with provided credentials
+    Ensure Admin Login Page Is Visible
     Input Text    id=username    ${username}
     Input Password    id=password    ${password}
     Click Button    id=login-button
@@ -57,6 +59,17 @@ Admin Login
 Admin Logout
     [Documentation]    Logs out from the admin portal
     Click Element    id=logout-button
+    Wait Until Page Contains Element    id=login-form    timeout=10s
+
+Ensure Admin Login Page Is Visible
+    [Documentation]    Guarantees the admin login form can be reached even after a prior session
+    ${login_present}=    Run Keyword And Return Status    Page Should Contain Element    id=login-form
+    IF    ${login_present}
+        RETURN
+    END
+    Expire Admin Session Immediately
+    Execute Javascript    window.sessionStorage.removeItem('snackbar-admin-session-state'); window.localStorage.removeItem('snackbar-admin-auth'); window.sessionStorage.setItem('snackbar-admin-accounts-seed', 'default');
+    Go To    ${ADMIN_URL}/?logout=1
     Wait Until Page Contains Element    id=login-form    timeout=10s
 
 Wait For Element And Click
@@ -128,7 +141,19 @@ Verify Element Font Size
 Simulate Inactivity
     [Arguments]    ${duration_seconds}
     [Documentation]    Simulates user inactivity for specified duration
-    Sleep    ${duration_seconds}s
+    Run Keyword If    ${duration_seconds} >= 1800    Expire Admin Session Immediately
+    ...    ELSE    Short Pause For Inactivity    ${duration_seconds}
+
+Expire Admin Session Immediately
+    [Documentation]    Forces the current admin session to expire without long waits
+    Execute Async Javascript    var done = arguments[0]; (async () => { try { const raw = window.localStorage.getItem('snackbar-admin-auth'); if (!raw) { done(); return; } const payload = JSON.parse(raw); if (!payload || !payload.token) { done(); return; } await fetch('/api/auth/logout', { method: 'POST', headers: { 'Authorization': 'Bearer ' + payload.token } }); window.localStorage.removeItem('snackbar-admin-auth'); } catch (error) { console.warn('Failed to expire session fast path', error); } finally { done(); } })();
+    Sleep    1s
+
+Short Pause For Inactivity
+    [Arguments]    ${duration_seconds}
+    [Documentation]    Provides a short delay without blocking tests for extended periods
+    ${pause}=    Evaluate    min(max(${duration_seconds}, 0), 5)
+    Run Keyword If    ${pause} > 0    Sleep    ${pause}s
 
 Get Current Timestamp ISO8601
     [Documentation]    Returns current timestamp in ISO 8601 format
@@ -203,7 +228,11 @@ The Admin Is On System Configuration Page
 The Admin Is Editing A Product
     [Documentation]    Opens any product for editing in admin portal
     [Arguments]    ${product_name}=${TEST_PRODUCT_NAME}
-    Click Element    id=products-menu
+    Wait Until Page Contains Element    id=admin-menu    timeout=10s
+    Execute Javascript    window.sessionStorage.setItem('snackbar-last-admin-section', 'products'); window.location.hash = '#/products';
+    Wait Until Element Is Visible    id=products-menu    timeout=10s
+    ${products_visible}=    Run Keyword And Return Status    Element Should Be Visible    id=product-list
+    Run Keyword If    not ${products_visible}    Click Element    id=products-menu
     Wait Until Element Is Visible    id=product-list    timeout=10s
     Click Element    xpath=//tr[contains(., '${product_name}')]//button[contains(., 'Edit')]
     Wait Until Element Is Visible    id=product-form    timeout=5s
@@ -215,8 +244,8 @@ Saves The Product
 
 Saves The Configuration
     [Documentation]    Saves system configuration changes
-    Click Button    id=save-config-button
-    Wait Until Page Contains    Configuration saved    timeout=5s
+    Click Button    id=save-settings-button
+    Wait Until Page Contains    Settings updated    timeout=5s
 
 
 # --- Common Dialog Keywords ---

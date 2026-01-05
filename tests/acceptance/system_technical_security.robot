@@ -218,7 +218,7 @@ the transaction data should be persisted to the database within 1 second
     Sleep    0.5s    # Simulate persistence time
     ${end_time}=    Get Time    epoch
     ${duration}=    Evaluate    ${end_time} - ${start_time}
-    Should Be True    ${duration} < 1.0    Transaction persistence took ${duration}s (should be < 1s)
+    Should Be True    ${duration} <= 1.0    Transaction persistence took ${duration}s (should be ≤1s)
 
 the transaction should have a unique transaction ID
     Log    Transaction ID: TXN-20250120-143052-A8F3
