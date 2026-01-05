@@ -308,7 +308,7 @@ const ProductForm = ({
             onChange={handleChange}
           />
         </div>
-        <div className="form-field">
+        <div className="form-field" id="category-select">
           <label htmlFor="product-category">Primary category</label>
           <select
             id="product-category"

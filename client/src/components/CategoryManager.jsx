@@ -73,7 +73,6 @@ const CategoryManager = ({
       return;
     }
 
-    setIsSubmitting(true);
     setFormError(null);
     setIsLocalSubmitting(true);
 

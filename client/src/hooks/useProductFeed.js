@@ -25,17 +25,20 @@ const buildFeedFromOfflineSnapshot = (snapshot) => {
       available: normalized.status !== 'archived',
       purchaseLimit: normalized.purchaseLimit ?? null,
       imageAlt: normalized.imageAlt || normalized.name || 'Product image',
+      categoryId: normalized.categoryId ?? normalized.categoryIds?.[0] ?? null,
+      categoryIds: normalized.categoryIds || [],
+      categories: normalized.categories || [],
       metadata: normalized.metadata || {},
       primaryMedia: primaryCandidate
         ? {
-          url: primaryCandidate.url || primaryCandidate.previewUrl || primaryCandidate.localPath || '',
-          alt:
-            primaryCandidate.alt ||
-            primaryCandidate.description ||
-            normalized.imageAlt ||
-            normalized.name ||
-            'Product image'
-        }
+            url: primaryCandidate.url || primaryCandidate.previewUrl || primaryCandidate.localPath || '',
+            alt:
+              primaryCandidate.alt ||
+              primaryCandidate.description ||
+              normalized.imageAlt ||
+              normalized.name ||
+              'Product image'
+          }
         : null
     };
   });
