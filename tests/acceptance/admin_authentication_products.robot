@@ -546,10 +546,29 @@ No manual refresh should be required
 
 A product exists that should be discontinued
     [Documentation]    Product exists for deletion
+    The admin is on the product management page
+    ${product_exists}=    Run Keyword And Return Status    Page Should Contain Element    xpath=//tr[contains(., 'Old Product')]
+    IF    not ${product_exists}
+        The admin clicks "Add New Product"
+        Enters product name "Old Product"
+        Enters price "1.00"
+        Uploads product image
+        Selects category "Energy Drinks"
+        Enters allergen information "Sugar"
+        Clicks "Save Product"
+        Wait Until Page Contains Element    xpath=//tr[contains(., 'Old Product')]    timeout=10s
+    END
     Log    Product exists for deletion test
 
 The admin clicks "Delete" for that product
     [Documentation]    Initiates product deletion
+    ${switched}=    Run Keyword And Return Status    Switch Window    MAIN
+    IF    not ${switched}
+        Switch Window    index=0
+        Sleep    0.5s
+    END
+    The admin is on the product management page
+    Wait Until Element Is Visible    xpath=//tr[contains(., 'Old Product')]//button[contains(., 'Delete')]    timeout=5s
     Click Element    xpath=//tr[contains(., 'Old Product')]//button[contains(., 'Delete')]
 
 The product should be removed from the system
