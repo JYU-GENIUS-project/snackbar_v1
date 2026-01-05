@@ -22,6 +22,12 @@ const statusOptions = [
   { value: 'archived', label: 'Archived' }
 ];
 
+const limitValidationMessages = new Set([
+  'Purchase limit must be a numeric value.',
+  'Minimum limit is 1',
+  'Maximum limit is 50'
+]);
+
 const ProductForm = ({
   initialValues,
   onSubmit,
@@ -34,6 +40,7 @@ const ProductForm = ({
 }) => {
   const [formValues, setFormValues] = useState(initialValues);
   const [formError, setFormError] = useState('');
+  const [purchaseLimitError, setPurchaseLimitError] = useState('');
   const [imageFile, setImageFile] = useState(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState(initialValues?.imagePreviewUrl || '');
   const [imageFileName, setImageFileName] = useState('');
@@ -45,6 +52,7 @@ const ProductForm = ({
     setImagePreviewUrl(initialValues?.imagePreviewUrl || '');
     setImageFile(null);
     setImageFileName('');
+    setPurchaseLimitError('');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -56,10 +64,35 @@ const ProductForm = ({
     if (name === 'categoryIds' || name === 'primaryCategory') {
       return;
     }
+    const nextValue = type === 'checkbox' ? checked : value;
     setFormValues((current) => ({
       ...current,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: nextValue
     }));
+
+    if (name === 'purchaseLimit') {
+      const rawValue = typeof nextValue === 'string' ? nextValue.trim() : nextValue;
+      const parsedValue = Number(rawValue);
+      const isEmpty = rawValue === '' || rawValue === null || rawValue === undefined;
+      if (isEmpty || Number.isNaN(parsedValue)) {
+        setPurchaseLimitError('Purchase limit must be a numeric value.');
+        setFormError('Purchase limit must be a numeric value.');
+        return;
+      }
+      if (parsedValue < 1) {
+        setPurchaseLimitError('Minimum limit is 1');
+        setFormError('Minimum limit is 1');
+        return;
+      }
+      if (parsedValue > 50) {
+        setPurchaseLimitError('Maximum limit is 50');
+        setFormError('Maximum limit is 50');
+        return;
+      }
+
+      setPurchaseLimitError('');
+      setFormError((current) => (limitValidationMessages.has(current) ? '' : current));
+    }
   };
 
   const handlePrimaryCategoryChange = (event) => {
@@ -150,17 +183,22 @@ const ProductForm = ({
     const limitValue = formValues.purchaseLimit;
     const parsedLimit = Number(limitValue);
     if (limitValue === '' || Number.isNaN(parsedLimit)) {
+      setPurchaseLimitError('Purchase limit must be a numeric value.');
       setFormError('Purchase limit must be a numeric value.');
       return;
     }
     if (parsedLimit < 1) {
+      setPurchaseLimitError('Minimum limit is 1');
       setFormError('Minimum limit is 1');
       return;
     }
     if (parsedLimit > 50) {
+      setPurchaseLimitError('Maximum limit is 50');
       setFormError('Maximum limit is 50');
       return;
     }
+
+    setPurchaseLimitError('');
 
     try {
       await onSubmit({ ...formValues, imageFile });
@@ -236,6 +274,17 @@ const ProductForm = ({
             value={formValues.purchaseLimit}
             onChange={handleChange}
           />
+          {purchaseLimitError && (
+            <span
+              className="helper error error-message"
+              id="purchase-limit-error"
+              role="alert"
+              aria-live="assertive"
+              style={{ display: 'block' }}
+            >
+              {purchaseLimitError}
+            </span>
+          )}
         </div>
         <div className="form-field">
           <label htmlFor="product-lowStockThreshold">Low-stock threshold</label>
@@ -381,7 +430,7 @@ const ProductForm = ({
       </div>
 
       {formError && (
-        <div className="alert error">
+        <div className="alert error error-message" id="product-form-error">
           <span>{formError}</span>
         </div>
       )}

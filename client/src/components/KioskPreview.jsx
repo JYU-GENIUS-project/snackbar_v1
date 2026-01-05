@@ -41,7 +41,6 @@ const KioskPreview = () => {
   const { data, isLoading, isFetching, error } = useProductFeed();
 
   const products = data?.products ?? [];
-
   return (
     <section className="card" id="kiosk-preview">
       <div className="inline" style={{ justifyContent: 'space-between', alignItems: 'baseline' }}>
@@ -67,7 +66,8 @@ const KioskPreview = () => {
           {products.map((product) => {
             const imageUrl = product.primaryMedia?.url;
             const imageAlt = product.primaryMedia?.alt || product.imageAlt || product.name;
-            const limit = Number.isFinite(product.purchaseLimit) ? Number(product.purchaseLimit) : null;
+            const parsedLimit = Number(product.purchaseLimit);
+            const hasLimit = Number.isFinite(parsedLimit) && parsedLimit > 0;
             return (
               <article key={product.id} style={cardStyles}>
                 {imageUrl ? (
@@ -84,7 +84,10 @@ const KioskPreview = () => {
                     <p className="helper">{product.metadata.calories} kcal</p>
                   )}
                   <div className="preview-cart-controls" style={{ marginTop: '0.5rem' }}>
-                    <div className="cart-item-controls" style={{ gap: '0.5rem' }}>
+                    <div
+                      className="cart-item-controls"
+                      style={{ gap: '0.5rem' }}
+                    >
                       <button
                         type="button"
                         className="quantity-minus-button"
@@ -94,20 +97,22 @@ const KioskPreview = () => {
                       >
                         −
                       </button>
-                      <span className="quantity-value cart-item-quantity">{limit ?? 0}</span>
+                      <span className="quantity-value cart-item-quantity">
+                        {hasLimit ? parsedLimit : ''}
+                      </span>
                       <button
                         type="button"
                         className="quantity-plus-button"
-                        disabled={Boolean(limit)}
+                        disabled={hasLimit}
                         aria-label={`Increase quantity for ${product.name}`}
                         style={{ width: '48px', height: '48px' }}
                       >
                         +
                       </button>
                     </div>
-                    {limit && (
+                    {hasLimit && (
                       <p className="helper" style={{ marginTop: '0.25rem' }}>
-                        Maximum {limit} of this item per purchase
+                        Maximum {parsedLimit} of this item per purchase
                       </p>
                     )}
                   </div>

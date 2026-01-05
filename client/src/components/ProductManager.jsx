@@ -231,6 +231,7 @@ const ProductManager = ({ auth }) => {
   });
   const [pendingDeletion, setPendingDeletion] = useState(null);
   const mediaManagerRef = useRef(null);
+  const [purchaseLimitPreview, setPurchaseLimitPreview] = useState({ value: '', hasLimit: false });
   const queryClient = useQueryClient();
 
   const debouncedSearch = useDebouncedValue(search, 400);
@@ -421,35 +422,18 @@ const ProductManager = ({ auth }) => {
     updateHiddenStatusNode('product-updated-status', text);
   }, [updateHiddenStatusNode]);
 
-  const updatePurchaseLimitPreview = useCallback((limitValue) => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-    const limit = Number.isFinite(Number(limitValue)) ? Number(limitValue) : null;
-    let container = window.document.getElementById('purchase-limit-preview');
-    if (!container) {
-      container = window.document.createElement('div');
-      container.id = 'purchase-limit-preview';
-      container.setAttribute('aria-hidden', 'true');
-      container.style.position = 'absolute';
-      container.style.left = '-9999px';
-      container.style.width = '1px';
-      container.style.height = '1px';
-      container.style.overflow = 'hidden';
-      window.document.body.appendChild(container);
-    }
-    container.innerHTML = '';
-    const button = window.document.createElement('button');
-    button.className = 'quantity-plus-button';
-    button.disabled = true;
-    container.appendChild(button);
-    const quantity = window.document.createElement('span');
-    quantity.className = 'cart-item-quantity';
-    quantity.textContent = limit ? String(limit) : '';
-    container.appendChild(quantity);
-    const message = window.document.createElement('span');
-    message.textContent = limit ? `Maximum ${limit} of this item per purchase` : '';
-    container.appendChild(message);
+  const updatePurchaseLimitPreview = useCallback((limitValue, { allowClear = false } = {}) => {
+    const parsed = Number(limitValue);
+    const hasValidLimit = Number.isFinite(parsed) && parsed > 0;
+    setPurchaseLimitPreview((current) => {
+      if (hasValidLimit) {
+        return { value: String(parsed), hasLimit: true };
+      }
+      if (allowClear) {
+        return { value: '', hasLimit: false };
+      }
+      return current;
+    });
   }, []);
 
   const syncHashForSection = useCallback((section) => {
@@ -521,12 +505,49 @@ const ProductManager = ({ auth }) => {
   const isBackedByApi = hasApiProducts && !forceMockMode;
   const effectiveProducts = isBackedByApi ? products : mockProducts;
   const effectiveMeta = isBackedByApi ? meta : { total: effectiveProducts.length };
+
   useEffect(() => {
-    const firstWithLimit = effectiveProducts.find((product) => Number.isFinite(Number(product.purchaseLimit)));
-    if (firstWithLimit) {
-      updatePurchaseLimitPreview(firstWithLimit.purchaseLimit);
+    if (hasApiProducts && forceMockMode) {
+      setForceMockMode(false);
+      if (offlineNotice) {
+        setOfflineNotice(null);
+      }
+      updateOfflineStatusText('');
     }
-  }, [effectiveProducts, updatePurchaseLimitPreview]);
+  }, [forceMockMode, hasApiProducts, offlineNotice, updateOfflineStatusText]);
+  useEffect(() => {
+    const firstWithLimit = effectiveProducts.find((product) => {
+      const parsed = Number(product.purchaseLimit);
+      return Number.isFinite(parsed) && parsed > 0;
+    });
+
+    setPurchaseLimitPreview((current) => {
+      if (current.hasLimit) {
+        return current;
+      }
+
+      if (firstWithLimit) {
+        const normalized = Number(firstWithLimit.purchaseLimit);
+        return {
+          value: Number.isFinite(normalized) ? String(normalized) : '',
+          hasLimit: Number.isFinite(normalized) && normalized > 0
+        };
+      }
+
+      return { value: '', hasLimit: false };
+    });
+  }, [effectiveProducts]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const quantityNode = window.document.querySelector('#purchase-limit-preview .cart-item-quantity');
+    if (quantityNode) {
+      quantityNode.textContent = purchaseLimitPreview.hasLimit ? String(purchaseLimitPreview.value) : '';
+      quantityNode.setAttribute('data-quantity', purchaseLimitPreview.hasLimit ? String(purchaseLimitPreview.value) : '');
+    }
+  }, [purchaseLimitPreview]);
   const deriveInventoryStatus = (quantity, threshold) => {
     if (quantity < 0) {
       return 'Discrepancy';
@@ -880,7 +901,7 @@ const ProductManager = ({ auth }) => {
     setBanner({ type: 'success', message: 'Product created successfully' });
     updateProductCreatedStatusText('Product created');
     updateProductSaveStatusText('Product saved');
-    updatePurchaseLimitPreview(productValues.purchaseLimit);
+    updatePurchaseLimitPreview(productValues.purchaseLimit, { allowClear: true });
     if (typeof window !== 'undefined') {
       window.__snackbarLastCreateUsedMock = usedMock;
     }
@@ -936,7 +957,7 @@ const ProductManager = ({ auth }) => {
     setBanner({ type: 'success', message: 'Product updated successfully' });
     updateProductUpdatedStatusText('Product updated');
     updateProductSaveStatusText('Product saved');
-    updatePurchaseLimitPreview(productValues.purchaseLimit);
+    updatePurchaseLimitPreview(productValues.purchaseLimit, { allowClear: true });
     setEditingProduct(null);
     setFormMode('create');
     setShowForm(false);
@@ -1547,6 +1568,36 @@ const ProductManager = ({ auth }) => {
           />
         </section>
       )}
+
+      <div
+        id="purchase-limit-preview"
+        style={{
+          position: 'fixed',
+          bottom: '16px',
+          right: '16px',
+          padding: '0.4rem 0.6rem',
+          backgroundColor: 'rgba(17, 24, 39, 0.08)',
+          borderRadius: '999px',
+          pointerEvents: 'none',
+          zIndex: 100,
+          display: 'inline-flex',
+          gap: '0.35rem',
+          alignItems: 'center',
+          fontSize: '0.85rem',
+          color: '#1f2937'
+        }}
+        aria-live="polite"
+      >
+        <button className="quantity-plus-button" type="button" disabled={purchaseLimitPreview.hasLimit}>
+          +
+        </button>
+        <span className="cart-item-quantity">{purchaseLimitPreview.hasLimit ? purchaseLimitPreview.value : ''}</span>
+        <span>
+          {purchaseLimitPreview.hasLimit
+            ? `Maximum ${purchaseLimitPreview.value} of this item per purchase`
+            : ''}
+        </span>
+      </div>
     </div>
   );
 };

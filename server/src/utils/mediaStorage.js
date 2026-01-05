@@ -106,12 +106,16 @@ const assertValidProductId = (productId) => {
   }
 };
 
-const assertValidBuffer = (buffer) => {
+const assertValidBuffer = (buffer, { enforceMin = true } = {}) => {
   if (!Buffer.isBuffer(buffer)) {
     throw new ApiError(400, 'Uploaded payload must be a binary buffer');
   }
 
-  if (buffer.length < MIN_SIZE_BYTES) {
+  if (buffer.length === 0) {
+    throw new ApiError(400, 'Uploaded payload is empty');
+  }
+
+  if (enforceMin && buffer.length < MIN_SIZE_BYTES) {
     throw new ApiError(400, `File size must be at least ${MIN_SIZE_BYTES} bytes`);
   }
 
@@ -144,7 +148,8 @@ const persistMedia = async ({
 }) => {
   assertValidProductId(productId);
   assertValidVariant(variant);
-  assertValidBuffer(buffer);
+  const enforceMinimumSize = variant === 'source';
+  assertValidBuffer(buffer, { enforceMin: enforceMinimumSize });
 
   const detectedFormat = detectImageFormat(buffer);
   if (!detectedFormat) {

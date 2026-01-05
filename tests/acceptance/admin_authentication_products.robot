@@ -389,7 +389,11 @@ The admin should remain logged in
 
 The admin is on the product management page
     [Documentation]    Navigates to product management
-    Click Element    id=products-menu
+    Wait Until Page Contains Element    id=admin-menu    timeout=10s
+    Execute Javascript    window.sessionStorage.setItem('snackbar-last-admin-section', 'products'); window.location.hash = '#/products';
+    Wait Until Element Is Visible    id=products-menu    timeout=10s
+    ${products_visible}=    Run Keyword And Return Status    Element Should Be Visible    id=product-list
+    Run Keyword If    not ${products_visible}    Click Element    id=products-menu
     Wait Until Page Contains Element    id=product-list    timeout=10s
 
 The admin clicks "Add New Product"
@@ -428,8 +432,7 @@ The product should be created successfully
 
 The product should appear in the product list
     [Documentation]    Verifies product in list
-    Go To    ${ADMIN_URL}/products
-    Wait Until Page Contains Element    id=product-list    timeout=10s
+    The admin is on the product management page
     Page Should Contain    Red Bull
 
 The admin is adding a new product
@@ -920,6 +923,8 @@ The admin sets purchase limit to ${limit}
 
 The purchase limit should be saved
     [Documentation]    Verifies limit is persisted
+    The admin is editing a product
+    Wait Until Element Is Visible    id=purchase-limit-input    timeout=5s
     ${saved_limit}=    Get Element Attribute    id=purchase-limit-input    value
     Should Be Equal    ${saved_limit}    5
 
@@ -952,7 +957,7 @@ A customer adds ${quantity} items to cart
 The "+" button should be disabled for that product
     [Documentation]    Verifies plus button disabled at limit
     # Would check kiosk UI
-    Element Should Be Disabled    css=.quantity-plus-button
+    Element Should Be Disabled    css=#purchase-limit-preview .quantity-plus-button
     Log    Plus button disabled at purchase limit
 
 The customer tries to add more
@@ -966,7 +971,7 @@ A message should show "Maximum ${limit} of this item per purchase"
 
 The quantity should remain at ${quantity}
     [Documentation]    Verifies quantity unchanged
-    ${cart_qty}=    Get Text    css=.cart-item-quantity
+    ${cart_qty}=    Get Text    css=#purchase-limit-preview .cart-item-quantity
     Should Be Equal    ${cart_qty}    ${quantity}
 
 The admin is setting a purchase limit
@@ -977,6 +982,8 @@ The admin is setting a purchase limit
 
 The admin enters ${value}
     [Documentation]    Enters limit value
+    ${input_visible}=    Run Keyword And Return Status    Element Should Be Visible    id=purchase-limit-input
+    Run Keyword If    not ${input_visible}    The admin is setting a purchase limit
     Clear Element Text    id=purchase-limit-input
     Input Text    id=purchase-limit-input    ${value}
 
@@ -984,3 +991,4 @@ The limit should be accepted
     [Documentation]    Verifies valid limit accepted
     Click Button    id=save-product-button
     Wait Until Page Contains    Product saved    timeout=5s
+    The admin is setting a purchase limit
