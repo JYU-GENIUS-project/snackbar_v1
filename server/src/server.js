@@ -98,6 +98,20 @@ const serveAdminApp = (req, res, next) => {
 app.get('/admin', serveAdminApp);
 app.get(/\/admin\/.*/, serveAdminApp);
 
+// Serve kiosk bundle and shared static assets
+app.use(express.static(CLIENT_DIST_DIR, { index: false }));
+
+const serveKioskApp = (req, res, next) => {
+  try {
+    res.sendFile(path.join(CLIENT_DIST_DIR, 'index.html'));
+  } catch (error) {
+    next(error);
+  }
+};
+
+app.get('/', serveKioskApp);
+app.get(/^(?!\/(?:api|admin|uploads)\/).*/, serveKioskApp);
+
 // Serve media assets
 app.use(
   '/uploads',

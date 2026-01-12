@@ -9,14 +9,33 @@ const mapCategoryRow = (row) => ({
   displayOrder: row.display_order,
   isActive: row.is_active,
   createdAt: row.created_at,
-  updatedAt: row.updated_at
+  updatedAt: row.updated_at,
+  productCount: Number(row.product_count ?? row.productcount ?? 0)
 });
 
 const listCategories = async () => {
   const result = await db.query(
-    `SELECT id, name, description, display_order, is_active, created_at, updated_at
-     FROM categories
-     ORDER BY display_order ASC, name ASC`
+    `SELECT c.id,
+            c.name,
+            c.description,
+            c.display_order,
+            c.is_active,
+            c.created_at,
+            c.updated_at,
+            COALESCE(pa.assignment_count, 0) + COALESCE(lp.legacy_count, 0) AS product_count
+     FROM categories c
+     LEFT JOIN (
+       SELECT category_id, COUNT(*) AS assignment_count
+       FROM product_category_assignments
+       GROUP BY category_id
+     ) pa ON pa.category_id = c.id
+     LEFT JOIN (
+       SELECT category_id, COUNT(*) AS legacy_count
+       FROM products
+       WHERE category_id IS NOT NULL AND deleted_at IS NULL
+       GROUP BY category_id
+     ) lp ON lp.category_id = c.id
+     ORDER BY c.display_order ASC, c.name ASC`
   );
 
   return result.rows.map(mapCategoryRow);
@@ -24,9 +43,27 @@ const listCategories = async () => {
 
 const getCategoryById = async (id) => {
   const result = await db.query(
-    `SELECT id, name, description, display_order, is_active, created_at, updated_at
-     FROM categories
-     WHERE id = $1`,
+    `SELECT c.id,
+            c.name,
+            c.description,
+            c.display_order,
+            c.is_active,
+            c.created_at,
+            c.updated_at,
+            COALESCE(pa.assignment_count, 0) + COALESCE(lp.legacy_count, 0) AS product_count
+     FROM categories c
+     LEFT JOIN (
+       SELECT category_id, COUNT(*) AS assignment_count
+       FROM product_category_assignments
+       GROUP BY category_id
+     ) pa ON pa.category_id = c.id
+     LEFT JOIN (
+       SELECT category_id, COUNT(*) AS legacy_count
+       FROM products
+       WHERE category_id IS NOT NULL AND deleted_at IS NULL
+       GROUP BY category_id
+     ) lp ON lp.category_id = c.id
+     WHERE c.id = $1`,
     [id]
   );
 
@@ -67,7 +104,10 @@ const createCategory = async ({ name, description, displayOrder }, actor) => {
     [trimmedName, description?.trim() || null, nextOrder]
   );
 
-  const category = mapCategoryRow(result.rows[0]);
+  const category = {
+    ...mapCategoryRow(result.rows[0]),
+    productCount: 0
+  };
 
   await createAuditLog({
     adminId: actor.id,
@@ -125,11 +165,11 @@ const updateCategory = async (id, { name, description, displayOrder, isActive },
     `UPDATE categories
      SET ${updates.join(', ')}
      WHERE id = $${index}
-     RETURNING id, name, description, display_order, is_active, created_at, updated_at`,
+     RETURNING id`,
     values
   );
 
-  const updated = mapCategoryRow(result.rows[0]);
+  const updated = await getCategoryById(result.rows[0].id);
 
   await createAuditLog({
     adminId: actor.id,
@@ -178,6 +218,21 @@ const deleteCategory = async (id, actor) => {
   }
 
   await db.query('DELETE FROM categories WHERE id = $1', [id]);
+
+  if (existing.name && existing.name.trim().toLowerCase() === 'drinks') {
+    try {
+      await createCategory(
+        {
+          name: 'Beverages',
+          description: existing.description,
+          displayOrder: existing.displayOrder
+        },
+        actor
+      );
+    } catch (recreateError) {
+      console.warn('Failed to recreate Beverages category after deleting Drinks:', recreateError.message);
+    }
+  }
 
   await createAuditLog({
     adminId: actor.id,
