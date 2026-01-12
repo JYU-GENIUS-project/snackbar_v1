@@ -45,7 +45,10 @@ ALTER TABLE products
 
 -- Ensure currency uses ISO 4217 style formatting (three uppercase letters)
 ALTER TABLE products
-    ADD CONSTRAINT IF NOT EXISTS products_currency_format
+    DROP CONSTRAINT IF EXISTS products_currency_format;
+
+ALTER TABLE products
+    ADD CONSTRAINT products_currency_format
         CHECK (currency ~ '^[A-Z]{3}$');
 
 -- Tighten price validation to keep values within expected kiosk ranges
@@ -53,7 +56,10 @@ ALTER TABLE products
     DROP CONSTRAINT IF EXISTS products_price_check;
 
 ALTER TABLE products
-    ADD CONSTRAINT IF NOT EXISTS products_price_range
+    DROP CONSTRAINT IF EXISTS products_price_range;
+
+ALTER TABLE products
+    ADD CONSTRAINT products_price_range
         CHECK (price >= 0 AND price <= 999.99);
 
 -- Maintain uniqueness of active product names to avoid kiosk collisions
