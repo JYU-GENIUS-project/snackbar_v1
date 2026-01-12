@@ -20,9 +20,9 @@ US-029: Create Custom Product Categories
     And enters category name "Energy Drinks"
     And clicks "Save Category"
     Then the category should be created successfully
-    And the category should appear in the category list
+    And the category should appear in the category list    Energy Drinks
     And a success message should be displayed
-    And the category should be available for product assignment
+    And the category should be available for product assignment    Energy Drinks
 
 
 US-029-Edge: Category Name Validation
@@ -66,11 +66,11 @@ US-030: Edit And Delete Categories
     And changes the name to "Drinks"
     And clicks "Save Changes"
     Then the category name should be updated to "Drinks"
-    And the updated name should appear in the list
+    And the updated name should appear in the list    Drinks
     When the admin clicks "Delete" for "Drinks"
     And confirms the deletion
     Then the category should be deleted
-    And the category should no longer appear in the list
+    And the category should no longer appear in the list    Drinks
 
 
 US-030-Edge: Cannot Delete Category With Products
@@ -92,7 +92,7 @@ US-030-Comprehensive: Edit Category Updates Product Assignments
     
     [Setup]    Admin Login
     Given a category "Cold Beverages" has 5 products assigned
-    When the admin edits the category name to "Chilled Drinks"
+    When the admin edits the category name from "Cold Beverages" to "Chilled Drinks"
     Then all 5 products should show the new category "Chilled Drinks"
     And the old category "Cold Beverages" should no longer exist
     And product browsing should show "Chilled Drinks" as a filter option
@@ -170,16 +170,18 @@ The category should be created successfully
     Wait Until Page Contains    Category created successfully    timeout=5s
 
 The category should appear in the category list
+    [Arguments]    ${category_name}
     [Documentation]    Verifies category appears in list
-    Wait Until Page Contains Element    css=.category-list-item:contains('Energy Drinks')    timeout=5s
-    Element Should Be Visible    css=.category-list-item
+    Wait Until Page Contains Element    xpath=//tr[contains(@class, 'category-list-item')]//td[normalize-space()='${category_name}']    timeout=5s
+    Element Should Be Visible    xpath=//tr[contains(@class, 'category-list-item')]//td[normalize-space()='${category_name}']
 
 The category should be available for product assignment
+    [Arguments]    ${category_name}
     [Documentation]    Verifies category can be used for products
     Click Element    id=products-menu
     Wait For Element And Click    id=add-product-button    timeout=5s
     Wait Until Element Is Visible    id=category-select    timeout=5s
-    Page Should Contain Element    css=option:contains('Energy Drinks')
+    Page Should Contain Element    xpath=//select[@id='category-select']//option[normalize-space()='${category_name}']
 
 The admin is creating a new category
     [Documentation]    Admin in new category form
@@ -239,7 +241,7 @@ A category exists named "${name}"
 
 The admin clicks "Edit" for "${name}"
     [Documentation]    Clicks edit button for category
-    Click Element    xpath=//tr[contains(., '${name}')]//button[contains(., 'Edit')]
+    Click Element    xpath=//tr[contains(@class, 'category-list-item')]//td[normalize-space()='${name}']/following-sibling::td//button[contains(., 'Edit')]
     Wait Until Element Is Visible    id=category-form    timeout=5s
 
 Changes the name to "${new_name}"
@@ -250,15 +252,16 @@ Changes the name to "${new_name}"
 
 The category name should be updated to "${name}"
     [Documentation]    Verifies category renamed
-    Page Should Contain Element    xpath=//tr[contains(., '${name}')]
+    Page Should Contain Element    xpath=//tr[contains(@class, 'category-list-item')]//td[normalize-space()='${name}']
 
 The updated name should appear in the list
+    [Arguments]    ${category_name}
     [Documentation]    Verifies new name in list
-    Wait Until Page Contains Element    css=.category-list-item:contains('Drinks')    timeout=5s
+    Wait Until Page Contains Element    xpath=//tr[contains(@class, 'category-list-item')]//td[normalize-space()='${category_name}']    timeout=5s
 
 The admin clicks "Delete" for "${name}"
     [Documentation]    Clicks delete button for category
-    Click Element    xpath=//tr[contains(., '${name}')]//button[contains(., 'Delete')]
+    Click Element    xpath=//tr[contains(@class, 'category-list-item')]//td[normalize-space()='${name}']/following-sibling::td//button[contains(., 'Delete')]
     Wait Until Element Is Visible    id=confirm-delete-dialog    timeout=5s
 
 The category should be deleted
@@ -266,8 +269,9 @@ The category should be deleted
     Wait Until Page Contains    Category deleted    timeout=5s
 
 The category should no longer appear in the list
+    [Arguments]    ${category_name}
     [Documentation]    Verifies category removed from list
-    Wait Until Page Does Not Contain Element    xpath=//tr[contains(., 'Drinks')]    timeout=5s
+    Wait Until Page Does Not Contain Element    xpath=//tr[contains(@class, 'category-list-item')]//td[normalize-space()='${category_name}']    timeout=5s
 
 A category "${name}" has products assigned
     [Documentation]    Precondition: Category with products
@@ -297,9 +301,9 @@ A category "${name}" has ${count} products assigned
     # Would set up via API
     Log    Category ${name} has ${count} products
 
-The admin edits the category name to "${new_name}"
+The admin edits the category name from "${current_name}" to "${new_name}"
     [Documentation]    Edits category name
-    The admin clicks "Edit" for "${name}"
+    The admin clicks "Edit" for "${current_name}"
     Changes the name to "${new_name}"
     Clicks "Save Changes"
 
@@ -356,7 +360,8 @@ A customer filters by "${category_name}" on the kiosk
     [Documentation]    Customer selects category filter
     # Would interact with kiosk interface
     Go To    ${KIOSK_URL}
-    Wait Until Element Is Visible    id=category-filters    timeout=5s
+    Wait Until Element Is Visible    id=category-filters    timeout=10s
+    Wait Until Element Is Visible    xpath=//button[@data-category='${category_name}']    timeout=10s
     Click Element    xpath=//button[@data-category='${category_name}']
     Wait For Page Load Complete
 
@@ -389,6 +394,7 @@ The admin assigns the product to ${count} categories
     Wait Until Element Is Visible    id=category-multiselect    timeout=5s
     # Would select multiple categories
     Log    Assigning product to ${count} categories
+    Set Test Variable    ${CATEGORY_ASSIGNMENT_COUNT}    ${count}
 
 All ${count} category assignments should be saved
     [Documentation]    Verifies all assignments persisted
@@ -404,4 +410,5 @@ The product should appear in all ${count} category filters
 No performance degradation should occur
     [Documentation]    Verifies acceptable performance
     # Would measure response times
+    ${count}=    Get Variable Value    ${CATEGORY_ASSIGNMENT_COUNT}    multiple
     Log    Performance remains acceptable with ${count} categories

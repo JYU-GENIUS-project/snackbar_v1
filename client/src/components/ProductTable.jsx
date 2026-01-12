@@ -20,7 +20,7 @@ const ProductTable = ({
 
   return (
     <div className="table-wrapper">
-      <table id="product-list" className="table">
+      <table id="product-list" className="table product-list">
         <thead>
           <tr>
             <th>Name</th>
@@ -53,7 +53,7 @@ const ProductTable = ({
                 : [];
               const primaryMedia = mediaItems.find((item) => item.isPrimary);
               return (
-                <tr key={product.id} className="product-item" data-product-id={product.id}>
+                <tr key={product.id} className="product-item product-list-item" data-product-id={product.id}>
                   <td>
                     <strong>{product.name}</strong>
                     <div className="helper" style={{ maxWidth: '320px' }}>

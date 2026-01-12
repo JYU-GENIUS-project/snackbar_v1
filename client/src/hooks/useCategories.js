@@ -87,6 +87,7 @@ export const useCreateCategory = (token) => {
           isActive: true,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
+          productCount: 0,
           __optimistic: true
         };
         return [...current, optimistic];
@@ -124,10 +125,10 @@ export const useUpdateCategory = (token) => {
         current.map((category) =>
           category.id === id
             ? {
-                ...category,
-                ...payload,
-                updatedAt: new Date().toISOString()
-              }
+              ...category,
+              ...payload,
+              updatedAt: new Date().toISOString()
+            }
             : category
         )
       );

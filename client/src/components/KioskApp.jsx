@@ -6,6 +6,20 @@ const formatPrice = (value) => `${Number(value ?? 0).toFixed(2)}€`;
 
 const normalizeProduct = (product) => {
     const limit = Number(product.purchaseLimit);
+    const categories = Array.isArray(product.categories)
+        ? product.categories
+            .filter(Boolean)
+            .map((category) => ({
+                id: category.id ?? (category.name ? `name:${category.name}` : null),
+                name: category.name ?? category.id,
+                isActive: category.isActive !== false
+            }))
+            .filter((category) => Boolean(category.name))
+        : [];
+    const categoryIds = Array.isArray(product.categoryIds)
+        ? product.categoryIds.filter(Boolean)
+        : categories.map((category) => category.id).filter(Boolean);
+
     return {
         id: product.id,
         name: product.name || 'Product',
@@ -14,6 +28,9 @@ const normalizeProduct = (product) => {
         imageUrl: product.primaryMedia?.url || '',
         imageAlt: product.primaryMedia?.alt || product.name || 'Product image',
         description: product.description || product.metadata?.description || '',
+        categoryId: categoryIds[0] || null,
+        categoryIds,
+        categories,
         available: product.available !== false
     };
 };
@@ -45,10 +62,49 @@ const KioskApp = () => {
         return data.products.map(normalizeProduct).filter((product) => product.available);
     }, [data]);
 
+    const categoryFilters = useMemo(() => {
+        const seen = new Set();
+        const derived = [];
+
+        products.forEach((product) => {
+            (product.categories || []).forEach((category) => {
+                const name = category.name;
+                if (!name || category.isActive === false || seen.has(name)) {
+                    return;
+                }
+                seen.add(name);
+                derived.push({ id: category.id, name });
+            });
+        });
+
+        return derived.sort((a, b) => a.name.localeCompare(b.name));
+    }, [products]);
+
+    const [selectedCategory, setSelectedCategory] = useState('all');
     const [cart, setCart] = useState([]);
     const [cartOpen, setCartOpen] = useState(false);
     const [toastMessage, setToastMessage] = useState('');
     const [limitMessage, setLimitMessage] = useState('');
+
+    useEffect(() => {
+        if (selectedCategory === 'all') {
+            return;
+        }
+        const exists = categoryFilters.some((category) => category.name === selectedCategory);
+        if (!exists) {
+            setSelectedCategory('all');
+        }
+    }, [categoryFilters, selectedCategory]);
+
+    const filteredProducts = useMemo(() => {
+        if (selectedCategory === 'all') {
+            return products;
+        }
+
+        return products.filter((product) =>
+            (product.categories || []).some((category) => category.name === selectedCategory)
+        );
+    }, [products, selectedCategory]);
 
     useEffect(() => {
         if (!toastMessage || typeof window === 'undefined') {
@@ -216,13 +272,44 @@ const KioskApp = () => {
                         {error.message || 'Unable to load products.'}
                     </div>
                 )}
+                {!isLoading && categoryFilters.length > 0 && (
+                    <div
+                        id="category-filters"
+                        className="category-filters"
+                        role="group"
+                        aria-label="Filter by category"
+                        style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}
+                    >
+                        <button
+                            type="button"
+                            className={`button secondary${selectedCategory === 'all' ? '' : ' muted'}`}
+                            data-category="all"
+                            onClick={() => setSelectedCategory('all')}
+                        >
+                            All
+                        </button>
+                        {categoryFilters.map((category) => (
+                            <button
+                                key={category.id || category.name}
+                                type="button"
+                                className={`button secondary${selectedCategory === category.name ? '' : ' muted'}`}
+                                data-category={category.name}
+                                onClick={() => setSelectedCategory(category.name)}
+                            >
+                                {category.name}
+                            </button>
+                        ))}
+                    </div>
+                )}
                 {isLoading ? (
                     <div className="loading-placeholder">Loading products…</div>
                 ) : products.length === 0 ? (
                     <div className="loading-placeholder">No products available.</div>
+                ) : filteredProducts.length === 0 ? (
+                    <div className="loading-placeholder">No products match this category.</div>
                 ) : (
                     <div id="product-grid" className="product-grid" aria-live={isFetching ? 'polite' : 'off'}>
-                        {products.map((product) => (
+                        {filteredProducts.map((product) => (
                             <div key={product.id} className="product-card" data-product-name={product.name}>
                                 <div className="product-image" role="img" aria-label={product.imageAlt}>
                                     {product.imageUrl ? <img src={product.imageUrl} alt={product.imageAlt} /> : 'No Image'}

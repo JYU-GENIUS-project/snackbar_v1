@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 const asyncNoop = async () => undefined;
 
@@ -18,25 +18,106 @@ const CategoryManager = ({
   const [formMode, setFormMode] = useState('create');
   const [categoryName, setCategoryName] = useState('');
   const [activeCategoryId, setActiveCategoryId] = useState(null);
-  const [formError, setFormError] = useState(null);
+  const [submitError, setSubmitError] = useState(null);
   const [statusMessage, setStatusMessage] = useState(null);
   const [isLocalSubmitting, setIsLocalSubmitting] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
   const [deleteError, setDeleteError] = useState(null);
+  const [hasInteracted, setHasInteracted] = useState(false);
 
-  const hasCategories = useMemo(() => Array.isArray(categories) && categories.length > 0, [categories]);
+  const normalizedCategories = useMemo(() => {
+    if (!Array.isArray(categories)) {
+      return [];
+    }
+
+    return categories
+      .map((category) => ({
+        id: category?.id ?? null,
+        name: typeof category?.name === 'string' ? category.name.trim().toLowerCase() : ''
+      }))
+      .filter((category) => Boolean(category.name));
+  }, [categories]);
+
+  const hasCategories = useMemo(() => normalizedCategories.length > 0, [normalizedCategories]);
+  const pendingCategory = useMemo(
+    () => (Array.isArray(categories) ? categories.find((category) => category?.id === pendingDeleteId) || null : null),
+    [categories, pendingDeleteId]
+  );
+  const pendingCategoryProductCount = Number(pendingCategory?.productCount ?? 0);
+  const isDeleteBlocked = pendingCategoryProductCount > 0;
+
+  const validateCategoryName = (value) => {
+    const rawValue = typeof value === 'string' ? value : '';
+    const trimmed = rawValue.trim();
+
+    if (!trimmed) {
+      return 'Category name is required';
+    }
+
+    if (trimmed.length > 50) {
+      return 'Maximum 50 characters';
+    }
+
+    if (!/^[-A-Za-z0-9 ]+$/.test(trimmed)) {
+      return 'Only letters, numbers, spaces and hyphens allowed';
+    }
+
+    const normalized = trimmed.toLowerCase();
+    const hasDuplicate = normalizedCategories.some((category) => {
+      if (category.name !== normalized) {
+        return false;
+      }
+
+      if (formMode === 'edit' && category.id === activeCategoryId) {
+        return false;
+      }
+
+      return true;
+    });
+
+    if (hasDuplicate) {
+      return 'Category name already exists';
+    }
+
+    return null;
+  };
+
+  const validationMessage = validateCategoryName(categoryName);
+  const shouldShowValidation = formMode === 'create' || hasInteracted;
+  const formError = submitError || (shouldShowValidation ? validationMessage : null);
+
+  const handleNameFocus = () => {
+    if (!hasInteracted) {
+      setHasInteracted(true);
+    }
+    setSubmitError(null);
+  };
+
+  useEffect(() => {
+    if (!isFormVisible) {
+      return;
+    }
+
+    if (formMode === 'create') {
+      setSubmitError(null);
+    }
+  }, [isFormVisible, formMode]);
 
   const resetFormState = () => {
     setCategoryName('');
     setActiveCategoryId(null);
-    setFormError(null);
+    setSubmitError(null);
     setIsLocalSubmitting(false);
+    setHasInteracted(false);
   };
 
   const handleStartCreate = () => {
     setFormMode('create');
     setIsFormVisible(true);
     resetFormState();
+    setStatusMessage(null);
+    setHasInteracted(true);
+    setSubmitError(null);
   };
 
   const handleStartEdit = (category) => {
@@ -44,8 +125,9 @@ const CategoryManager = ({
     setIsFormVisible(true);
     setActiveCategoryId(category.id);
     setCategoryName(category.name || '');
-    setFormError(null);
+    setSubmitError(null);
     setStatusMessage(null);
+    setHasInteracted(false);
   };
 
   const handleCancelForm = () => {
@@ -53,42 +135,48 @@ const CategoryManager = ({
     resetFormState();
   };
 
+  const handleNameChange = (event) => {
+    const nextValue = event.target.value;
+    setCategoryName(nextValue);
+    if (!hasInteracted) {
+      setHasInteracted(true);
+    }
+    setSubmitError(null);
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
 
+    setHasInteracted(true);
+    const validationMessage = validateCategoryName(categoryName);
+    if (validationMessage) {
+      return;
+    }
+
     const trimmedName = categoryName.trim();
 
-    if (!trimmedName) {
-      setFormError('Category name is required');
-      return;
-    }
-
-    if (trimmedName.length > 50) {
-      setFormError('Maximum 50 characters');
-      return;
-    }
-
-    if (!/^[-A-Za-z0-9 ]+$/.test(trimmedName)) {
-      setFormError('Only letters, numbers, spaces and hyphens allowed');
-      return;
-    }
-
-    setIsSubmitting(true);
-    setFormError(null);
+    setSubmitError(null);
     setIsLocalSubmitting(true);
 
     try {
       if (formMode === 'create') {
         await onCreate({ name: trimmedName });
         setStatusMessage({ id: 'success-message', tone: 'success', text: 'Category created successfully' });
-      } else if (formMode === 'edit' && activeCategoryId) {
+        resetFormState();
+        setIsFormVisible(true);
+        return;
+      }
+
+      if (formMode === 'edit' && activeCategoryId) {
         await onUpdate({ id: activeCategoryId, name: trimmedName });
         setStatusMessage({ id: 'success-message', tone: 'success', text: 'Category updated successfully' });
+        setIsFormVisible(false);
+        resetFormState();
+        return;
       }
-      setIsFormVisible(false);
       resetFormState();
-    } catch (submitError) {
-      setFormError(submitError?.message || 'Failed to save category.');
+    } catch (errorReason) {
+      setSubmitError(errorReason?.message || 'Failed to save category.');
     } finally {
       setIsLocalSubmitting(false);
     }
@@ -97,6 +185,13 @@ const CategoryManager = ({
   const requestDelete = (category) => {
     setPendingDeleteId(category.id);
     setDeleteError(null);
+    const productCount = Number(category?.productCount ?? 0);
+    if (productCount > 0) {
+      setDeleteError({
+        message: 'Cannot delete category with assigned products',
+        advice: 'Please reassign or delete products first'
+      });
+    }
   };
 
   const cancelDelete = () => {
@@ -106,6 +201,14 @@ const CategoryManager = ({
 
   const confirmDelete = async () => {
     if (!pendingDeleteId) {
+      return;
+    }
+
+    if (isDeleteBlocked) {
+      setDeleteError({
+        message: 'Cannot delete category with assigned products',
+        advice: 'Please reassign or delete products first'
+      });
       return;
     }
 
@@ -182,15 +285,19 @@ const CategoryManager = ({
             name="name"
             type="text"
             value={categoryName}
-            onChange={(event) => setCategoryName(event.target.value)}
-            maxLength={50}
+            onChange={handleNameChange}
+            onFocus={handleNameFocus}
             autoFocus
+            aria-describedby={formError ? 'category-name-error' : undefined}
           />
-          {formError && (
-            <div id="category-name-error" className="error-message">
-              {formError}
-            </div>
-          )}
+          <div
+            id="category-name-error"
+            className="error-message"
+            role="alert"
+            style={{ display: formError ? 'block' : 'none' }}
+          >
+            {formError || ''}
+          </div>
           <div className="inline" style={{ gap: '0.75rem' }}>
             <button
               id="save-category-button"
@@ -228,18 +335,18 @@ const CategoryManager = ({
             {hasCategories &&
               categories.map((category) => (
                 <tr key={category.id || category.name} className="category-list-item">
-                <td>{category.name}</td>
-                <td>
-                  <div className="inline" style={{ justifyContent: 'flex-end', gap: '0.5rem' }}>
-                    <button className="button secondary" type="button" onClick={() => handleStartEdit(category)}>
-                      Edit
-                    </button>
-                    <button className="button secondary" type="button" onClick={() => requestDelete(category)}>
-                      Delete
-                    </button>
-                  </div>
-                </td>
-              </tr>
+                  <td>{category.name}</td>
+                  <td>
+                    <div className="inline" style={{ justifyContent: 'flex-end', gap: '0.5rem' }}>
+                      <button className="button secondary" type="button" onClick={() => handleStartEdit(category)}>
+                        Edit
+                      </button>
+                      <button className="button secondary" type="button" onClick={() => requestDelete(category)}>
+                        Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
               ))}
           </tbody>
         </table>
@@ -267,7 +374,7 @@ const CategoryManager = ({
                 className="button"
                 type="button"
                 onClick={confirmDelete}
-                disabled={isDeleting && deletePendingId === pendingDeleteId}
+                disabled={isDeleteBlocked || (isDeleting && deletePendingId === pendingDeleteId)}
               >
                 {isDeleting && deletePendingId === pendingDeleteId ? 'Deleting…' : 'Confirm'}
               </button>

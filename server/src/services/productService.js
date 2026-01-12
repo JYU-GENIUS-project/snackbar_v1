@@ -491,6 +491,9 @@ const getProductFeed = async () => {
   const products = await attachMediaToProducts(result.rows.map(mapProductRow));
 
   return products.map((product) => {
+    const categoryIds = Array.isArray(product.categoryIds) ? product.categoryIds.filter(Boolean) : [];
+    const categories = Array.isArray(product.categories) ? product.categories : [];
+
     const primaryMedia =
       product.media.find((item) => item.isPrimary) ||
       product.media.find((item) => item.variant === 'display') ||
@@ -503,6 +506,9 @@ const getProductFeed = async () => {
       price: product.price,
       currency: product.currency,
       status: product.status,
+      categoryId: categoryIds[0] || product.categoryId || null,
+      categoryIds,
+      categories,
       available:
         product.status === 'active' &&
         product.isActive &&
