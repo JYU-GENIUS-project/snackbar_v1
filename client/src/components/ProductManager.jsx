@@ -593,6 +593,7 @@ const ProductManager = ({ auth }) => {
     const snapshot = {
       generatedAt: new Date().toISOString(),
       source: isBackedByApi ? 'api' : 'mock',
+      inventoryTrackingEnabled,
       products: mockProducts.map((product) => ({
         ...product,
         media: Array.isArray(product.media)
@@ -601,7 +602,7 @@ const ProductManager = ({ auth }) => {
       }))
     };
     saveOfflineProductSnapshot(snapshot);
-  }, [mockProducts, isBackedByApi]);
+  }, [mockProducts, isBackedByApi, inventoryTrackingEnabled]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
