@@ -230,6 +230,34 @@ textarea {
   outline-offset: 2px;
 }
 
+.inventory-row.low-stock {
+  background: rgba(250, 204, 21, 0.15);
+}
+
+.inventory-row.has-discrepancy {
+  background: rgba(254, 226, 226, 0.4);
+  color: #b91c1c;
+}
+
+.inventory-row.negative-stock {
+  border-left: 4px solid #b91c1c;
+}
+
+.inventory-row.inactive {
+  opacity: 0.65;
+}
+
+.stock-column {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.warning-icon {
+  color: #b91c1c;
+  font-weight: 700;
+}
+
 .kiosk-app {
   min-height: 100vh;
   background: #f5f7fb;

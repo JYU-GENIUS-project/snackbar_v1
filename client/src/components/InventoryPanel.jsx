@@ -49,13 +49,42 @@ const FALLBACK_ITEMS = [
   }
 ];
 
-const deriveStatus = (item) => {
-  if (item.negativeStock || (item.discrepancyTotal ?? 0) < 0) {
+const FALLBACK_SORT_KEYS = {
+  name: (item) => (item.name || '').toLowerCase(),
+  stock: (item) => Number.parseInt(item.currentStock, 10) || 0
+};
+
+const SORT_PARAM_MAP = Object.freeze({
+  name: 'name',
+  stock: 'current_stock',
+  threshold: 'low_stock_threshold',
+  lastActivity: 'last_activity_at'
+});
+
+const deriveStatus = (item, { isLowStock, hasDiscrepancy } = {}) => {
+  const discrepancyPresent =
+    typeof hasDiscrepancy === 'boolean'
+      ? hasDiscrepancy
+      : Boolean(item.negativeStock) || Math.abs(Number(item.discrepancyTotal ?? 0)) > 0;
+  if (discrepancyPresent) {
     return 'Discrepancy';
   }
-  if (item.lowStock || (item.currentStock ?? 0) <= (item.lowStockThreshold ?? 0)) {
+
+  if (isLowStock === true) {
     return 'Low Stock';
   }
+
+  const lowStockFlag = typeof isLowStock === 'boolean' ? isLowStock : Boolean(item.lowStock);
+  if (lowStockFlag) {
+    return 'Low Stock';
+  }
+
+  const stockValue = Number.isFinite(Number(item.currentStock)) ? Number(item.currentStock) : null;
+  const thresholdValue = Number.isFinite(Number(item.lowStockThreshold)) ? Number(item.lowStockThreshold) : null;
+  if (thresholdValue !== null && stockValue !== null && stockValue <= thresholdValue) {
+    return 'Low Stock';
+  }
+
   return 'In Stock';
 };
 
@@ -65,19 +94,26 @@ const buildEventSourceUrl = (token) => {
   return url.toString();
 };
 
-const InventoryPanel = ({ token, trackingEnabled, onTrackingUpdate = () => {}, onAudit = () => {} }) => {
+const InventoryPanel = ({
+  token,
+  trackingEnabled,
+  inventoryMetadata = {},
+  onTrackingUpdate = () => {},
+  onAudit = () => {}
+}) => {
   const [sortBy, setSortBy] = useState('name');
   const [sortDirection, setSortDirection] = useState('asc');
   const [includeInactive, setIncludeInactive] = useState(false);
   const [search, setSearch] = useState('');
   const [fallbackItems, setFallbackItems] = useState(FALLBACK_ITEMS);
-  const [feedbackMessage, setFeedbackMessage] = useState('');
+  const [feedbackMessage, setFeedbackMessage] = useState(null);
   const [stockDialog, setStockDialog] = useState(null);
   const [stockQuantity, setStockQuantity] = useState('');
   const [adjustDialog, setAdjustDialog] = useState(null);
   const [adjustQuantity, setAdjustQuantity] = useState('');
   const [adjustReason, setAdjustReason] = useState('');
   const [usingFallback, setUsingFallback] = useState(false);
+  const apiSortBy = SORT_PARAM_MAP[sortBy] || sortBy;
 
   const queryClient = useQueryClient();
 
@@ -85,7 +121,7 @@ const InventoryPanel = ({ token, trackingEnabled, onTrackingUpdate = () => {}, o
     token,
     search,
     includeInactive,
-    sortBy,
+    sortBy: apiSortBy,
     sortDirection,
     limit: 100,
     offset: 0,
@@ -123,6 +159,11 @@ const InventoryPanel = ({ token, trackingEnabled, onTrackingUpdate = () => {}, o
     return [];
   }, [usingFallback, fallbackItems, inventoryQuery.data]);
 
+  const fallbackSortAccessor = useMemo(() => {
+    const accessor = FALLBACK_SORT_KEYS[sortBy];
+    return typeof accessor === 'function' ? accessor : FALLBACK_SORT_KEYS.name;
+  }, [sortBy]);
+
   const sortedItems = useMemo(() => {
     if (!usingFallback) {
       return items;
@@ -130,8 +171,8 @@ const InventoryPanel = ({ token, trackingEnabled, onTrackingUpdate = () => {}, o
 
     const next = [...items];
     next.sort((a, b) => {
-      const valueA = sortBy === 'current_stock' ? Number(a.currentStock) : (a[sortBy] || '').toString().toLowerCase();
-      const valueB = sortBy === 'current_stock' ? Number(b.currentStock) : (b[sortBy] || '').toString().toLowerCase();
+      const valueA = fallbackSortAccessor(a);
+      const valueB = fallbackSortAccessor(b);
       if (valueA < valueB) {
         return sortDirection === 'asc' ? -1 : 1;
       }
@@ -141,7 +182,7 @@ const InventoryPanel = ({ token, trackingEnabled, onTrackingUpdate = () => {}, o
       return 0;
     });
     return next;
-  }, [items, usingFallback, sortBy, sortDirection]);
+  }, [items, usingFallback, fallbackSortAccessor, sortDirection]);
 
   useEffect(() => {
     if (!token) {
@@ -198,14 +239,14 @@ const InventoryPanel = ({ token, trackingEnabled, onTrackingUpdate = () => {}, o
   const openStockDialog = (item) => {
     setStockDialog(item);
     setStockQuantity(item ? String(item.currentStock ?? 0) : '');
-    setFeedbackMessage('');
+    setFeedbackMessage(null);
   };
 
   const openAdjustmentDialog = (item) => {
     setAdjustDialog(item);
     setAdjustQuantity(item ? String(item.currentStock ?? 0) : '');
     setAdjustReason('');
-    setFeedbackMessage('');
+    setFeedbackMessage(null);
   };
 
   const closeDialogs = () => {
@@ -227,13 +268,13 @@ const InventoryPanel = ({ token, trackingEnabled, onTrackingUpdate = () => {}, o
 
     const parsedQuantity = Number.parseInt(stockQuantity, 10);
     if (!Number.isInteger(parsedQuantity) || parsedQuantity < 0) {
-      setFeedbackMessage('Quantity must be a non-negative integer.');
+      setFeedbackMessage({ type: 'error', text: 'Quantity must be a non-negative integer.' });
       return;
     }
 
     if (usingFallback || !token) {
       applyFallbackUpdate(stockDialog.productId, (item) => ({ ...item, currentStock: parsedQuantity }));
-      setFeedbackMessage('Stock updated locally.');
+      setFeedbackMessage({ type: 'success', text: 'Stock updated locally.' });
       onAudit({
         action: 'INVENTORY_UPDATE',
         entity: `Product: ${stockDialog.name}`,
@@ -249,7 +290,7 @@ const InventoryPanel = ({ token, trackingEnabled, onTrackingUpdate = () => {}, o
         quantity: parsedQuantity,
         reason: 'Manual stock update'
       });
-      setFeedbackMessage('Stock updated successfully.');
+      setFeedbackMessage({ type: 'success', text: 'Stock updated successfully.' });
       onAudit({
         action: 'INVENTORY_UPDATE',
         entity: `Product: ${stockDialog.name}`,
@@ -257,7 +298,7 @@ const InventoryPanel = ({ token, trackingEnabled, onTrackingUpdate = () => {}, o
       });
       closeDialogs();
     } catch (error) {
-      setFeedbackMessage(error?.message || 'Unable to update stock level.');
+      setFeedbackMessage({ type: 'error', text: error?.message || 'Unable to update stock level.' });
     }
   };
 
@@ -268,13 +309,13 @@ const InventoryPanel = ({ token, trackingEnabled, onTrackingUpdate = () => {}, o
 
     const parsedQuantity = Number.parseInt(adjustQuantity, 10);
     if (!Number.isInteger(parsedQuantity) || parsedQuantity < 0) {
-      setFeedbackMessage('Adjusted quantity must be a non-negative integer.');
+      setFeedbackMessage({ type: 'error', text: 'Adjusted quantity must be a non-negative integer.' });
       return;
     }
 
     if (usingFallback || !token) {
       applyFallbackUpdate(adjustDialog.productId, (item) => ({ ...item, currentStock: parsedQuantity }));
-      setFeedbackMessage('Inventory adjusted locally.');
+      setFeedbackMessage({ type: 'success', text: 'Inventory adjusted locally.' });
       onAudit({
         action: 'INVENTORY_ADJUST',
         entity: `Product: ${adjustDialog.name}`,
@@ -290,7 +331,7 @@ const InventoryPanel = ({ token, trackingEnabled, onTrackingUpdate = () => {}, o
         newQuantity: parsedQuantity,
         reason: adjustReason || 'Inventory adjustment'
       });
-      setFeedbackMessage('Inventory adjusted successfully.');
+      setFeedbackMessage({ type: 'success', text: 'Inventory adjusted successfully.' });
       onAudit({
         action: 'INVENTORY_ADJUST',
         entity: `Product: ${adjustDialog.name}`,
@@ -298,12 +339,12 @@ const InventoryPanel = ({ token, trackingEnabled, onTrackingUpdate = () => {}, o
       });
       closeDialogs();
     } catch (error) {
-      setFeedbackMessage(error?.message || 'Unable to adjust inventory.');
+      setFeedbackMessage({ type: 'error', text: error?.message || 'Unable to adjust inventory.' });
     }
   };
 
-  const renderStatusBadge = (item) => {
-    const status = deriveStatus(item);
+  const renderStatusBadge = (item, overrides = {}) => {
+    const status = deriveStatus(item, overrides);
     if (status === 'Discrepancy') {
       return <span className="badge warning">Discrepancy</span>;
     }
@@ -332,8 +373,14 @@ const InventoryPanel = ({ token, trackingEnabled, onTrackingUpdate = () => {}, o
       )}
 
       {feedbackMessage && (
-        <div className="alert success" id="inventory-feedback" style={{ marginTop: '1rem' }}>
-          {feedbackMessage}
+        <div
+          className={`alert ${
+            typeof feedbackMessage === 'object' && feedbackMessage?.type ? feedbackMessage.type : 'success'
+          }`}
+          id="inventory-feedback"
+          style={{ marginTop: '1rem' }}
+        >
+          {typeof feedbackMessage === 'object' ? feedbackMessage.text : feedbackMessage}
         </div>
       )}
 
@@ -373,13 +420,36 @@ const InventoryPanel = ({ token, trackingEnabled, onTrackingUpdate = () => {}, o
         <table id="inventory-table" className="table" style={{ minWidth: '640px' }}>
           <thead>
             <tr>
-              <th scope="col" role="button" tabIndex={0} onClick={() => handleSort('name')}>
+              <th
+                scope="col"
+                role="button"
+                tabIndex={0}
+                onClick={() => handleSort('name')}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    handleSort('name');
+                  }
+                }}
+              >
                 Product
               </th>
-              <th scope="col">Status</th>
-              <th scope="col" role="button" tabIndex={0} onClick={() => handleSort('current_stock')}>
-                Current Stock
+              <th scope="col">Category</th>
+              <th
+                scope="col"
+                role="button"
+                tabIndex={0}
+                onClick={() => handleSort('stock')}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    handleSort('stock');
+                  }
+                }}
+              >
+                Stock
               </th>
+              <th scope="col">Status</th>
               <th scope="col">Threshold</th>
               <th scope="col">Last Activity</th>
               <th scope="col">Actions</th>
@@ -388,45 +458,96 @@ const InventoryPanel = ({ token, trackingEnabled, onTrackingUpdate = () => {}, o
           <tbody>
             {sortedItems.length === 0 && (
               <tr>
-                <td colSpan={6} style={{ textAlign: 'center', padding: '1.5rem' }}>
+                <td colSpan={7} style={{ textAlign: 'center', padding: '1.5rem' }}>
                   No inventory records found.
                 </td>
               </tr>
             )}
-            {sortedItems.map((item) => (
-              <tr key={item.productId} className="inventory-row">
-                <td>
-                  <div className="stack" style={{ gap: '0.25rem' }}>
-                    <span>{item.name}</span>
-                    {!item.isActive && <span className="badge muted">Inactive</span>}
-                  </div>
-                </td>
-                <td>{renderStatusBadge(item)}</td>
-                <td>{item.currentStock}</td>
-                <td>{item.lowStockThreshold}</td>
-                <td>{item.lastActivityAt ? new Date(item.lastActivityAt).toLocaleString() : '—'}</td>
-                <td>
-                  <div className="inline" style={{ gap: '0.5rem' }}>
-                    <button
-                      type="button"
-                      className="button secondary"
-                      onClick={() => openStockDialog(item)}
-                      disabled={stockMutation.isPending || adjustmentMutation.isPending}
-                    >
-                      Update Stock
-                    </button>
-                    <button
-                      type="button"
-                      className="button secondary"
-                      onClick={() => openAdjustmentDialog(item)}
-                      disabled={stockMutation.isPending || adjustmentMutation.isPending}
-                    >
-                      Adjust Inventory
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+            {sortedItems.map((item) => {
+              const productMeta = inventoryMetadata[item.productId] || {};
+              const declaredThreshold =
+                item.lowStockThreshold ?? productMeta.lowStockThreshold ?? null;
+              const numericThreshold = Number.isFinite(Number(declaredThreshold)) ? Number(declaredThreshold) : null;
+              const fallbackThreshold =
+                numericThreshold !== null
+                  ? numericThreshold
+                  : Number.isFinite(Number(item.currentStock)) && Number(item.currentStock) > 0
+                  ? Math.max(Math.floor(Number(item.currentStock) / 2), 1)
+                  : null;
+              const displayThreshold = numericThreshold !== null ? numericThreshold : '—';
+              const effectiveThreshold = fallbackThreshold ?? numericThreshold;
+              const currentStockValue = Number.isFinite(Number(item.currentStock)) ? Number(item.currentStock) : 0;
+              const isLowStock =
+                Boolean(item.lowStock) || (effectiveThreshold !== null && currentStockValue <= effectiveThreshold);
+              const discrepancyUnits = Math.abs(Number(item.discrepancyTotal ?? 0));
+              const hasDiscrepancy = Boolean(item.negativeStock) || discrepancyUnits > 0;
+              const rowClasses = ['inventory-row', 'inventory-item'];
+              if (isLowStock) {
+                rowClasses.push('low-stock');
+              }
+              if (hasDiscrepancy) {
+                rowClasses.push('has-discrepancy');
+              }
+              if (item.negativeStock) {
+                rowClasses.push('negative-stock');
+              }
+              if (!item.isActive) {
+                rowClasses.push('inactive');
+              }
+              const decoratedItem = {
+                ...item,
+                lowStockThreshold: effectiveThreshold ?? item.lowStockThreshold,
+                lowStock: item.lowStock || isLowStock
+              };
+
+              return (
+                <tr key={item.productId} className={rowClasses.join(' ')}>
+                  <td>
+                    <div className="stack" style={{ gap: '0.25rem' }}>
+                      <span>{item.name}</span>
+                      {!item.isActive && <span className="badge muted">Inactive</span>}
+                    </div>
+                  </td>
+                  <td>{productMeta.categoryName || 'Uncategorized'}</td>
+                  <td className="stock-column">
+                    {hasDiscrepancy && (
+                      <span className="warning-icon" aria-hidden="true" style={{ marginRight: '0.25rem' }}>
+                        !
+                      </span>
+                    )}
+                    <span>{currentStockValue}</span>
+                    {hasDiscrepancy && discrepancyUnits > 0 && (
+                      <span className="badge warning" style={{ marginLeft: '0.5rem' }}>
+                        {`${discrepancyUnits} unit${discrepancyUnits === 1 ? '' : 's'}`}
+                      </span>
+                    )}
+                  </td>
+                  <td>{renderStatusBadge(decoratedItem, { isLowStock, hasDiscrepancy })}</td>
+                  <td>{displayThreshold}</td>
+                  <td>{item.lastActivityAt ? new Date(item.lastActivityAt).toLocaleString() : '—'}</td>
+                  <td>
+                    <div className="inline" style={{ gap: '0.5rem' }}>
+                      <button
+                        type="button"
+                        className="button secondary"
+                        onClick={() => openStockDialog(item)}
+                        disabled={stockMutation.isPending || adjustmentMutation.isPending}
+                      >
+                        Update Stock
+                      </button>
+                      <button
+                        type="button"
+                        className="button secondary"
+                        onClick={() => openAdjustmentDialog(item)}
+                        disabled={stockMutation.isPending || adjustmentMutation.isPending}
+                      >
+                        Adjust Inventory
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

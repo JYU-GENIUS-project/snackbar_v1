@@ -5,6 +5,7 @@ import { useDebouncedValue } from '../hooks/useDebouncedValue.js';
 import ProductTable from './ProductTable.jsx';
 import ProductForm from './ProductForm.jsx';
 import ProductMediaManager from './ProductMediaManager.jsx';
+import InventoryPanel from './InventoryPanel.jsx';
 import KioskPreview from './KioskPreview.jsx';
 import CategoryManager from './CategoryManager.jsx';
 import AdminAccountsManager from './AdminAccountsManager.jsx';
@@ -455,9 +456,39 @@ const ProductManager = ({ auth }) => {
     }
     return fallbackCategories;
   }, [categoriesData]);
+  const categoryNameById = useMemo(() => {
+    const lookup = new Map();
+    categories.forEach((category) => {
+      if (category?.id) {
+        lookup.set(category.id, category.name || 'Uncategorized');
+      }
+    });
+    return lookup;
+  }, [categories]);
   const isBackedByApi = hasApiProducts && !forceMockMode;
   const effectiveProducts = isBackedByApi ? products : mockProducts;
   const effectiveMeta = isBackedByApi ? meta : { total: effectiveProducts.length };
+  const inventoryProductMetadata = useMemo(() => {
+    const metadata = {};
+    effectiveProducts.forEach((product) => {
+      if (!product?.id) {
+        return;
+      }
+      const primaryCategoryId = product.categoryId || (Array.isArray(product.categoryIds) ? product.categoryIds[0] : null);
+      const resolvedCategoryName =
+        product.categories?.find((category) => category?.id === primaryCategoryId)?.name ||
+        (primaryCategoryId ? categoryNameById.get(primaryCategoryId) : null) ||
+        'Uncategorized';
+
+      metadata[product.id] = {
+        categoryName: resolvedCategoryName,
+        lowStockThreshold:
+          typeof product.lowStockThreshold === 'number' ? product.lowStockThreshold : Number(product.lowStockThreshold) || null,
+        status: product.status || 'draft'
+      };
+    });
+    return metadata;
+  }, [effectiveProducts, categoryNameById]);
 
   useEffect(() => {
     if (hasApiProducts && forceMockMode) {
@@ -501,16 +532,6 @@ const ProductManager = ({ auth }) => {
       quantityNode.setAttribute('data-quantity', purchaseLimitPreview.hasLimit ? String(purchaseLimitPreview.value) : '');
     }
   }, [purchaseLimitPreview]);
-  const deriveInventoryStatus = (quantity, threshold) => {
-    if (quantity < 0) {
-      return 'Discrepancy';
-    }
-    if (quantity <= threshold) {
-      return 'Low Stock';
-    }
-    return 'In Stock';
-  };
-
   const createProductLocally = (productValues) => {
     const now = new Date().toISOString();
     const createdProduct = {
@@ -526,35 +547,6 @@ const ProductManager = ({ auth }) => {
     };
 
     setMockProducts((current) => [...current, createdProduct]);
-
-    const threshold = Number(productValues.lowStockThreshold ?? settingsForm.lowStockThreshold ?? 5);
-    const derivedStatus = deriveInventoryStatus(createdProduct.stockQuantity, threshold);
-    setInventoryItems((current) => {
-      const exists = current.some((item) => item.name === createdProduct.name);
-      if (exists) {
-        return current.map((item) =>
-          item.name === createdProduct.name
-            ? {
-              ...item,
-              quantity: createdProduct.stockQuantity,
-              lowStockThreshold: threshold,
-              status: derivedStatus
-            }
-            : item
-        );
-      }
-      return [
-        ...current,
-        {
-          id: `inventory-${createdProduct.id}`,
-          name: createdProduct.name,
-          category: productValues.category || 'Uncategorized',
-          quantity: createdProduct.stockQuantity,
-          lowStockThreshold: threshold,
-          status: derivedStatus
-        }
-      ];
-    });
 
     return createdProduct;
   };
@@ -575,62 +567,11 @@ const ProductManager = ({ auth }) => {
           : product
       )
     );
-
-    const threshold = Number(productValues.lowStockThreshold ?? settingsForm.lowStockThreshold ?? 5);
-    setInventoryItems((current) =>
-      current.map((item) =>
-        item.name !== (editingProduct?.name ?? productValues.name)
-          ? item
-          : {
-            ...item,
-            lowStockThreshold: threshold,
-            status: deriveInventoryStatus(item.quantity, threshold)
-          }
-      )
-    );
   };
 
   const archiveProductLocally = (productId, productName) => {
     setMockProducts((current) => current.filter((product) => product.id !== productId));
-    setInventoryItems((current) =>
-      current.filter((item) => (productName ? item.name !== productName : item.id !== productId))
-    );
   };
-  const inventoryHeaders = useMemo(
-    () => [
-      { key: 'name', label: 'Product' },
-      { key: 'category', label: 'Category' },
-      { key: 'quantity', label: 'Stock', className: 'stock-header' },
-      { key: 'status', label: 'Status' },
-      { key: 'actions', label: 'Actions' }
-    ],
-    []
-  );
-  const sortedInventory = useMemo(() => {
-    const items = [...inventoryItems];
-    const { column, direction } = inventorySort;
-    const normalize = (value) => {
-      if (typeof value === 'string') {
-        return value.toLowerCase();
-      }
-      return value;
-    };
-    items.sort((a, b) => {
-      if (column === 'actions') {
-        return 0;
-      }
-      const valueA = normalize(column === 'quantity' ? a.quantity : a[column]);
-      const valueB = normalize(column === 'quantity' ? b.quantity : b[column]);
-      if (valueA < valueB) {
-        return direction === 'asc' ? -1 : 1;
-      }
-      if (valueA > valueB) {
-        return direction === 'asc' ? 1 : -1;
-      }
-      return 0;
-    });
-    return items;
-  }, [inventoryItems, inventorySort]);
 
   useEffect(() => {
     if (formMode === 'edit') {
@@ -657,11 +598,10 @@ const ProductManager = ({ auth }) => {
         media: Array.isArray(product.media)
           ? product.media.map((item) => ({ ...item }))
           : []
-      })),
-      inventory: inventoryItems.map((item) => ({ ...item }))
+      }))
     };
     saveOfflineProductSnapshot(snapshot);
-  }, [mockProducts, inventoryItems, isBackedByApi]);
+  }, [mockProducts, isBackedByApi]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -703,98 +643,8 @@ const ProductManager = ({ auth }) => {
     changeSection('settings');
   };
 
-  const handleInventorySort = (column) => {
-    setInventorySort((current) => {
-      if (current.column === column) {
-        return { column, direction: current.direction === 'asc' ? 'desc' : 'asc' };
-      }
-      return { column, direction: 'asc' };
-    });
-  };
-
-  const openStockDialog = (item) => {
-    setActiveStockDialog(item);
-    setStockInputValue(String(item.quantity));
-    setInventoryMessage('');
-  };
-
-  const closeStockDialog = () => {
-    setActiveStockDialog(null);
-    setStockInputValue('');
-  };
-
-  const handleSaveStockUpdate = () => {
-    if (!activeStockDialog) {
-      return;
-    }
-    const parsedQuantity = Number(stockInputValue);
-    if (Number.isNaN(parsedQuantity)) {
-      setInventoryMessage('Enter a valid stock quantity.');
-      return;
-    }
-    const threshold = Number(settingsForm.lowStockThreshold ?? 5);
-    setInventoryItems((current) =>
-      current.map((item) =>
-        item.id === activeStockDialog.id
-          ? {
-            ...item,
-            quantity: parsedQuantity,
-            status: deriveInventoryStatus(parsedQuantity, item.lowStockThreshold ?? threshold)
-          }
-          : item
-      )
-    );
-    recordAuditEntry({
-      action: 'INVENTORY',
-      entity: `Product: ${activeStockDialog.name}`,
-      details: `Set stock quantity to ${parsedQuantity}`
-    });
-    setInventoryMessage(`Inventory updated for ${activeStockDialog.name}`);
-    setActiveStockDialog(null);
-    setStockInputValue('');
-  };
-
-  const handleSaveAdjustment = () => {
-    if (!activeAdjustmentDialog) {
-      return;
-    }
-    const parsedQuantity = Number(adjustmentInputValue);
-    if (Number.isNaN(parsedQuantity)) {
-      setInventoryMessage('Enter a valid adjusted stock quantity.');
-      return;
-    }
-    const threshold = Number(settingsForm.lowStockThreshold ?? 5);
-    setInventoryItems((current) =>
-      current.map((item) =>
-        item.id === activeAdjustmentDialog.id
-          ? {
-            ...item,
-            quantity: parsedQuantity,
-            status: deriveInventoryStatus(parsedQuantity, item.lowStockThreshold ?? threshold)
-          }
-          : item
-      )
-    );
-    recordAuditEntry({
-      action: 'INVENTORY',
-      entity: `Product: ${activeAdjustmentDialog.name}`,
-      details: `Adjusted stock to ${parsedQuantity}${adjustmentReason ? ` (${adjustmentReason})` : ''}`
-    });
-    setInventoryMessage(`Inventory adjusted for ${activeAdjustmentDialog.name}`);
-    setActiveAdjustmentDialog(null);
-    setAdjustmentInputValue('');
-    setAdjustmentReason('');
-  };
-
   const handleSettingsSave = (event) => {
     event.preventDefault();
-    const threshold = Number(settingsForm.lowStockThreshold ?? 5);
-    setInventoryItems((current) =>
-      current.map((item) => ({
-        ...item,
-        status: deriveInventoryStatus(item.quantity, item.lowStockThreshold ?? threshold)
-      }))
-    );
     recordAuditEntry({
       action: 'SETTINGS',
       entity: 'System Settings',
@@ -1209,177 +1059,14 @@ const ProductManager = ({ auth }) => {
       )}
 
       {activeSection === 'inventory' && (
-        <section className="card" id="inventory-management">
-          <div className="inline" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <h2>Inventory Management</h2>
-              <p className="helper">Review stock levels and reconcile discrepancies.</p>
-            </div>
-            <button id="discrepancy-report-link" className="button secondary" type="button">
-              Download Discrepancy Report
-            </button>
-          </div>
-          {inventoryMessage && (
-            <div className="alert success" id="inventory-feedback" style={{ marginTop: '1rem' }}>
-              {inventoryMessage}
-            </div>
-          )}
-          <div style={{ overflowX: 'auto', marginTop: '1rem' }}>
-            <table id="inventory-table" className="table" style={{ minWidth: '640px' }}>
-              <thead>
-                <tr>
-                  {inventoryHeaders.map((header) => (
-                    <th
-                      key={header.key}
-                      ref={(node) => {
-                        if (node) {
-                          inventoryHeaderRefs.current[header.key] = node;
-                          node.setAttribute('onclick', 'return true');
-                        }
-                      }}
-                      onClick={() => handleInventorySort(header.key)}
-                      className={header.className ?? ''}
-                      scope="col"
-                      role="button"
-                      tabIndex={0}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter' || event.key === ' ') {
-                          event.preventDefault();
-                          handleInventorySort(header.key);
-                        }
-                      }}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      {header.label}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {sortedInventory.map((item) => {
-                  const threshold = Number(item.lowStockThreshold ?? settingsForm.lowStockThreshold ?? 5);
-                  const isLowStock = item.quantity >= 0 && item.quantity <= threshold;
-                  const isNegative = item.quantity < 0;
-                  const rowClasses = ['inventory-row', 'inventory-item'];
-                  if (isLowStock) {
-                    rowClasses.push('low-stock');
-                  }
-                  if (isNegative) {
-                    rowClasses.push('negative-stock');
-                  }
-                  return (
-                    <tr
-                      key={item.id}
-                      className={rowClasses.join(' ')}
-                      role="button"
-                      tabIndex={0}
-                      onClick={(event) => {
-                        if (event.target instanceof HTMLElement && event.target.closest('button')) {
-                          return;
-                        }
-                        openStockDialog(item);
-                      }}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter' || event.key === ' ') {
-                          event.preventDefault();
-                          openStockDialog(item);
-                        }
-                      }}
-                    >
-                      <td>{item.name}</td>
-                      <td>{item.category}</td>
-                      <td className="stock-column">
-                        {isNegative && (
-                          <i className="warning-icon" aria-hidden="true" style={{ marginRight: '0.25rem' }}>
-                            !
-                          </i>
-                        )}
-                        <span>{item.quantity}</span>
-                      </td>
-                      <td>{item.status}</td>
-                      <td>
-                        <div className="inline" style={{ gap: '0.5rem' }}>
-                          <button type="button" className="button secondary" onClick={() => openStockDialog(item)}>
-                            Update Stock
-                          </button>
-                          <button type="button" className="button secondary" onClick={() => openAdjustmentDialog(item)}>
-                            Adjust Inventory
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </section>
+        <InventoryPanel
+          token={auth.token}
+          trackingEnabled={inventoryTrackingEnabled}
+          inventoryMetadata={inventoryProductMetadata}
+          onTrackingUpdate={() => inventoryTrackingQuery?.refetch?.()}
+          onAudit={recordAuditEntry}
+        />
       )}
-
-      {activeStockDialog && (
-        <section className="card" id="stock-update-dialog" style={{ position: 'relative' }}>
-          <div className="inline" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3>Update Stock &ndash; {activeStockDialog.name}</h3>
-            <button className="button secondary" type="button" onClick={closeStockDialog}>
-              Close
-            </button>
-          </div>
-          <div className="stack" style={{ marginTop: '1rem', gap: '0.75rem' }}>
-            <label htmlFor="quantity-input">New Stock Quantity</label>
-            <input
-              id="quantity-input"
-              type="number"
-              min="0"
-              value={stockInputValue}
-              onChange={(event) => setStockInputValue(event.target.value)}
-            />
-            <div className="inline" style={{ gap: '0.5rem' }}>
-              <button id="update-quantity-button" className="button" type="button" onClick={handleSaveStockUpdate}>
-                Save
-              </button>
-              <button className="button secondary" type="button" onClick={closeStockDialog}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {activeAdjustmentDialog && (
-        <section className="card" id="adjust-inventory-dialog" style={{ position: 'relative' }}>
-          <div className="inline" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3>Adjust Inventory &ndash; {activeAdjustmentDialog.name}</h3>
-            <button className="button secondary" type="button" onClick={closeAdjustmentDialog}>
-              Close
-            </button>
-          </div>
-          <div className="stack" style={{ marginTop: '1rem', gap: '0.75rem' }}>
-            <label htmlFor="adjustment-reason">Adjustment Reason</label>
-            <input
-              id="adjustment-reason"
-              type="text"
-              value={adjustmentReason}
-              onChange={(event) => setAdjustmentReason(event.target.value)}
-            />
-            <label htmlFor="adjusted-stock-quantity">Adjusted Stock Quantity</label>
-            <input
-              id="adjusted-stock-quantity"
-              type="number"
-              value={adjustmentInputValue}
-              onChange={(event) => setAdjustmentInputValue(event.target.value)}
-            />
-            <div className="inline" style={{ gap: '0.5rem' }}>
-              <button id="save-adjustment-button" className="button" type="button" onClick={handleSaveAdjustment}>
-                Save Adjustment
-              </button>
-              <button className="button secondary" type="button" onClick={closeAdjustmentDialog}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        </section>
-      )}
-
       {pendingDeletion && (
         <div
           id="confirm-delete-dialog"
