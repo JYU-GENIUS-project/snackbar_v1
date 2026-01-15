@@ -66,6 +66,7 @@
 
 5. **Real-Time Event Propagation**
    - Add SSE endpoint /api/inventory/events (or WebSocket channel) broadcasting stock changes, discrepancy raises/clears, and tracking toggle updates.
+   - Ensure authenticated admin clients subscribe to SSE stream; kiosk channel can be layered later if required.
    - Implement server heartbeat with retry or backoff to avoid PM2 worker duplication; potentially leverage shared Redis or in-memory guard.
    - Update kiosk and admin clients to subscribe to events, showing banners and immediate table refresh (Implementation_Roadmap step 27).
 

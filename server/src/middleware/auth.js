@@ -17,14 +17,21 @@ const SESSION_TIMEOUT_MS = parseInt(process.env.SESSION_TIMEOUT_MS, 10) || 18000
  */
 const authenticate = async (req, res, next) => {
   try {
-    // Get token from Authorization header
     const authHeader = req.headers.authorization;
+    let token = null;
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new ApiError(401, 'No authentication token provided');
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7);
+    } else if (req.query && req.query.token) {
+      const raw = Array.isArray(req.query.token) ? req.query.token[0] : req.query.token;
+      if (typeof raw === 'string' && raw.trim().length > 0) {
+        token = raw.trim();
+      }
     }
 
-    const token = authHeader.substring(7);
+    if (!token) {
+      throw new ApiError(401, 'No authentication token provided');
+    }
 
     // Verify JWT
     let decoded;

@@ -2,6 +2,7 @@ const db = require('../utils/database');
 const { ApiError } = require('../middleware/errorHandler');
 const { createAuditLog, AuditActions, EntityTypes } = require('./auditService');
 const notificationService = require('./notificationService');
+const inventoryEvents = require('./inventoryEvents');
 
 const INVENTORY_TRACKING_CONFIG_KEY = 'inventory_tracking_enabled';
 const INVENTORY_TRACKING_DESCRIPTION = 'Toggle that controls whether automated inventory deductions are applied.';
@@ -94,6 +95,7 @@ const finalizeInventoryChange = async ({ productId, context }) => {
     await refreshInventorySnapshot();
     const snapshot = await getInventoryItemByProductId(productId, { skipRefresh: true });
     await notifyLowStockChange({ snapshot, context });
+    inventoryEvents.broadcastInventoryChange({ snapshot, context });
     return snapshot;
 };
 
@@ -195,6 +197,8 @@ const setInventoryTrackingState = async (enabled, actor = null) => {
 
         return normalized;
     });
+
+    inventoryEvents.broadcastTrackingChange({ enabled: result, actor });
 
     return { enabled: result, previous };
 };

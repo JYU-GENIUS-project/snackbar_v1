@@ -3,6 +3,7 @@ const { body, param, query, validationResult } = require('express-validator');
 const { authenticate } = require('../middleware/auth');
 const { ApiError } = require('../middleware/errorHandler');
 const inventoryService = require('../services/inventoryService');
+const inventoryEvents = require('../services/inventoryEvents');
 
 const router = express.Router();
 
@@ -19,6 +20,35 @@ const inventoryListValidation = [
 const productIdParam = [param('productId').isUUID().withMessage('Invalid product ID')];
 
 router.use(authenticate);
+
+router.get('/events', (req, res, next) => {
+    try {
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+
+        if (typeof res.flushHeaders === 'function') {
+            res.flushHeaders();
+        }
+
+        res.write(': connected\n\n');
+        res.write(`event: inventory:init\ndata: ${JSON.stringify({ connectedAt: new Date().toISOString() })}\n\n`);
+
+        const clientId = inventoryEvents.registerClient({
+            res,
+            context: {
+                adminId: req.user?.id || null,
+                username: req.user?.username || null
+            }
+        });
+
+        const cleanup = () => inventoryEvents.removeClient(clientId);
+        req.on('close', cleanup);
+        req.on('end', cleanup);
+    } catch (error) {
+        next(error);
+    }
+});
 
 router.get('/tracking', async (req, res, next) => {
     try {

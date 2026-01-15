@@ -17,6 +17,7 @@ import {
   useDeleteCategory,
   useUpdateCategory
 } from '../hooks/useCategories.js';
+import { useInventoryTracking, useSetInventoryTracking } from '../hooks/useInventory.js';
 import { saveOfflineProductSnapshot, readOfflineProductSnapshot } from '../utils/offlineCache.js';
 
 const DEFAULT_LIMIT = 50;
@@ -167,64 +168,13 @@ const ProductManager = ({ auth }) => {
   const [offlineNotice, setOfflineNotice] = useState(null);
   const [focusMediaManager, setFocusMediaManager] = useState(false);
   const [mockProducts, setMockProducts] = useState(() => buildInitialMockProducts());
-  const [inventoryItems, setInventoryItems] = useState([
-    {
-      id: 'inventory-coke',
-      name: 'Coca-Cola',
-      category: 'Beverages',
-      quantity: 5,
-      lowStockThreshold: 5,
-      status: 'Low Stock'
-    },
-    {
-      id: 'inventory-old',
-      name: 'Old Product',
-      category: 'Snacks',
-      quantity: 8,
-      lowStockThreshold: 5,
-      status: 'In Stock'
-    },
-    {
-      id: 'inventory-energy',
-      name: 'Energy Drink',
-      category: 'Beverages',
-      quantity: 5,
-      lowStockThreshold: 5,
-      status: 'Low Stock'
-    },
-    {
-      id: 'inventory-trailmix',
-      name: 'Trail Mix',
-      category: 'Snacks',
-      quantity: 3,
-      lowStockThreshold: 5,
-      status: 'Low Stock'
-    },
-    {
-      id: 'inventory-sensors',
-      name: 'Vending Sensors',
-      category: 'Hardware',
-      quantity: -3,
-      lowStockThreshold: 0,
-      status: 'Discrepancy'
-    }
-  ]);
   const [forceMockMode, setForceMockMode] = useState(() => true);
-  const [inventoryMessage, setInventoryMessage] = useState('');
-  const [inventorySort, setInventorySort] = useState({ column: 'name', direction: 'asc' });
-  const inventoryHeaderRefs = useRef({});
-  const [activeStockDialog, setActiveStockDialog] = useState(null);
-  const [stockInputValue, setStockInputValue] = useState('');
-  const [activeAdjustmentDialog, setActiveAdjustmentDialog] = useState(null);
-  const [adjustmentInputValue, setAdjustmentInputValue] = useState('');
-  const [adjustmentReason, setAdjustmentReason] = useState('');
-  const [inventoryTrackingEnabled, setInventoryTrackingEnabled] = useState(true);
   const [settingsForm, setSettingsForm] = useState({
     operatingHoursStart: '09:00',
     operatingHoursEnd: '18:00',
     lowStockThreshold: 5
   });
-  const [settingsMessage, setSettingsMessage] = useState('');
+  const [settingsMessage, setSettingsMessage] = useState(null);
   const [auditEntries, setAuditEntries] = useState(() => {
     const stored = readPersistedAuditEntries();
     return stored && stored.length > 0 ? stored : createAuditSeedEntries();
@@ -343,6 +293,9 @@ const ProductManager = ({ auth }) => {
   const createCategoryMutation = useCreateCategory(auth.token);
   const updateCategoryMutation = useUpdateCategory(auth.token);
   const deleteCategoryMutation = useDeleteCategory(auth.token);
+  const inventoryTrackingQuery = useInventoryTracking(auth.token);
+  const { mutate: setInventoryTracking, isPending: inventoryTrackingMutationPending } = useSetInventoryTracking(auth.token);
+  const inventoryTrackingEnabled = inventoryTrackingQuery.data?.enabled ?? true;
 
   const hasApiProducts = useMemo(() => {
     if (error) {
@@ -847,7 +800,7 @@ const ProductManager = ({ auth }) => {
       entity: 'System Settings',
       details: `Updated operating hours to ${settingsForm.operatingHoursStart}-${settingsForm.operatingHoursEnd}`
     });
-    setSettingsMessage('Settings updated successfully');
+    setSettingsMessage({ type: 'success', text: 'Settings updated successfully' });
   };
 
   const handleCreate = async (values) => {
@@ -1484,12 +1437,29 @@ const ProductManager = ({ auth }) => {
                 type="checkbox"
                 checked={inventoryTrackingEnabled}
                 onChange={(event) => {
-                  setInventoryTrackingEnabled(event.target.checked);
-                  setSettingsMessage('');
+                  const nextValue = event.target.checked;
+                  setSettingsMessage(null);
+                  setInventoryTracking(
+                    { enabled: nextValue },
+                    {
+                      onSuccess: () => {
+                        setSettingsMessage({ type: 'success', text: 'Inventory tracking preference saved' });
+                      },
+                      onError: () => {
+                        setSettingsMessage({ type: 'error', text: 'Failed to update inventory tracking preference' });
+                      }
+                    }
+                  );
                 }}
+                disabled={inventoryTrackingMutationPending || inventoryTrackingQuery.isLoading}
               />
               Enable inventory tracking
             </label>
+            {inventoryTrackingQuery.isError && (
+              <p className="helper" role="status" style={{ color: '#dc2626' }}>
+                Unable to load inventory tracking status. Try refreshing the page.
+              </p>
+            )}
             <div className="inline" style={{ gap: '1rem', flexWrap: 'wrap' }}>
               <label className="stack" style={{ gap: '0.25rem' }}>
                 <span>Operating hours start</span>
@@ -1500,7 +1470,7 @@ const ProductManager = ({ auth }) => {
                   onChange={(event) => {
                     const value = event.target.value;
                     setSettingsForm((current) => ({ ...current, operatingHoursStart: value }));
-                    setSettingsMessage('');
+                    setSettingsMessage(null);
                   }}
                 />
               </label>
@@ -1513,7 +1483,7 @@ const ProductManager = ({ auth }) => {
                   onChange={(event) => {
                     const value = event.target.value;
                     setSettingsForm((current) => ({ ...current, operatingHoursEnd: value }));
-                    setSettingsMessage('');
+                    setSettingsMessage(null);
                   }}
                 />
               </label>
@@ -1527,7 +1497,7 @@ const ProductManager = ({ auth }) => {
                   onChange={(event) => {
                     const value = event.target.value;
                     setSettingsForm((current) => ({ ...current, lowStockThreshold: value }));
-                    setSettingsMessage('');
+                    setSettingsMessage(null);
                   }}
                 />
               </label>
@@ -1538,18 +1508,22 @@ const ProductManager = ({ auth }) => {
                 id="notification-email"
                 type="email"
                 placeholder="admin@example.com"
-                onChange={() => setSettingsMessage('')}
+                onChange={() => setSettingsMessage(null)}
               />
             </label>
             <div className="inline" style={{ gap: '0.75rem' }}>
               <button id="save-settings-button" className="button" type="submit">
                 Save Settings
               </button>
-              <button className="button secondary" type="button" onClick={() => setSettingsMessage('')}>
+              <button className="button secondary" type="button" onClick={() => setSettingsMessage(null)}>
                 Reset Message
               </button>
             </div>
-            {settingsMessage && <div className="alert success">{settingsMessage}</div>}
+            {settingsMessage && (
+              <div className={`alert ${settingsMessage.type === 'error' ? 'danger' : 'success'}`}>
+                {settingsMessage.text}
+              </div>
+            )}
           </form>
         </section>
       )}
