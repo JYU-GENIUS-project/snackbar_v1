@@ -24,7 +24,7 @@
 
 - Must reuse Docker, Express, PostgreSQL, and SMTP architecture established in prior phases.
 - Inventory tracking toggle must preserve historical stock values when disabled, per FR-8.1.3.
-- Stock quantities must remain non-negative; discrepancies are recorded separately rather than allowing negative values.
+- Stock quantities must remain non-negative; discrepancies are recorded via ledger shortfall metadata rather than allowing negative values.
 - Notification retries follow FR-11.2.1 (1 min, 5 min, 15 min) even though current Robot script expects 30, 60, 120 seconds; plan includes aligning the suite to the requirement or introducing a configurable schedule.
 - Real-time inventory banners must leverage SSE or WebSocket as called out in Implementation_Roadmap.md and the C4 data flow diagram.
 
@@ -39,7 +39,7 @@
    - Author migration 004 to:
    - Retain products.stock_quantity CHECK constraint to prevent negative values; enforce zero floor inside mutation services.
    - Introduce inventory_ledger table capturing product_id, delta, source (purchase, manual_adjustment, reconciliation), reason, admin_id, transaction_id, and resulting discrepancy balance to support reconciliation while keeping stock non-negative.
-   - Create inventory_snapshots or a materialized view for admin inventory table aggregations (current_stock, low_stock_flag, discrepancy_flag).
+   - Create inventory_snapshots or a materialized view for admin inventory table aggregations (current_stock, low_stock_flag, ledger_deficit_flag based on summed deltas and shortfall metadata).
      - Add system_config keys for inventory_tracking_enabled (default true) and notification email list if not already present.
      - Create email_notification_log table to store notification attempts, outcomes, and retry counts for FR-11.2.1 compliance.
    - Update init-db scripts and seed data to reflect new structures while keeping previous migrations idempotent.
@@ -51,7 +51,7 @@
      - Retrieval of inventory summary with filtering and sorting (FR-8.2).
      - Manual update endpoint with audit log emission and ledger entry (US-034, FR-8.2).
    - Adjustment endpoint capturing reason text, linking to admin user, clearing discrepancy flags without permitting sub-zero stock (US-038).
-     - Discrepancy report endpoint exposing negative stock and uncertain payments (ties to FR-8.2.4 for future phases).
+      - Discrepancy report endpoint exposing ledger deficits and uncertain payments (ties to FR-8.2.4 for future phases).
    - Extend existing product purchase flow (likely in transactions service) to deduct stock via InventoryService when tracking enabled, clamping results at zero and logging any shortfall as a discrepancy event (FR-8.3).
    - Ensure all inventory mutations emit domain events (for example, via EventEmitter) consumed by notification and real-time modules.
 
