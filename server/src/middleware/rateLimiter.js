@@ -23,7 +23,9 @@ const defaultIdentifier = (req) => {
 
 const parseEnvInt = (key, fallback) => {
   const value = process.env[key];
-  if (!value) return fallback;
+  if (!value) {
+    return fallback;
+  }
 
   const parsed = Number.parseInt(value, 10);
   if (Number.isNaN(parsed) || parsed <= 0) {

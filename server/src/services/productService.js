@@ -273,7 +273,7 @@ const listProducts = async ({ includeArchived = false, search = '', limit = 50, 
 
   if (!includeArchived) {
     filters.push('p.deleted_at IS NULL');
-    filters.push("p.status <> 'archived'");
+    filters.push('p.status <> \'archived\'');
   }
 
   if (search) {
