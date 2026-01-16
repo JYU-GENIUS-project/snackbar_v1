@@ -3,12 +3,14 @@
 const nodemailer = require('nodemailer');
 const db = require('../utils/database');
 
-const RETRY_SCHEDULE_MINUTES = [1, 5, 15];
+const RETRY_SCHEDULE_SECONDS = [30, 60, 120];
 const NOTIFICATION_TYPES = {
   LOW_STOCK: 'inventory.low_stock'
 };
 
 let transport = null;
+
+const NOTIFICATION_WORKER_LOCK_ID = 90210;
 
 const getSmtpConfig = () => {
   const host = process.env.SMTP_HOST;
@@ -206,13 +208,13 @@ const sendNotification = async ({ notification }) => {
 };
 
 const scheduleNextAttempt = (attemptNumber) => {
-  const scheduleMinutes = RETRY_SCHEDULE_MINUTES[attemptNumber - 1];
-  if (!scheduleMinutes) {
+  const scheduleSeconds = RETRY_SCHEDULE_SECONDS[attemptNumber - 1];
+  if (!scheduleSeconds) {
     return null;
   }
 
   const nextAttempt = new Date();
-  nextAttempt.setMinutes(nextAttempt.getMinutes() + scheduleMinutes);
+  nextAttempt.setSeconds(nextAttempt.getSeconds() + scheduleSeconds);
   return nextAttempt;
 };
 
@@ -287,6 +289,28 @@ const claimPendingNotifications = async ({ limit, workerId }) => db.transaction(
   return rows;
 });
 
+const tryAcquireWorkerLock = async (workerId) => {
+  try {
+    const { rows } = await db.query('SELECT pg_try_advisory_lock($1) AS acquired', [NOTIFICATION_WORKER_LOCK_ID]);
+    const acquired = rows[0]?.acquired === true;
+    if (!acquired) {
+      console.info(`[NotificationWorker] ${workerId} did not acquire lock; another worker is active.`);
+    }
+    return acquired;
+  } catch (error) {
+    console.error('[NotificationWorker] Failed to acquire advisory lock', error);
+    return false;
+  }
+};
+
+const releaseWorkerLock = async () => {
+  try {
+    await db.query('SELECT pg_advisory_unlock($1)', [NOTIFICATION_WORKER_LOCK_ID]);
+  } catch (error) {
+    console.error('[NotificationWorker] Failed to release advisory lock', error);
+  }
+};
+
 const processPendingNotifications = async ({ limit = 10, workerId = 'notification-worker' } = {}) => {
   const claimed = await claimPendingNotifications({ limit, workerId });
   if (!claimed.length) {
@@ -294,13 +318,93 @@ const processPendingNotifications = async ({ limit = 10, workerId = 'notificatio
   }
 
   const results = [];
-  // Process sequentially to simplify failure handling
   for (const notification of claimed) {
     const outcome = await attemptDelivery(notification, workerId);
     results.push(outcome);
   }
 
   return results;
+};
+
+const startNotificationWorker = ({ intervalMs = 60000, workerId = 'notification-worker' } = {}) => {
+  if (process.env.NOTIFICATION_WORKER_ENABLED === 'false') {
+    return null;
+  }
+
+  let timer = null;
+  let retryTimer = null;
+  let lockAcquired = false;
+  let stopped = false;
+  let acquiring = false;
+
+  const execute = async () => {
+    if (!lockAcquired || stopped) {
+      return;
+    }
+    try {
+      await processPendingNotifications({ workerId });
+    } catch (error) {
+      console.error('[NotificationWorker] Failed to process notifications', error);
+    }
+  };
+
+  const scheduleRetry = () => {
+    if (stopped || retryTimer) {
+      return;
+    }
+    retryTimer = setTimeout(() => {
+      retryTimer = null;
+      ensureWorkerStarted().catch((error) => console.error('[NotificationWorker] Retry start failed', error));
+    }, intervalMs);
+    if (retryTimer && typeof retryTimer.unref === 'function') {
+      retryTimer.unref();
+    }
+  };
+
+  const ensureWorkerStarted = async () => {
+    if (stopped || lockAcquired || acquiring) {
+      return;
+    }
+
+    acquiring = true;
+    const acquired = await tryAcquireWorkerLock(workerId);
+    acquiring = false;
+
+    if (!acquired) {
+      scheduleRetry();
+      return;
+    }
+
+    lockAcquired = true;
+    await execute();
+    timer = setInterval(execute, intervalMs);
+    if (timer && typeof timer.unref === 'function') {
+      timer.unref();
+    }
+  };
+
+  ensureWorkerStarted().catch((error) => console.error('[NotificationWorker] Initial start failed', error));
+
+  return {
+    stop: async () => {
+      if (stopped) {
+        return;
+      }
+      stopped = true;
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
+      }
+      if (retryTimer) {
+        clearTimeout(retryTimer);
+        retryTimer = null;
+      }
+      if (lockAcquired) {
+        await releaseWorkerLock();
+        lockAcquired = false;
+      }
+    }
+  };
 };
 
 const evaluateLowStockState = async ({ snapshot, context = {} }) => {
@@ -313,30 +417,6 @@ const evaluateLowStockState = async ({ snapshot, context = {} }) => {
   } else {
     await markLowStockResolved(snapshot.productId);
   }
-};
-
-const startNotificationWorker = ({ intervalMs = 60000, workerId = 'notification-worker' } = {}) => {
-  if (process.env.NOTIFICATION_WORKER_ENABLED === 'false') {
-    return null;
-  }
-
-  const execute = async () => {
-    try {
-      await processPendingNotifications({ workerId });
-    } catch (error) {
-      console.error('[NotificationWorker] Failed to process notifications', error);
-    }
-  };
-
-  execute();
-  const timer = setInterval(execute, intervalMs);
-  if (typeof timer.unref === 'function') {
-    timer.unref();
-  }
-
-  return {
-    stop: () => clearInterval(timer)
-  };
 };
 
 const getNotificationLog = async ({ limit = 50, offset = 0, status = null }) => {

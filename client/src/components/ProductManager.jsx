@@ -1154,7 +1154,6 @@ const ProductManager = ({ auth }) => {
           token={auth.token}
           trackingEnabled={inventoryTrackingEnabled}
           inventoryMetadata={inventoryProductMetadata}
-          onTrackingUpdate={() => inventoryTrackingQuery?.refetch?.()}
           onAudit={recordAuditEntry}
         />
       )}

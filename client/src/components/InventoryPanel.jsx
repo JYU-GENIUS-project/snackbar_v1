@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import {
     INVENTORY_QUERY_KEY,
-    INVENTORY_TRACKING_QUERY_KEY,
     useInventorySnapshot,
     useRecordInventoryAdjustment,
     useRecordStockUpdate
@@ -94,19 +92,12 @@ const deriveStatus = (item, { isLowStock, hasDiscrepancy } = {}) => {
     return 'In Stock';
 };
 
-const buildEventSourceUrl = (token) => {
-    const url = new URL(`${API_BASE_PATH}/inventory/events`, window.location.origin);
-    url.searchParams.set('token', token);
-    return url.toString();
-};
-
 const isLikelyUuid = (value) => Boolean(typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value));
 
 const InventoryPanel = ({
     token,
     trackingEnabled,
     inventoryMetadata = {},
-    onTrackingUpdate = () => { },
     onAudit = () => { }
 }) => {
     const [sortBy, setSortBy] = useState('name');
@@ -135,8 +126,6 @@ const InventoryPanel = ({
         });
     }, []);
     const latestInventoryDataRef = useRef(null);
-
-    const queryClient = useQueryClient();
 
     const inventoryQuery = useInventorySnapshot({
         token,
@@ -349,47 +338,6 @@ const InventoryPanel = ({
         };
     }, [sortedItems, isLoading]);
 
-    useEffect(() => {
-        if (!token) {
-            return;
-        }
-
-        let eventSource;
-        try {
-            const url = buildEventSourceUrl(token);
-            eventSource = new EventSource(url, { withCredentials: true });
-
-            eventSource.addEventListener('inventory:update', () => {
-                queryClient.invalidateQueries({ queryKey: [INVENTORY_QUERY_KEY] });
-            });
-
-            eventSource.addEventListener('inventory:tracking', (event) => {
-                queryClient.invalidateQueries({ queryKey: [INVENTORY_TRACKING_QUERY_KEY] });
-                queryClient.invalidateQueries({ queryKey: [INVENTORY_QUERY_KEY] });
-                if (event?.data) {
-                    try {
-                        const payload = JSON.parse(event.data);
-                        onTrackingUpdate(payload.enabled);
-                    } catch (parseError) {
-                        // ignore parsing error
-                    }
-                }
-            });
-
-            eventSource.onerror = () => {
-                eventSource.close();
-            };
-        } catch (error) {
-            console.error('[InventoryPanel] Failed to establish SSE connection', error);
-        }
-
-        return () => {
-            if (eventSource) {
-                eventSource.close();
-            }
-        };
-    }, [token, queryClient, onTrackingUpdate]);
-
     const handleSort = (column) => {
         setSortBy((currentColumn) => {
             if (column === currentColumn) {
@@ -437,6 +385,7 @@ const InventoryPanel = ({
                 return nextItem;
             })
         );
+        latestInventoryDataRef.current = null;
     };
 
     const handleSaveStock = async () => {
