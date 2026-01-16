@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD013 -->
 # Phase 4 Implementation Plan - Inventory & Alerting Backbone
 
 ## Source References
@@ -65,19 +66,20 @@
    - Provide admin endpoint to fetch notification logs for observability and Robot verifications.
 
 5. **Real-Time Event Propagation**
-   - Add SSE endpoint /api/inventory/events (or WebSocket channel) broadcasting stock changes, discrepancy raises/clears, and tracking toggle updates.
-   - Ensure authenticated admin clients subscribe to SSE stream; kiosk channel can be layered later if required.
-   - Implement server heartbeat with retry or backoff to avoid PM2 worker duplication; potentially leverage shared Redis or in-memory guard.
-   - Update kiosk and admin clients to subscribe to events, showing banners and immediate table refresh (Implementation_Roadmap step 27).
+    - Add SSE endpoint /api/inventory/events (or WebSocket channel) broadcasting stock changes, discrepancy raises/clears, and tracking toggle updates.
+    - Ensure authenticated admin clients subscribe to SSE stream; kiosk channel can be layered later if required.
+    - Implement server heartbeat with retry or backoff to avoid PM2 worker duplication; potentially leverage shared Redis or in-memory guard.
+    - Update kiosk and admin clients to subscribe to events, showing banners and immediate table refresh (Implementation_Roadmap step 27).
+   - **Status**: Implemented via [server/src/routes/inventory.js](server/src/routes/inventory.js#L34-L58) SSE endpoint and [server/src/services/inventoryEvents.js](server/src/services/inventoryEvents.js#L1-L97); kiosk channel remains future scope.
 
 6. **Admin Portal UX Enhancements**
-   - Replace mock inventory data in client/src/components/ProductManager.jsx with API-backed hooks (new useInventory hook in hooks/useInventory.js).
-    - Implement UI states per acceptance tests:
-     - Inventory toggle banner and messaging (US-032).
-       - Sortable inventory table with low-stock and discrepancy highlighting using explicit flags instead of negative values (US-033, US-037).
-       - Stock update and adjustment dialogs integrated with API, showing optimistic updates and error handling without displaying negative quantities (US-034, US-038).
-     - Threshold configuration inputs tied to product data, with validations (FR-8.5, US-035).
-   - Introduce audit log capturing (integration with existing audit viewer) to reflect inventory actions in UI feedback.
+    - Replace mock inventory data in client/src/components/ProductManager.jsx with API-backed hooks (new useInventory hook in hooks/useInventory.js).
+        - Implement UI states per acceptance tests:
+            - Inventory toggle banner and messaging (US-032).
+            - Sortable inventory table with low-stock and discrepancy highlighting using explicit flags instead of negative values (US-033, US-037).
+            - Stock update and adjustment dialogs integrated with API, showing optimistic updates and error handling without displaying negative quantities (US-034, US-038).
+            - Threshold configuration inputs tied to product data, with validations (FR-8.5, US-035).
+    - Introduce audit log capturing (integration with existing audit viewer) to reflect inventory actions in UI feedback.
 
 7. **Kiosk UI Updates**
    - Ensure kiosk React app consumes stock availability flags from feed endpoint, showing out-of-stock or warning states (FR-1.6, FR-8.3).
