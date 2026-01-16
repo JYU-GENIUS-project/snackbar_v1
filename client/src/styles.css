@@ -254,8 +254,17 @@ textarea {
 }
 
 .warning-icon {
-  color: #b91c1c;
-  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-right: 0.25rem;
+}
+
+.warning-icon svg {
+  width: 100%;
+  height: 100%;
 }
 
 .kiosk-app {

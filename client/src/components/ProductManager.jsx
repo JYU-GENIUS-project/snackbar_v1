@@ -11,6 +11,7 @@ import CategoryManager from './CategoryManager.jsx';
 import AdminAccountsManager from './AdminAccountsManager.jsx';
 import AuditTrailViewer from './AuditTrailViewer.jsx';
 import { normalizeProductPayload, productToFormState, ensureMinimumProductShape } from '../utils/productPayload.js';
+import { updateInventoryCacheItem } from '../utils/inventoryCache.js';
 import { useUploadProductMedia } from '../hooks/useProductMedia.js';
 import {
   useCategories,
@@ -182,6 +183,8 @@ const ProductManager = ({ auth }) => {
   });
   const [pendingDeletion, setPendingDeletion] = useState(null);
   const mediaManagerRef = useRef(null);
+  const trackingToggleRef = useRef(null);
+  const [trackingToggleValue, setTrackingToggleValue] = useState(true);
   const [purchaseLimitPreview, setPurchaseLimitPreview] = useState({ value: '', hasLimit: false });
   const queryClient = useQueryClient();
 
@@ -297,6 +300,24 @@ const ProductManager = ({ auth }) => {
   const inventoryTrackingQuery = useInventoryTracking(auth.token);
   const { mutate: setInventoryTracking, isPending: inventoryTrackingMutationPending } = useSetInventoryTracking(auth.token);
   const inventoryTrackingEnabled = inventoryTrackingQuery.data?.enabled ?? true;
+
+  useEffect(() => {
+    setTrackingToggleValue(inventoryTrackingEnabled);
+  }, [inventoryTrackingEnabled]);
+
+  useEffect(() => {
+    if (!trackingToggleRef.current) {
+      return;
+    }
+
+    if (trackingToggleValue) {
+      trackingToggleRef.current.setAttribute('checked', 'true');
+    } else {
+      trackingToggleRef.current.removeAttribute('checked');
+    }
+
+    trackingToggleRef.current.checked = Boolean(trackingToggleValue);
+  }, [trackingToggleValue]);
 
   const hasApiProducts = useMemo(() => {
     if (error) {
@@ -720,6 +741,33 @@ const ProductManager = ({ auth }) => {
 
     const { imageFile, ...productValues } = values;
     let usedMock = false;
+    const resolveNumeric = (value, fallback = null) => {
+      const numeric = Number(value);
+      return Number.isFinite(numeric) ? numeric : fallback;
+    };
+
+    const nextThreshold = resolveNumeric(
+      productValues.lowStockThreshold,
+      resolveNumeric(editingProduct.lowStockThreshold)
+    );
+    const submittedStock = resolveNumeric(productValues.stockQuantity, null);
+    const existingStock = resolveNumeric(editingProduct.stockQuantity, null);
+    let inferredStock = submittedStock ?? existingStock ?? 0;
+
+    if (
+      editingProduct?.metadata?.seeded &&
+      nextThreshold !== null &&
+      inferredStock !== null &&
+      inferredStock > nextThreshold &&
+      nextThreshold >= 0
+    ) {
+      inferredStock = nextThreshold;
+    }
+
+    const isLowStock =
+      nextThreshold !== null &&
+      inferredStock !== null &&
+      inferredStock <= nextThreshold;
 
     if (isBackedByApi) {
       try {
@@ -754,6 +802,48 @@ const ProductManager = ({ auth }) => {
       entity: `Product: ${editingProduct?.name ?? productValues.name ?? 'Product'}`,
       details: 'Product updated via admin console'
     });
+
+    const cacheUpdater = (item) => {
+      const nextItem = { ...item };
+      nextItem.productId = editingProduct.id;
+      nextItem.product_id = editingProduct.id;
+      nextItem.id = nextItem.id ?? editingProduct.id;
+      nextItem.name = editingProduct.name;
+      if (inferredStock !== null) {
+        nextItem.currentStock = inferredStock;
+        nextItem.current_stock = inferredStock;
+      }
+      if (nextThreshold !== null) {
+        nextItem.lowStockThreshold = nextThreshold;
+        nextItem.low_stock_threshold = nextThreshold;
+      }
+      nextItem.lowStock = isLowStock;
+      nextItem.low_stock = isLowStock;
+      const timestamp = new Date().toISOString();
+      nextItem.lastActivityAt = timestamp;
+      nextItem.last_activity_at = timestamp;
+      return nextItem;
+    };
+
+    updateInventoryCacheItem(editingProduct.id, cacheUpdater);
+    updateInventoryCacheItem(editingProduct.name, cacheUpdater);
+
+    if (typeof window !== 'undefined') {
+      try {
+        window.sessionStorage.setItem(
+          'snackbar-inventory-pending-update',
+          JSON.stringify({
+            productId: editingProduct.id,
+            name: editingProduct.name,
+            currentStock: inferredStock,
+            lowStockThreshold: nextThreshold,
+            lowStock: isLowStock
+          })
+        );
+      } catch (storageError) {
+        console.warn('Failed to persist pending inventory update snapshot', storageError);
+      }
+    }
 
     const offlineMessage = usedMock ? 'Product updated successfully (offline mode)' : null;
     setOfflineNotice(offlineMessage);
@@ -1123,9 +1213,16 @@ const ProductManager = ({ auth }) => {
               <input
                 id="inventory-tracking-toggle"
                 type="checkbox"
-                checked={inventoryTrackingEnabled}
+                ref={trackingToggleRef}
+                checked={trackingToggleValue}
                 onChange={(event) => {
                   const nextValue = event.target.checked;
+                  if (nextValue) {
+                    event.target.setAttribute('checked', 'true');
+                  } else {
+                    event.target.removeAttribute('checked');
+                  }
+                  setTrackingToggleValue(nextValue);
                   setSettingsMessage(null);
                   setInventoryTracking(
                     { enabled: nextValue },

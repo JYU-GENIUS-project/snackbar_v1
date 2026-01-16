@@ -33,14 +33,14 @@ const buildFeedFromOfflineSnapshot = (snapshot) => {
       metadata: normalized.metadata || {},
       primaryMedia: primaryCandidate
         ? {
-            url: primaryCandidate.url || primaryCandidate.previewUrl || primaryCandidate.localPath || '',
-            alt:
-              primaryCandidate.alt ||
-              primaryCandidate.description ||
-              normalized.imageAlt ||
-              normalized.name ||
-              'Product image'
-          }
+          url: primaryCandidate.url || primaryCandidate.previewUrl || primaryCandidate.localPath || '',
+          alt:
+            primaryCandidate.alt ||
+            primaryCandidate.description ||
+            normalized.imageAlt ||
+            normalized.name ||
+            'Product image'
+        }
         : null
     };
   });

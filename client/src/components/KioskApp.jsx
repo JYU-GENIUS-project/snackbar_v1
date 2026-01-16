@@ -201,11 +201,11 @@ const KioskApp = () => {
                 return current.map((item) =>
                     item.id === product.id
                         ? {
-                              ...item,
-                              quantity: nextQuantity,
-                              price: product.price,
-                              purchaseLimit: product.purchaseLimit
-                          }
+                            ...item,
+                            quantity: nextQuantity,
+                            price: product.price,
+                            purchaseLimit: product.purchaseLimit
+                        }
                         : item
                 );
             }

@@ -7,7 +7,17 @@ const inventoryEvents = require('../services/inventoryEvents');
 
 const router = express.Router();
 
-const SORTABLE_FIELDS = ['name', 'stock', 'threshold', 'updated', 'discrepancy'];
+const SORTABLE_FIELDS = [
+    'name',
+    'stock',
+    'threshold',
+    'updated',
+    'discrepancy',
+    'current_stock',
+    'low_stock_threshold',
+    'last_activity_at',
+    'ledger_balance'
+];
 
 const inventoryListValidation = [
     query('limit').optional().isInt({ min: 1, max: 200 }).withMessage('limit must be between 1 and 200'),
