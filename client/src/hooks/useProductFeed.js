@@ -1,13 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '../services/apiClient.js';
 import { ensureMinimumProductShape } from '../utils/productPayload.js';
-import { readOfflineProductSnapshot } from '../utils/offlineCache.js';
+import { readOfflineProductSnapshot, saveOfflineProductSnapshot } from '../utils/offlineCache.js';
 
 const FEED_QUERY_KEY = ['product-feed'];
 
 const buildFeedFromOfflineSnapshot = (snapshot) => {
   if (!snapshot || !Array.isArray(snapshot.products)) {
-    return { products: [] };
+    return { products: [], source: 'offline', inventoryTrackingEnabled: true };
   }
 
   const feedProducts = snapshot.products.map((product) => {
@@ -23,6 +23,8 @@ const buildFeedFromOfflineSnapshot = (snapshot) => {
       price: Number(normalized.price ?? 0),
       currency: normalized.currency || 'EUR',
       available: normalized.status !== 'archived',
+      stockQuantity: normalized.stockQuantity ?? null,
+      lowStockThreshold: normalized.lowStockThreshold ?? null,
       purchaseLimit: normalized.purchaseLimit ?? null,
       imageAlt: normalized.imageAlt || normalized.name || 'Product image',
       categoryId: normalized.categoryId ?? normalized.categoryIds?.[0] ?? null,
@@ -31,14 +33,14 @@ const buildFeedFromOfflineSnapshot = (snapshot) => {
       metadata: normalized.metadata || {},
       primaryMedia: primaryCandidate
         ? {
-            url: primaryCandidate.url || primaryCandidate.previewUrl || primaryCandidate.localPath || '',
-            alt:
-              primaryCandidate.alt ||
-              primaryCandidate.description ||
-              normalized.imageAlt ||
-              normalized.name ||
-              'Product image'
-          }
+          url: primaryCandidate.url || primaryCandidate.previewUrl || primaryCandidate.localPath || '',
+          alt:
+            primaryCandidate.alt ||
+            primaryCandidate.description ||
+            normalized.imageAlt ||
+            normalized.name ||
+            'Product image'
+        }
         : null
     };
   });
@@ -46,7 +48,28 @@ const buildFeedFromOfflineSnapshot = (snapshot) => {
   return {
     products: feedProducts,
     source: snapshot.source || 'offline',
-    generatedAt: snapshot.generatedAt || new Date().toISOString()
+    generatedAt: snapshot.generatedAt || new Date().toISOString(),
+    inventoryTrackingEnabled:
+      typeof snapshot.inventoryTrackingEnabled === 'boolean'
+        ? snapshot.inventoryTrackingEnabled
+        : true
+  };
+};
+
+const normalizeFeedPayload = (payload) => {
+  if (!payload || typeof payload !== 'object') {
+    return { products: [], source: 'api', generatedAt: new Date().toISOString(), inventoryTrackingEnabled: true };
+  }
+
+  const products = Array.isArray(payload.products) ? payload.products : [];
+
+  return {
+    ...payload,
+    products,
+    generatedAt: payload.generatedAt || new Date().toISOString(),
+    source: payload.source || 'api',
+    inventoryTrackingEnabled:
+      typeof payload.inventoryTrackingEnabled === 'boolean' ? payload.inventoryTrackingEnabled : true
   };
 };
 
@@ -58,12 +81,24 @@ const fetchProductFeed = async ({ signal }) => {
       signal
     });
 
-    if (Array.isArray(response?.products)) {
-      return response;
-    }
+    const selected = normalizeFeedPayload(
+      response?.success && response.data
+        ? response.data
+        : Array.isArray(response?.products)
+          ? response
+          : response?.data && typeof response.data === 'object'
+            ? response.data
+            : response
+    );
 
-    if (Array.isArray(response?.data?.products)) {
-      return response.data;
+    if (Array.isArray(selected.products) && selected.products.length > 0) {
+      saveOfflineProductSnapshot({
+        products: selected.products,
+        generatedAt: selected.generatedAt || new Date().toISOString(),
+        source: 'api',
+        inventoryTrackingEnabled: selected.inventoryTrackingEnabled
+      });
+      return selected;
     }
 
     const fallbackSnapshot = readOfflineProductSnapshot();
@@ -71,20 +106,14 @@ const fetchProductFeed = async ({ signal }) => {
       return buildFeedFromOfflineSnapshot(fallbackSnapshot);
     }
 
-    return {
-      products: Array.isArray(response?.products)
-        ? response.products
-        : Array.isArray(response?.data?.products)
-          ? response.data.products
-          : []
-    };
+    return selected;
   } catch (error) {
     console.warn('Product feed request failed, using offline snapshot.', error);
     const fallbackSnapshot = readOfflineProductSnapshot();
     if (fallbackSnapshot?.products?.length) {
       return buildFeedFromOfflineSnapshot(fallbackSnapshot);
     }
-    return { products: [] };
+    return { products: [], source: 'offline', inventoryTrackingEnabled: true };
   }
 };
 

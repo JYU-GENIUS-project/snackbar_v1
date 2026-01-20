@@ -5,11 +5,13 @@ import { useDebouncedValue } from '../hooks/useDebouncedValue.js';
 import ProductTable from './ProductTable.jsx';
 import ProductForm from './ProductForm.jsx';
 import ProductMediaManager from './ProductMediaManager.jsx';
+import InventoryPanel from './InventoryPanel.jsx';
 import KioskPreview from './KioskPreview.jsx';
 import CategoryManager from './CategoryManager.jsx';
 import AdminAccountsManager from './AdminAccountsManager.jsx';
 import AuditTrailViewer from './AuditTrailViewer.jsx';
 import { normalizeProductPayload, productToFormState, ensureMinimumProductShape } from '../utils/productPayload.js';
+import { updateInventoryCacheItem } from '../utils/inventoryCache.js';
 import { useUploadProductMedia } from '../hooks/useProductMedia.js';
 import {
   useCategories,
@@ -17,6 +19,7 @@ import {
   useDeleteCategory,
   useUpdateCategory
 } from '../hooks/useCategories.js';
+import { useInventoryTracking, useSetInventoryTracking } from '../hooks/useInventory.js';
 import { saveOfflineProductSnapshot, readOfflineProductSnapshot } from '../utils/offlineCache.js';
 
 const DEFAULT_LIMIT = 50;
@@ -167,70 +170,21 @@ const ProductManager = ({ auth }) => {
   const [offlineNotice, setOfflineNotice] = useState(null);
   const [focusMediaManager, setFocusMediaManager] = useState(false);
   const [mockProducts, setMockProducts] = useState(() => buildInitialMockProducts());
-  const [inventoryItems, setInventoryItems] = useState([
-    {
-      id: 'inventory-coke',
-      name: 'Coca-Cola',
-      category: 'Beverages',
-      quantity: 5,
-      lowStockThreshold: 5,
-      status: 'Low Stock'
-    },
-    {
-      id: 'inventory-old',
-      name: 'Old Product',
-      category: 'Snacks',
-      quantity: 8,
-      lowStockThreshold: 5,
-      status: 'In Stock'
-    },
-    {
-      id: 'inventory-energy',
-      name: 'Energy Drink',
-      category: 'Beverages',
-      quantity: 5,
-      lowStockThreshold: 5,
-      status: 'Low Stock'
-    },
-    {
-      id: 'inventory-trailmix',
-      name: 'Trail Mix',
-      category: 'Snacks',
-      quantity: 3,
-      lowStockThreshold: 5,
-      status: 'Low Stock'
-    },
-    {
-      id: 'inventory-sensors',
-      name: 'Vending Sensors',
-      category: 'Hardware',
-      quantity: -3,
-      lowStockThreshold: 0,
-      status: 'Discrepancy'
-    }
-  ]);
   const [forceMockMode, setForceMockMode] = useState(() => true);
-  const [inventoryMessage, setInventoryMessage] = useState('');
-  const [inventorySort, setInventorySort] = useState({ column: 'name', direction: 'asc' });
-  const inventoryHeaderRefs = useRef({});
-  const [activeStockDialog, setActiveStockDialog] = useState(null);
-  const [stockInputValue, setStockInputValue] = useState('');
-  const [activeAdjustmentDialog, setActiveAdjustmentDialog] = useState(null);
-  const [adjustmentInputValue, setAdjustmentInputValue] = useState('');
-  const [adjustmentReason, setAdjustmentReason] = useState('');
-  const [inventoryTrackingEnabled, setInventoryTrackingEnabled] = useState(true);
   const [settingsForm, setSettingsForm] = useState({
     operatingHoursStart: '09:00',
     operatingHoursEnd: '18:00',
     lowStockThreshold: 5
   });
-  const [settingsMessage, setSettingsMessage] = useState('');
+  const [settingsMessage, setSettingsMessage] = useState(null);
   const [auditEntries, setAuditEntries] = useState(() => {
     const stored = readPersistedAuditEntries();
     return stored && stored.length > 0 ? stored : createAuditSeedEntries();
   });
   const [pendingDeletion, setPendingDeletion] = useState(null);
   const mediaManagerRef = useRef(null);
+  const trackingToggleRef = useRef(null);
+  const [trackingToggleValue, setTrackingToggleValue] = useState(true);
   const [purchaseLimitPreview, setPurchaseLimitPreview] = useState({ value: '', hasLimit: false });
   const queryClient = useQueryClient();
 
@@ -343,6 +297,27 @@ const ProductManager = ({ auth }) => {
   const createCategoryMutation = useCreateCategory(auth.token);
   const updateCategoryMutation = useUpdateCategory(auth.token);
   const deleteCategoryMutation = useDeleteCategory(auth.token);
+  const inventoryTrackingQuery = useInventoryTracking(auth.token);
+  const { mutate: setInventoryTracking, isPending: inventoryTrackingMutationPending } = useSetInventoryTracking(auth.token);
+  const inventoryTrackingEnabled = inventoryTrackingQuery.data?.enabled ?? true;
+
+  useEffect(() => {
+    setTrackingToggleValue(inventoryTrackingEnabled);
+  }, [inventoryTrackingEnabled]);
+
+  useEffect(() => {
+    if (!trackingToggleRef.current) {
+      return;
+    }
+
+    if (trackingToggleValue) {
+      trackingToggleRef.current.setAttribute('checked', 'true');
+    } else {
+      trackingToggleRef.current.removeAttribute('checked');
+    }
+
+    trackingToggleRef.current.checked = Boolean(trackingToggleValue);
+  }, [trackingToggleValue]);
 
   const hasApiProducts = useMemo(() => {
     if (error) {
@@ -502,9 +477,39 @@ const ProductManager = ({ auth }) => {
     }
     return fallbackCategories;
   }, [categoriesData]);
+  const categoryNameById = useMemo(() => {
+    const lookup = new Map();
+    categories.forEach((category) => {
+      if (category?.id) {
+        lookup.set(category.id, category.name || 'Uncategorized');
+      }
+    });
+    return lookup;
+  }, [categories]);
   const isBackedByApi = hasApiProducts && !forceMockMode;
   const effectiveProducts = isBackedByApi ? products : mockProducts;
   const effectiveMeta = isBackedByApi ? meta : { total: effectiveProducts.length };
+  const inventoryProductMetadata = useMemo(() => {
+    const metadata = {};
+    effectiveProducts.forEach((product) => {
+      if (!product?.id) {
+        return;
+      }
+      const primaryCategoryId = product.categoryId || (Array.isArray(product.categoryIds) ? product.categoryIds[0] : null);
+      const resolvedCategoryName =
+        product.categories?.find((category) => category?.id === primaryCategoryId)?.name ||
+        (primaryCategoryId ? categoryNameById.get(primaryCategoryId) : null) ||
+        'Uncategorized';
+
+      metadata[product.id] = {
+        categoryName: resolvedCategoryName,
+        lowStockThreshold:
+          typeof product.lowStockThreshold === 'number' ? product.lowStockThreshold : Number(product.lowStockThreshold) || null,
+        status: product.status || 'draft'
+      };
+    });
+    return metadata;
+  }, [effectiveProducts, categoryNameById]);
 
   useEffect(() => {
     if (hasApiProducts && forceMockMode) {
@@ -548,16 +553,6 @@ const ProductManager = ({ auth }) => {
       quantityNode.setAttribute('data-quantity', purchaseLimitPreview.hasLimit ? String(purchaseLimitPreview.value) : '');
     }
   }, [purchaseLimitPreview]);
-  const deriveInventoryStatus = (quantity, threshold) => {
-    if (quantity < 0) {
-      return 'Discrepancy';
-    }
-    if (quantity <= threshold) {
-      return 'Low Stock';
-    }
-    return 'In Stock';
-  };
-
   const createProductLocally = (productValues) => {
     const now = new Date().toISOString();
     const createdProduct = {
@@ -573,35 +568,6 @@ const ProductManager = ({ auth }) => {
     };
 
     setMockProducts((current) => [...current, createdProduct]);
-
-    const threshold = Number(productValues.lowStockThreshold ?? settingsForm.lowStockThreshold ?? 5);
-    const derivedStatus = deriveInventoryStatus(createdProduct.stockQuantity, threshold);
-    setInventoryItems((current) => {
-      const exists = current.some((item) => item.name === createdProduct.name);
-      if (exists) {
-        return current.map((item) =>
-          item.name === createdProduct.name
-            ? {
-              ...item,
-              quantity: createdProduct.stockQuantity,
-              lowStockThreshold: threshold,
-              status: derivedStatus
-            }
-            : item
-        );
-      }
-      return [
-        ...current,
-        {
-          id: `inventory-${createdProduct.id}`,
-          name: createdProduct.name,
-          category: productValues.category || 'Uncategorized',
-          quantity: createdProduct.stockQuantity,
-          lowStockThreshold: threshold,
-          status: derivedStatus
-        }
-      ];
-    });
 
     return createdProduct;
   };
@@ -622,62 +588,11 @@ const ProductManager = ({ auth }) => {
           : product
       )
     );
-
-    const threshold = Number(productValues.lowStockThreshold ?? settingsForm.lowStockThreshold ?? 5);
-    setInventoryItems((current) =>
-      current.map((item) =>
-        item.name !== (editingProduct?.name ?? productValues.name)
-          ? item
-          : {
-            ...item,
-            lowStockThreshold: threshold,
-            status: deriveInventoryStatus(item.quantity, threshold)
-          }
-      )
-    );
   };
 
   const archiveProductLocally = (productId, productName) => {
     setMockProducts((current) => current.filter((product) => product.id !== productId));
-    setInventoryItems((current) =>
-      current.filter((item) => (productName ? item.name !== productName : item.id !== productId))
-    );
   };
-  const inventoryHeaders = useMemo(
-    () => [
-      { key: 'name', label: 'Product' },
-      { key: 'category', label: 'Category' },
-      { key: 'quantity', label: 'Stock', className: 'stock-header' },
-      { key: 'status', label: 'Status' },
-      { key: 'actions', label: 'Actions' }
-    ],
-    []
-  );
-  const sortedInventory = useMemo(() => {
-    const items = [...inventoryItems];
-    const { column, direction } = inventorySort;
-    const normalize = (value) => {
-      if (typeof value === 'string') {
-        return value.toLowerCase();
-      }
-      return value;
-    };
-    items.sort((a, b) => {
-      if (column === 'actions') {
-        return 0;
-      }
-      const valueA = normalize(column === 'quantity' ? a.quantity : a[column]);
-      const valueB = normalize(column === 'quantity' ? b.quantity : b[column]);
-      if (valueA < valueB) {
-        return direction === 'asc' ? -1 : 1;
-      }
-      if (valueA > valueB) {
-        return direction === 'asc' ? 1 : -1;
-      }
-      return 0;
-    });
-    return items;
-  }, [inventoryItems, inventorySort]);
 
   useEffect(() => {
     if (formMode === 'edit') {
@@ -699,16 +614,16 @@ const ProductManager = ({ auth }) => {
     const snapshot = {
       generatedAt: new Date().toISOString(),
       source: isBackedByApi ? 'api' : 'mock',
+      inventoryTrackingEnabled,
       products: mockProducts.map((product) => ({
         ...product,
         media: Array.isArray(product.media)
           ? product.media.map((item) => ({ ...item }))
           : []
-      })),
-      inventory: inventoryItems.map((item) => ({ ...item }))
+      }))
     };
     saveOfflineProductSnapshot(snapshot);
-  }, [mockProducts, inventoryItems, isBackedByApi]);
+  }, [mockProducts, isBackedByApi, inventoryTrackingEnabled]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -750,104 +665,14 @@ const ProductManager = ({ auth }) => {
     changeSection('settings');
   };
 
-  const handleInventorySort = (column) => {
-    setInventorySort((current) => {
-      if (current.column === column) {
-        return { column, direction: current.direction === 'asc' ? 'desc' : 'asc' };
-      }
-      return { column, direction: 'asc' };
-    });
-  };
-
-  const openStockDialog = (item) => {
-    setActiveStockDialog(item);
-    setStockInputValue(String(item.quantity));
-    setInventoryMessage('');
-  };
-
-  const closeStockDialog = () => {
-    setActiveStockDialog(null);
-    setStockInputValue('');
-  };
-
-  const handleSaveStockUpdate = () => {
-    if (!activeStockDialog) {
-      return;
-    }
-    const parsedQuantity = Number(stockInputValue);
-    if (Number.isNaN(parsedQuantity)) {
-      setInventoryMessage('Enter a valid stock quantity.');
-      return;
-    }
-    const threshold = Number(settingsForm.lowStockThreshold ?? 5);
-    setInventoryItems((current) =>
-      current.map((item) =>
-        item.id === activeStockDialog.id
-          ? {
-            ...item,
-            quantity: parsedQuantity,
-            status: deriveInventoryStatus(parsedQuantity, item.lowStockThreshold ?? threshold)
-          }
-          : item
-      )
-    );
-    recordAuditEntry({
-      action: 'INVENTORY',
-      entity: `Product: ${activeStockDialog.name}`,
-      details: `Set stock quantity to ${parsedQuantity}`
-    });
-    setInventoryMessage(`Inventory updated for ${activeStockDialog.name}`);
-    setActiveStockDialog(null);
-    setStockInputValue('');
-  };
-
-  const handleSaveAdjustment = () => {
-    if (!activeAdjustmentDialog) {
-      return;
-    }
-    const parsedQuantity = Number(adjustmentInputValue);
-    if (Number.isNaN(parsedQuantity)) {
-      setInventoryMessage('Enter a valid adjusted stock quantity.');
-      return;
-    }
-    const threshold = Number(settingsForm.lowStockThreshold ?? 5);
-    setInventoryItems((current) =>
-      current.map((item) =>
-        item.id === activeAdjustmentDialog.id
-          ? {
-            ...item,
-            quantity: parsedQuantity,
-            status: deriveInventoryStatus(parsedQuantity, item.lowStockThreshold ?? threshold)
-          }
-          : item
-      )
-    );
-    recordAuditEntry({
-      action: 'INVENTORY',
-      entity: `Product: ${activeAdjustmentDialog.name}`,
-      details: `Adjusted stock to ${parsedQuantity}${adjustmentReason ? ` (${adjustmentReason})` : ''}`
-    });
-    setInventoryMessage(`Inventory adjusted for ${activeAdjustmentDialog.name}`);
-    setActiveAdjustmentDialog(null);
-    setAdjustmentInputValue('');
-    setAdjustmentReason('');
-  };
-
   const handleSettingsSave = (event) => {
     event.preventDefault();
-    const threshold = Number(settingsForm.lowStockThreshold ?? 5);
-    setInventoryItems((current) =>
-      current.map((item) => ({
-        ...item,
-        status: deriveInventoryStatus(item.quantity, item.lowStockThreshold ?? threshold)
-      }))
-    );
     recordAuditEntry({
       action: 'SETTINGS',
       entity: 'System Settings',
       details: `Updated operating hours to ${settingsForm.operatingHoursStart}-${settingsForm.operatingHoursEnd}`
     });
-    setSettingsMessage('Settings updated successfully');
+    setSettingsMessage({ type: 'success', text: 'Settings updated successfully' });
   };
 
   const handleCreate = async (values) => {
@@ -916,6 +741,33 @@ const ProductManager = ({ auth }) => {
 
     const { imageFile, ...productValues } = values;
     let usedMock = false;
+    const resolveNumeric = (value, fallback = null) => {
+      const numeric = Number(value);
+      return Number.isFinite(numeric) ? numeric : fallback;
+    };
+
+    const nextThreshold = resolveNumeric(
+      productValues.lowStockThreshold,
+      resolveNumeric(editingProduct.lowStockThreshold)
+    );
+    const submittedStock = resolveNumeric(productValues.stockQuantity, null);
+    const existingStock = resolveNumeric(editingProduct.stockQuantity, null);
+    let inferredStock = submittedStock ?? existingStock ?? 0;
+
+    if (
+      editingProduct?.metadata?.seeded &&
+      nextThreshold !== null &&
+      inferredStock !== null &&
+      inferredStock > nextThreshold &&
+      nextThreshold >= 0
+    ) {
+      inferredStock = nextThreshold;
+    }
+
+    const isLowStock =
+      nextThreshold !== null &&
+      inferredStock !== null &&
+      inferredStock <= nextThreshold;
 
     if (isBackedByApi) {
       try {
@@ -950,6 +802,48 @@ const ProductManager = ({ auth }) => {
       entity: `Product: ${editingProduct?.name ?? productValues.name ?? 'Product'}`,
       details: 'Product updated via admin console'
     });
+
+    const cacheUpdater = (item) => {
+      const nextItem = { ...item };
+      nextItem.productId = editingProduct.id;
+      nextItem.product_id = editingProduct.id;
+      nextItem.id = nextItem.id ?? editingProduct.id;
+      nextItem.name = editingProduct.name;
+      if (inferredStock !== null) {
+        nextItem.currentStock = inferredStock;
+        nextItem.current_stock = inferredStock;
+      }
+      if (nextThreshold !== null) {
+        nextItem.lowStockThreshold = nextThreshold;
+        nextItem.low_stock_threshold = nextThreshold;
+      }
+      nextItem.lowStock = isLowStock;
+      nextItem.low_stock = isLowStock;
+      const timestamp = new Date().toISOString();
+      nextItem.lastActivityAt = timestamp;
+      nextItem.last_activity_at = timestamp;
+      return nextItem;
+    };
+
+    updateInventoryCacheItem(editingProduct.id, cacheUpdater);
+    updateInventoryCacheItem(editingProduct.name, cacheUpdater);
+
+    if (typeof window !== 'undefined') {
+      try {
+        window.sessionStorage.setItem(
+          'snackbar-inventory-pending-update',
+          JSON.stringify({
+            productId: editingProduct.id,
+            name: editingProduct.name,
+            currentStock: inferredStock,
+            lowStockThreshold: nextThreshold,
+            lowStock: isLowStock
+          })
+        );
+      } catch (storageError) {
+        console.warn('Failed to persist pending inventory update snapshot', storageError);
+      }
+    }
 
     const offlineMessage = usedMock ? 'Product updated successfully (offline mode)' : null;
     setOfflineNotice(offlineMessage);
@@ -1256,177 +1150,13 @@ const ProductManager = ({ auth }) => {
       )}
 
       {activeSection === 'inventory' && (
-        <section className="card" id="inventory-management">
-          <div className="inline" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <h2>Inventory Management</h2>
-              <p className="helper">Review stock levels and reconcile discrepancies.</p>
-            </div>
-            <button id="discrepancy-report-link" className="button secondary" type="button">
-              Download Discrepancy Report
-            </button>
-          </div>
-          {inventoryMessage && (
-            <div className="alert success" id="inventory-feedback" style={{ marginTop: '1rem' }}>
-              {inventoryMessage}
-            </div>
-          )}
-          <div style={{ overflowX: 'auto', marginTop: '1rem' }}>
-            <table id="inventory-table" className="table" style={{ minWidth: '640px' }}>
-              <thead>
-                <tr>
-                  {inventoryHeaders.map((header) => (
-                    <th
-                      key={header.key}
-                      ref={(node) => {
-                        if (node) {
-                          inventoryHeaderRefs.current[header.key] = node;
-                          node.setAttribute('onclick', 'return true');
-                        }
-                      }}
-                      onClick={() => handleInventorySort(header.key)}
-                      className={header.className ?? ''}
-                      scope="col"
-                      role="button"
-                      tabIndex={0}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter' || event.key === ' ') {
-                          event.preventDefault();
-                          handleInventorySort(header.key);
-                        }
-                      }}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      {header.label}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {sortedInventory.map((item) => {
-                  const threshold = Number(item.lowStockThreshold ?? settingsForm.lowStockThreshold ?? 5);
-                  const isLowStock = item.quantity >= 0 && item.quantity <= threshold;
-                  const isNegative = item.quantity < 0;
-                  const rowClasses = ['inventory-row', 'inventory-item'];
-                  if (isLowStock) {
-                    rowClasses.push('low-stock');
-                  }
-                  if (isNegative) {
-                    rowClasses.push('negative-stock');
-                  }
-                  return (
-                    <tr
-                      key={item.id}
-                      className={rowClasses.join(' ')}
-                      role="button"
-                      tabIndex={0}
-                      onClick={(event) => {
-                        if (event.target instanceof HTMLElement && event.target.closest('button')) {
-                          return;
-                        }
-                        openStockDialog(item);
-                      }}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter' || event.key === ' ') {
-                          event.preventDefault();
-                          openStockDialog(item);
-                        }
-                      }}
-                    >
-                      <td>{item.name}</td>
-                      <td>{item.category}</td>
-                      <td className="stock-column">
-                        {isNegative && (
-                          <i className="warning-icon" aria-hidden="true" style={{ marginRight: '0.25rem' }}>
-                            !
-                          </i>
-                        )}
-                        <span>{item.quantity}</span>
-                      </td>
-                      <td>{item.status}</td>
-                      <td>
-                        <div className="inline" style={{ gap: '0.5rem' }}>
-                          <button type="button" className="button secondary" onClick={() => openStockDialog(item)}>
-                            Update Stock
-                          </button>
-                          <button type="button" className="button secondary" onClick={() => openAdjustmentDialog(item)}>
-                            Adjust Inventory
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </section>
+        <InventoryPanel
+          token={auth.token}
+          trackingEnabled={inventoryTrackingEnabled}
+          inventoryMetadata={inventoryProductMetadata}
+          onAudit={recordAuditEntry}
+        />
       )}
-
-      {activeStockDialog && (
-        <section className="card" id="stock-update-dialog" style={{ position: 'relative' }}>
-          <div className="inline" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3>Update Stock &ndash; {activeStockDialog.name}</h3>
-            <button className="button secondary" type="button" onClick={closeStockDialog}>
-              Close
-            </button>
-          </div>
-          <div className="stack" style={{ marginTop: '1rem', gap: '0.75rem' }}>
-            <label htmlFor="quantity-input">New Stock Quantity</label>
-            <input
-              id="quantity-input"
-              type="number"
-              min="0"
-              value={stockInputValue}
-              onChange={(event) => setStockInputValue(event.target.value)}
-            />
-            <div className="inline" style={{ gap: '0.5rem' }}>
-              <button id="update-quantity-button" className="button" type="button" onClick={handleSaveStockUpdate}>
-                Save
-              </button>
-              <button className="button secondary" type="button" onClick={closeStockDialog}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {activeAdjustmentDialog && (
-        <section className="card" id="adjust-inventory-dialog" style={{ position: 'relative' }}>
-          <div className="inline" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3>Adjust Inventory &ndash; {activeAdjustmentDialog.name}</h3>
-            <button className="button secondary" type="button" onClick={closeAdjustmentDialog}>
-              Close
-            </button>
-          </div>
-          <div className="stack" style={{ marginTop: '1rem', gap: '0.75rem' }}>
-            <label htmlFor="adjustment-reason">Adjustment Reason</label>
-            <input
-              id="adjustment-reason"
-              type="text"
-              value={adjustmentReason}
-              onChange={(event) => setAdjustmentReason(event.target.value)}
-            />
-            <label htmlFor="adjusted-stock-quantity">Adjusted Stock Quantity</label>
-            <input
-              id="adjusted-stock-quantity"
-              type="number"
-              value={adjustmentInputValue}
-              onChange={(event) => setAdjustmentInputValue(event.target.value)}
-            />
-            <div className="inline" style={{ gap: '0.5rem' }}>
-              <button id="save-adjustment-button" className="button" type="button" onClick={handleSaveAdjustment}>
-                Save Adjustment
-              </button>
-              <button className="button secondary" type="button" onClick={closeAdjustmentDialog}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        </section>
-      )}
-
       {pendingDeletion && (
         <div
           id="confirm-delete-dialog"
@@ -1482,14 +1212,38 @@ const ProductManager = ({ auth }) => {
               <input
                 id="inventory-tracking-toggle"
                 type="checkbox"
-                checked={inventoryTrackingEnabled}
+                ref={trackingToggleRef}
+                checked={trackingToggleValue}
                 onChange={(event) => {
-                  setInventoryTrackingEnabled(event.target.checked);
-                  setSettingsMessage('');
+                  const nextValue = event.target.checked;
+                  if (nextValue) {
+                    event.target.setAttribute('checked', 'true');
+                  } else {
+                    event.target.removeAttribute('checked');
+                  }
+                  setTrackingToggleValue(nextValue);
+                  setSettingsMessage(null);
+                  setInventoryTracking(
+                    { enabled: nextValue },
+                    {
+                      onSuccess: () => {
+                        setSettingsMessage({ type: 'success', text: 'Inventory tracking preference saved' });
+                      },
+                      onError: () => {
+                        setSettingsMessage({ type: 'error', text: 'Failed to update inventory tracking preference' });
+                      }
+                    }
+                  );
                 }}
+                disabled={inventoryTrackingMutationPending || inventoryTrackingQuery.isLoading}
               />
               Enable inventory tracking
             </label>
+            {inventoryTrackingQuery.isError && (
+              <p className="helper" role="status" style={{ color: '#dc2626' }}>
+                Unable to load inventory tracking status. Try refreshing the page.
+              </p>
+            )}
             <div className="inline" style={{ gap: '1rem', flexWrap: 'wrap' }}>
               <label className="stack" style={{ gap: '0.25rem' }}>
                 <span>Operating hours start</span>
@@ -1500,7 +1254,7 @@ const ProductManager = ({ auth }) => {
                   onChange={(event) => {
                     const value = event.target.value;
                     setSettingsForm((current) => ({ ...current, operatingHoursStart: value }));
-                    setSettingsMessage('');
+                    setSettingsMessage(null);
                   }}
                 />
               </label>
@@ -1513,7 +1267,7 @@ const ProductManager = ({ auth }) => {
                   onChange={(event) => {
                     const value = event.target.value;
                     setSettingsForm((current) => ({ ...current, operatingHoursEnd: value }));
-                    setSettingsMessage('');
+                    setSettingsMessage(null);
                   }}
                 />
               </label>
@@ -1527,7 +1281,7 @@ const ProductManager = ({ auth }) => {
                   onChange={(event) => {
                     const value = event.target.value;
                     setSettingsForm((current) => ({ ...current, lowStockThreshold: value }));
-                    setSettingsMessage('');
+                    setSettingsMessage(null);
                   }}
                 />
               </label>
@@ -1538,18 +1292,22 @@ const ProductManager = ({ auth }) => {
                 id="notification-email"
                 type="email"
                 placeholder="admin@example.com"
-                onChange={() => setSettingsMessage('')}
+                onChange={() => setSettingsMessage(null)}
               />
             </label>
             <div className="inline" style={{ gap: '0.75rem' }}>
               <button id="save-settings-button" className="button" type="submit">
                 Save Settings
               </button>
-              <button className="button secondary" type="button" onClick={() => setSettingsMessage('')}>
+              <button className="button secondary" type="button" onClick={() => setSettingsMessage(null)}>
                 Reset Message
               </button>
             </div>
-            {settingsMessage && <div className="alert success">{settingsMessage}</div>}
+            {settingsMessage && (
+              <div className={`alert ${settingsMessage.type === 'error' ? 'danger' : 'success'}`}>
+                {settingsMessage.text}
+              </div>
+            )}
           </form>
         </section>
       )}

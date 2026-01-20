@@ -4,8 +4,18 @@ import { OFFLINE_FEED_STORAGE_KEY } from '../utils/offlineCache.js';
 
 const formatPrice = (value) => `${Number(value ?? 0).toFixed(2)}€`;
 
+const toNumberOrNull = (value) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+};
+
 const normalizeProduct = (product) => {
-    const limit = Number(product.purchaseLimit);
+    const limit = toNumberOrNull(product.purchaseLimit);
+    const stockQuantity = toNumberOrNull(product.stockQuantity);
+    const lowStockThreshold = toNumberOrNull(product.lowStockThreshold);
+    const isOutOfStock = stockQuantity !== null && stockQuantity <= 0;
+    const isLowStock =
+        !isOutOfStock && stockQuantity !== null && lowStockThreshold !== null && stockQuantity <= lowStockThreshold;
     const categories = Array.isArray(product.categories)
         ? product.categories
             .filter(Boolean)
@@ -25,6 +35,11 @@ const normalizeProduct = (product) => {
         name: product.name || 'Product',
         price: Number(product.price ?? 0),
         purchaseLimit: Number.isFinite(limit) && limit > 0 ? limit : null,
+        stockQuantity,
+        lowStockThreshold,
+        isOutOfStock,
+        isLowStock,
+        status: product.status || 'active',
         imageUrl: product.primaryMedia?.url || '',
         imageAlt: product.primaryMedia?.alt || product.name || 'Product image',
         description: product.description || product.metadata?.description || '',
@@ -59,8 +74,13 @@ const KioskApp = () => {
         if (!Array.isArray(data?.products)) {
             return [];
         }
-        return data.products.map(normalizeProduct).filter((product) => product.available);
+        return data.products
+            .map(normalizeProduct)
+            .filter((product) => product.status !== 'archived');
     }, [data]);
+    const inventoryTrackingEnabled = data?.inventoryTrackingEnabled !== false;
+    const trackingDisabled = !inventoryTrackingEnabled;
+    const usingOfflineFeed = data?.source === 'offline';
 
     const categoryFilters = useMemo(() => {
         const seen = new Set();
@@ -80,24 +100,25 @@ const KioskApp = () => {
         return derived.sort((a, b) => a.name.localeCompare(b.name));
     }, [products]);
 
-    const [selectedCategory, setSelectedCategory] = useState('all');
+    const [selectedCategory, setSelectedCategory] = useState('All Products');
     const [cart, setCart] = useState([]);
     const [cartOpen, setCartOpen] = useState(false);
     const [toastMessage, setToastMessage] = useState('');
     const [limitMessage, setLimitMessage] = useState('');
+    const [outOfStockPrompt, setOutOfStockPrompt] = useState(null);
 
     useEffect(() => {
-        if (selectedCategory === 'all') {
+        if (selectedCategory === 'All Products') {
             return;
         }
         const exists = categoryFilters.some((category) => category.name === selectedCategory);
         if (!exists) {
-            setSelectedCategory('all');
+            setSelectedCategory('All Products');
         }
     }, [categoryFilters, selectedCategory]);
 
     const filteredProducts = useMemo(() => {
-        if (selectedCategory === 'all') {
+        if (selectedCategory === 'All Products') {
             return products;
         }
 
@@ -163,7 +184,7 @@ const KioskApp = () => {
     const cartCount = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart]);
     const cartTotal = useMemo(() => cart.reduce((sum, item) => sum + item.price * item.quantity, 0), [cart]);
 
-    const handleAddToCart = (product) => {
+    const addProductToCart = (product) => {
         setCart((current) => {
             const existing = current.find((item) => item.id === product.id);
             const limit = product.purchaseLimit ?? null;
@@ -201,6 +222,32 @@ const KioskApp = () => {
         });
     };
 
+    const handleAddToCart = (product) => {
+        if (inventoryTrackingEnabled && product.isOutOfStock) {
+            setOutOfStockPrompt(product);
+            setLimitMessage('');
+            return;
+        }
+
+        if (product.available === false && !product.isOutOfStock) {
+            setToastMessage('This item is currently unavailable.');
+            return;
+        }
+
+        addProductToCart(product);
+    };
+
+    const confirmOutOfStockSelection = (accept) => {
+        if (!accept) {
+            setOutOfStockPrompt(null);
+            return;
+        }
+        if (outOfStockPrompt) {
+            addProductToCart(outOfStockPrompt);
+        }
+        setOutOfStockPrompt(null);
+    };
+
     const incrementQuantity = (productId) => {
         setCart((current) => {
             const target = current.find((item) => item.id === productId);
@@ -229,6 +276,13 @@ const KioskApp = () => {
         setLimitMessage('');
     };
 
+    const handleCheckout = () => {
+        if (!hasCartItems) {
+            return;
+        }
+        setToastMessage('Checkout flow coming soon');
+    };
+
     const handleToggleCart = () => {
         setCartOpen((current) => !current);
     };
@@ -253,6 +307,28 @@ const KioskApp = () => {
                     </span>
                 </button>
             </header>
+
+            {trackingDisabled && (
+                <div
+                    id="inventory-warning-banner"
+                    className="kiosk-warning-banner"
+                    role="status"
+                    aria-live="polite"
+                >
+                    ⚠️ Inventory tracking disabled. Please verify items are in cabinet before payment.
+                </div>
+            )}
+
+            {usingOfflineFeed && (
+                <div
+                    id="offline-feed-banner"
+                    className="kiosk-offline-banner"
+                    role="status"
+                    aria-live="polite"
+                >
+                    You are viewing cached inventory data. Availability may differ from the cabinet.
+                </div>
+            )}
 
             {toastMessage && (
                 <div id="kiosk-toast" className="kiosk-toast" role="status" aria-live="polite">
@@ -282,18 +358,20 @@ const KioskApp = () => {
                     >
                         <button
                             type="button"
-                            className={`button secondary${selectedCategory === 'all' ? '' : ' muted'}`}
-                            data-category="all"
-                            onClick={() => setSelectedCategory('all')}
+                            className={`button secondary category-filter-button${selectedCategory === 'All Products' ? ' active' : ' muted'}`}
+                            data-category="All Products"
+                            aria-pressed={selectedCategory === 'All Products'}
+                            onClick={() => setSelectedCategory('All Products')}
                         >
-                            All
+                            All Products
                         </button>
                         {categoryFilters.map((category) => (
                             <button
                                 key={category.id || category.name}
                                 type="button"
-                                className={`button secondary${selectedCategory === category.name ? '' : ' muted'}`}
+                                className={`button secondary category-filter-button${selectedCategory === category.name ? ' active' : ' muted'}`}
                                 data-category={category.name}
+                                aria-pressed={selectedCategory === category.name}
                                 onClick={() => setSelectedCategory(category.name)}
                             >
                                 {category.name}
@@ -306,28 +384,73 @@ const KioskApp = () => {
                 ) : products.length === 0 ? (
                     <div className="loading-placeholder">No products available.</div>
                 ) : filteredProducts.length === 0 ? (
-                    <div className="loading-placeholder">No products match this category.</div>
+                    <div className="loading-placeholder">No products in this category</div>
                 ) : (
                     <div id="product-grid" className="product-grid" aria-live={isFetching ? 'polite' : 'off'}>
-                        {filteredProducts.map((product) => (
-                            <div key={product.id} className="product-card" data-product-name={product.name}>
-                                <div className="product-image" role="img" aria-label={product.imageAlt}>
-                                    {product.imageUrl ? <img src={product.imageUrl} alt={product.imageAlt} /> : 'No Image'}
-                                </div>
-                                <div className="product-info">
-                                    <strong className="product-name">{product.name}</strong>
-                                    <span className="product-price">{formatPrice(product.price)}</span>
-                                    {product.description && <p className="product-description">{product.description}</p>}
-                                </div>
-                                <button
-                                    type="button"
-                                    className="add-to-cart"
-                                    onClick={() => handleAddToCart(product)}
+                        {filteredProducts.map((product) => {
+                            const categoryLabels = (product.categories || [])
+                                .map((category) => category?.name)
+                                .filter(Boolean);
+                            const primaryCategory = categoryLabels[0] || 'Uncategorized';
+                            const cardClasses = ['product-card'];
+                            if (inventoryTrackingEnabled && product.isOutOfStock) {
+                                cardClasses.push('out-of-stock');
+                            }
+                            if (inventoryTrackingEnabled && !product.isOutOfStock && product.isLowStock) {
+                                cardClasses.push('low-stock');
+                            }
+                            if (product.available === false && !inventoryTrackingEnabled) {
+                                cardClasses.push('trust-mode');
+                            }
+
+                            const stockValue =
+                                typeof product.stockQuantity === 'number' && Number.isFinite(product.stockQuantity)
+                                    ? product.stockQuantity
+                                    : '';
+
+                            return (
+                                <div
+                                    key={product.id}
+                                    className={cardClasses.join(' ')}
+                                    data-product-name={product.name}
+                                    data-category={categoryLabels.join(', ') || primaryCategory}
+                                    data-stock={stockValue}
+                                    data-low-stock={Boolean(product.isLowStock && inventoryTrackingEnabled)}
                                 >
-                                    Add to cart
-                                </button>
-                            </div>
-                        ))}
+                                    <div className="product-image" role="img" aria-label={product.imageAlt}>
+                                        {product.imageUrl ? (
+                                            <img src={product.imageUrl} alt={product.imageAlt} />
+                                        ) : (
+                                            'No Image'
+                                        )}
+                                    </div>
+                                    <div className="product-info">
+                                        <strong className="product-name">{product.name}</strong>
+                                        <span className="product-price">{formatPrice(product.price)}</span>
+                                        {inventoryTrackingEnabled && product.isOutOfStock && (
+                                            <span className="badge out-of-stock-badge">Out of Stock</span>
+                                        )}
+                                        {inventoryTrackingEnabled && !product.isOutOfStock && product.isLowStock && (
+                                            <span className="badge low-stock-badge">Low stock</span>
+                                        )}
+                                        {product.description && (
+                                            <p className="product-description">{product.description}</p>
+                                        )}
+                                    </div>
+                                    <button
+                                        type="button"
+                                        className="add-to-cart add-to-cart-button"
+                                        onClick={() => handleAddToCart(product)}
+                                        disabled={inventoryTrackingEnabled && product.available === false && !product.isOutOfStock}
+                                        aria-disabled={
+                                            inventoryTrackingEnabled && product.available === false && !product.isOutOfStock
+                                        }
+                                    >
+                                        {inventoryTrackingEnabled && product.isOutOfStock ? 'Request cabinet check' : 'Add to cart'}
+                                    </button>
+                                </div>
+                            );
+                        })}
                     </div>
                 )}
             </main>
@@ -396,6 +519,16 @@ const KioskApp = () => {
                         Total: {formatPrice(cartTotal)}
                     </div>
                     <button
+                        id="checkout-button"
+                        type="button"
+                        className="checkout-button"
+                        onClick={handleCheckout}
+                        disabled={!hasCartItems}
+                        aria-disabled={!hasCartItems}
+                    >
+                        Proceed to checkout
+                    </button>
+                    <button
                         id="clear-cart-button"
                         type="button"
                         className="clear-cart"
@@ -405,6 +538,38 @@ const KioskApp = () => {
                     </button>
                 </div>
             </aside>
+
+            {outOfStockPrompt && (
+                <div className="modal-backdrop" role="presentation">
+                    <div
+                        id="out-of-stock-confirmation"
+                        className="out-of-stock-dialog"
+                        role="dialog"
+                        aria-modal="true"
+                    >
+                        <h2 className="dialog-title">Out of stock confirmation</h2>
+                        <p className="dialog-message">Can you see it in the cabinet?</p>
+                        <div className="dialog-actions">
+                            <button
+                                id="confirm-yes-button"
+                                type="button"
+                                className="button"
+                                onClick={() => confirmOutOfStockSelection(true)}
+                            >
+                                Yes, I see it
+                            </button>
+                            <button
+                                id="confirm-no-button"
+                                type="button"
+                                className="button secondary"
+                                onClick={() => confirmOutOfStockSelection(false)}
+                            >
+                                No, go back
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

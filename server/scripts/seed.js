@@ -57,9 +57,9 @@ const PRODUCT_FIXTURES = [
     description: 'Classic cola 330ml can.',
     price: 1.8,
     status: 'active',
-    stockQuantity: 200,
+    stockQuantity: 5,
     purchaseLimit: 6,
-    lowStockThreshold: 30,
+    lowStockThreshold: 5,
     categoryNames: ['Cold Beverages', 'Cold Drinks', 'Soft Drinks']
   },
   {
@@ -219,6 +219,66 @@ const ensureReferenceProducts = async (actor, categoryMap) => {
   }
 };
 
+const ensureInventoryFixtures = async (actor) => {
+  console.log('\nEnsuring inventory ledger fixtures...');
+
+  await db.query(
+    `DELETE FROM inventory_ledger
+     WHERE product_id IN (
+       SELECT id
+       FROM products
+       WHERE LOWER(name) = ANY($1::text[])
+     )`,
+    [['coca-cola', 'trail mix']]
+  );
+  console.log('  Reset ledger history for Coca-Cola and Trail Mix.');
+
+  const discrepancyDelta = -3;
+  const discrepancyTag = 'inventory-discrepancy-trailmix';
+
+  const discrepancyResult = await db.query(
+    `WITH target_product AS (
+        SELECT id, stock_quantity
+        FROM products
+        WHERE LOWER(name) = LOWER($1)
+        LIMIT 1
+    )
+    INSERT INTO inventory_ledger (
+        product_id,
+        delta,
+        resulting_quantity,
+        source,
+        reason,
+        admin_id,
+        metadata
+    )
+    SELECT
+        tp.id,
+        $2::integer,
+        GREATEST(tp.stock_quantity + $2::integer, 0),
+        'manual_adjustment',
+        'Seeded discrepancy for acceptance tests',
+        $3,
+        jsonb_build_object('seedTag', $4::text)
+    FROM target_product tp
+    WHERE tp.id IS NOT NULL
+      AND NOT EXISTS (
+        SELECT 1
+        FROM inventory_ledger l
+        WHERE l.product_id = tp.id AND l.metadata ->> 'seedTag' = $4
+    );`,
+    ['Trail Mix', discrepancyDelta, actor?.id || null, discrepancyTag]
+  );
+
+  if (discrepancyResult.rowCount > 0) {
+    console.log('  Seeded Trail Mix ledger discrepancy (3 units).');
+  } else {
+    console.log('  Trail Mix ledger discrepancy already present.');
+  }
+
+  await db.query('SELECT refresh_inventory_snapshot();');
+};
+
 async function seed() {
   console.log('='.repeat(60));
   console.log('Snackbar Kiosk System - Database Seed');
@@ -262,6 +322,7 @@ async function seed() {
 
     const categoryMap = await ensureReferenceCategories(adminActor);
     await ensureReferenceProducts(adminActor, categoryMap);
+    await ensureInventoryFixtures(adminActor);
 
     console.log('\n' + '='.repeat(60));
     console.log('Seed completed successfully');

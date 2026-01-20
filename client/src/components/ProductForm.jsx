@@ -287,9 +287,9 @@ const ProductForm = ({
           )}
         </div>
         <div className="form-field">
-          <label htmlFor="product-lowStockThreshold">Low-stock threshold</label>
+          <label htmlFor="low-stock-threshold">Low-stock threshold</label>
           <input
-            id="product-lowStockThreshold"
+            id="low-stock-threshold"
             name="lowStockThreshold"
             type="number"
             min="0"

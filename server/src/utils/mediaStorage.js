@@ -70,7 +70,9 @@ const sanitizeFilename = (filename) => {
 const computeChecksum = (buffer) => crypto.createHash('sha256').update(buffer).digest('hex');
 
 const detectImageFormat = (buffer) => {
-  if (!buffer || buffer.length < 12) return null;
+  if (!buffer || buffer.length < 12) {
+    return null;
+  }
 
   // JPEG: FF D8 FF
   if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
@@ -211,7 +213,9 @@ const persistMedia = async ({
 };
 
 const deleteMedia = async (storagePath) => {
-  if (!storagePath) return;
+  if (!storagePath) {
+    return;
+  }
 
   const absolutePath = path.join(getBaseDirectory(), storagePath);
   try {

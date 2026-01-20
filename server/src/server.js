@@ -27,7 +27,11 @@ const adminRoutes = require('./routes/admins');
 const categoryRoutes = require('./routes/categories');
 const productRoutes = require('./routes/products');
 const feedRoutes = require('./routes/feed');
+const inventoryRoutes = require('./routes/inventory');
+const notificationRoutes = require('./routes/notifications');
+const transactionRoutes = require('./routes/transactions');
 const mediaStorage = require('./utils/mediaStorage');
+const notificationService = require('./services/notificationService');
 
 // =============================================================================
 // Application Setup
@@ -136,6 +140,17 @@ app.use(requestLogger);
 app.set('trust proxy', 1);
 
 // =============================================================================
+// Notification Worker
+// =============================================================================
+
+let notificationWorkerHandle = null;
+if (process.env.NODE_ENV !== 'test') {
+  notificationWorkerHandle = notificationService.startNotificationWorker({
+    workerId: 'api-process'
+  });
+}
+
+// =============================================================================
 // API Routes
 // =============================================================================
 
@@ -156,6 +171,15 @@ app.use('/api/products', rateLimiters.api, productRoutes);
 
 // Product feed routes
 app.use('/api/feed', rateLimiters.api, feedRoutes);
+
+// Inventory management routes
+app.use('/api/inventory', rateLimiters.api, inventoryRoutes);
+
+// Notification log routes
+app.use('/api/notifications', rateLimiters.api, notificationRoutes);
+
+// Customer transaction routes
+app.use('/api/transactions', rateLimiters.api, transactionRoutes);
 
 // =============================================================================
 // Error Handling
@@ -195,6 +219,10 @@ const server = app.listen(PORT, () => {
 
 const gracefulShutdown = (signal) => {
   console.log(`\n${signal} received. Shutting down gracefully...`);
+
+  if (notificationWorkerHandle) {
+    notificationWorkerHandle.stop();
+  }
 
   server.close(() => {
     console.log('HTTP server closed.');

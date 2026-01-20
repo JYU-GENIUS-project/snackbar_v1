@@ -86,18 +86,18 @@ US-036: Email Notifications For Low Stock
     And the email should be sent within 1 minute of threshold breach
 
 
-US-037: Highlight Products With Negative Stock
-    [Documentation]    As an administrator, I want to see products with negative stock 
-    ...                highlighted as discrepancies so that I can identify and investigate 
-    ...                inventory issues.
-    [Tags]    US-037    negative-stock    discrepancy
-    
+US-037: Highlight Products With Stock Discrepancy
+    [Documentation]    As an administrator, I want to see products with recorded stock 
+    ...                discrepancies highlighted so that I can investigate issues without 
+    ...                displaying negative quantities.
+    [Tags]    US-037    stock-discrepancy    discrepancy
+
     Given inventory tracking is enabled
-    And a product has negative stock (-3)
+    And a product has a discrepancy of 3 units
     When the admin views the inventory page
     Then the product should be highlighted in red
     And a warning icon should be displayed
-    And the negative stock value should be clearly visible
+    And the discrepancy badge should show 3 units
     And a discrepancy report should be accessible
 
 
@@ -106,8 +106,8 @@ US-038: Manually Adjust Inventory For Discrepancies
     ...                discrepancies so that I can correct the system when physical 
     ...                counts don't match.
     [Tags]    US-038    inventory-adjustment    reconciliation
-    
-    Given a product shows stock discrepancy (-5)
+
+    Given a product shows stock discrepancy of 5 units
     When the admin performs a physical count (finds 10 items)
     And clicks "Adjust Inventory"
     And enters adjustment reason "Physical count correction"
@@ -301,10 +301,10 @@ The email should be sent within 1 minute of threshold breach
     [Documentation]    Verifies email timing
     Log    Email sent within 1 minute
 
-A product has negative stock (${stock})
-    [Documentation]    Precondition: Product with negative stock
+A product has a discrepancy of ${units} units
+    [Documentation]    Precondition: Product with recorded discrepancy
     # Would set via API or database
-    Log    Product stock: ${stock}
+    Log    Product discrepancy: ${units} units
 
 The admin views the inventory page
     [Documentation]    Views inventory management
@@ -312,8 +312,8 @@ The admin views the inventory page
     Wait Until Element Is Visible    id=inventory-table    timeout=10s
 
 The product should be highlighted in red
-    [Documentation]    Verifies red highlighting for negative stock
-    ${row}=    Get WebElement    xpath=//tr[contains(@class, 'negative-stock')]
+    [Documentation]    Verifies red highlighting for discrepancy flag
+    ${row}=    Get WebElement    xpath=//tr[contains(@class, 'has-discrepancy')]
     ${color}=    Execute Javascript    
     ...    return window.getComputedStyle(arguments[0]).color
     ...    ARGUMENTS    ${row}
@@ -321,19 +321,19 @@ The product should be highlighted in red
 
 A warning icon should be displayed
     [Documentation]    Verifies warning icon present
-    Element Should Be Visible    xpath=//tr[contains(@class, 'negative-stock')]//i[@class='warning-icon']
+    Element Should Be Visible    xpath=//tr[contains(@class, 'has-discrepancy')]//i[@class='warning-icon']
 
-The negative stock value should be clearly visible
-    [Documentation]    Verifies negative value shown
-    Page Should Contain Element    xpath=//td[contains(text(), '-3')]
+The discrepancy badge should show ${units} units
+    [Documentation]    Verifies discrepancy indicator displays expected amount
+    Page Should Contain Element    xpath=//tr[contains(@class, 'has-discrepancy')]//span[contains(normalize-space(), '${units}')]
 
 A discrepancy report should be accessible
     [Documentation]    Verifies discrepancy report link
     Element Should Be Visible    id=discrepancy-report-link
 
-A product shows stock discrepancy (${stock})
+A product shows stock discrepancy of ${units} units
     [Documentation]    Precondition: Discrepancy exists
-    Log    Product discrepancy: ${stock}
+    Log    Product discrepancy: ${units} units
 
 The admin performs a physical count (finds ${count} items)
     [Documentation]    Admin counts physical inventory

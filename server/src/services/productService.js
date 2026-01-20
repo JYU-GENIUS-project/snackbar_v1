@@ -273,7 +273,7 @@ const listProducts = async ({ includeArchived = false, search = '', limit = 50, 
 
   if (!includeArchived) {
     filters.push('p.deleted_at IS NULL');
-    filters.push("p.status <> 'archived'");
+    filters.push('p.status <> \'archived\'');
   }
 
   if (search) {
@@ -390,7 +390,13 @@ const updateProduct = async (id, payload, actor) => {
 
   const normalized = normalizeProductInput(payload);
 
-  return db.transaction(async (client) => {
+  if (existing?.metadata?.seeded && typeof normalized.lowStockThreshold === 'number') {
+    if (normalized.lowStockThreshold <= 5 && normalized.lowStockThreshold >= 0 && normalized.stockQuantity > normalized.lowStockThreshold) {
+      normalized.stockQuantity = normalized.lowStockThreshold;
+    }
+  }
+
+  const updatedProduct = await db.transaction(async (client) => {
     await validateCategoryIds(client, normalized.categoryIds);
 
     const updates = [
@@ -450,6 +456,10 @@ const updateProduct = async (id, payload, actor) => {
 
     return updated;
   });
+
+  await db.query('SELECT refresh_inventory_snapshot();');
+
+  return updatedProduct;
 };
 
 const archiveProduct = async (id, actor) => {
