@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useProductFeed } from '../hooks/useProductFeed.js';
 import useKioskStatus from '../hooks/useKioskStatus.js';
 import ProductGridSkeleton from './ProductGridSkeleton.jsx';
+import ProductDetailModal from './ProductDetailModal.jsx';
 import { OFFLINE_FEED_STORAGE_KEY } from '../utils/offlineCache.js';
 
 const formatPrice = (value) => `${Number(value ?? 0).toFixed(2)}€`;
@@ -45,6 +46,9 @@ const normalizeProduct = (product) => {
         imageUrl: product.primaryMedia?.url || '',
         imageAlt: product.primaryMedia?.alt || product.name || 'Product image',
         description: product.description || product.metadata?.description || '',
+        allergens: typeof product.allergens === 'string' && product.allergens.trim()
+            ? product.allergens.trim()
+            : product.metadata?.allergens || '',
         categoryId: categoryIds[0] || null,
         categoryIds,
         categories,
@@ -111,6 +115,7 @@ const KioskApp = () => {
     const [toastMessage, setToastMessage] = useState('');
     const [limitMessage, setLimitMessage] = useState('');
     const [outOfStockPrompt, setOutOfStockPrompt] = useState(null);
+    const [selectedProduct, setSelectedProduct] = useState(null);
 
     useEffect(() => {
         if (selectedCategory === 'All Products') {
@@ -484,17 +489,35 @@ const KioskApp = () => {
                                             <p className="product-description">{product.description}</p>
                                         )}
                                     </div>
-                                    <button
-                                        type="button"
-                                        className="add-to-cart add-to-cart-button"
-                                        onClick={() => handleAddToCart(product)}
-                                        disabled={inventoryTrackingEnabled && product.available === false && !product.isOutOfStock}
-                                        aria-disabled={
-                                            inventoryTrackingEnabled && product.available === false && !product.isOutOfStock
-                                        }
-                                    >
-                                        {inventoryTrackingEnabled && product.isOutOfStock ? 'Request cabinet check' : 'Add to cart'}
-                                    </button>
+                                    <div className="product-card-actions">
+                                        <button
+                                            type="button"
+                                            className="button tertiary details-button"
+                                            onClick={() => setSelectedProduct(product)}
+                                            aria-label={`View details for ${product.name}`}
+                                        >
+                                            View details
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="add-to-cart add-to-cart-button"
+                                            onClick={() => handleAddToCart(product)}
+                                            disabled={
+                                                inventoryTrackingEnabled &&
+                                                product.available === false &&
+                                                !product.isOutOfStock
+                                            }
+                                            aria-disabled={
+                                                inventoryTrackingEnabled &&
+                                                product.available === false &&
+                                                !product.isOutOfStock
+                                            }
+                                        >
+                                            {inventoryTrackingEnabled && product.isOutOfStock
+                                                ? 'Request cabinet check'
+                                                : 'Add to cart'}
+                                        </button>
+                                    </div>
                                 </div>
                             );
                         })}
@@ -616,6 +639,14 @@ const KioskApp = () => {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {selectedProduct && (
+                <ProductDetailModal
+                    product={selectedProduct}
+                    onDismiss={() => setSelectedProduct(null)}
+                    connectionState={kioskConnectionState}
+                />
             )}
         </div>
     );
