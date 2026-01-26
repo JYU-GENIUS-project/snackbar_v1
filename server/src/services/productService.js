@@ -5,6 +5,42 @@ const productMediaService = require('./productMediaService');
 
 const ALLOWED_STATUSES = new Set(['draft', 'active', 'archived']);
 
+const deriveProductAvailability = ({
+  status = 'draft',
+  isActive = false,
+  stockQuantity = null,
+  lowStockThreshold = null
+} = {}) => {
+  const normalizedStatus = typeof status === 'string' ? status.toLowerCase() : '';
+  const normalizedStock = typeof stockQuantity === 'number' && Number.isFinite(stockQuantity)
+    ? stockQuantity
+    : null;
+  const normalizedThreshold = typeof lowStockThreshold === 'number' && Number.isFinite(lowStockThreshold)
+    ? lowStockThreshold
+    : null;
+
+  const isOutOfStock = normalizedStock !== null && normalizedStock <= 0;
+  const isLowStock = !isOutOfStock && normalizedStock !== null && normalizedThreshold !== null && normalizedStock <= normalizedThreshold;
+  const isAvailableStatus = normalizedStatus === 'active' && isActive === true;
+
+  const stockStatus = !isAvailableStatus
+    ? 'unavailable'
+    : isOutOfStock
+      ? 'out-of-stock'
+      : isLowStock
+        ? 'low-stock'
+        : 'available';
+
+  return {
+    stockQuantity: normalizedStock,
+    lowStockThreshold: normalizedThreshold,
+    isOutOfStock,
+    isLowStock,
+    stockStatus,
+    available: isAvailableStatus && !isOutOfStock
+  };
+};
+
 const runQuery = (client, text, params) => {
   if (client && typeof client.query === 'function') {
     return client.query(text, params);
@@ -503,17 +539,12 @@ const getProductFeed = async () => {
   return products.map((product) => {
     const categoryIds = Array.isArray(product.categoryIds) ? product.categoryIds.filter(Boolean) : [];
     const categories = Array.isArray(product.categories) ? product.categories : [];
-    const stockQuantity = typeof product.stockQuantity === 'number' ? product.stockQuantity : null;
-    const lowStockThreshold = typeof product.lowStockThreshold === 'number' ? product.lowStockThreshold : null;
-    const isOutOfStock = stockQuantity !== null && stockQuantity <= 0;
-    const isLowStock = !isOutOfStock && stockQuantity !== null && lowStockThreshold !== null && stockQuantity <= lowStockThreshold;
-    const stockStatus = !product.isActive
-      ? 'unavailable'
-      : isOutOfStock
-        ? 'out-of-stock'
-        : isLowStock
-          ? 'low-stock'
-          : 'available';
+    const availability = deriveProductAvailability({
+      status: product.status,
+      isActive: product.isActive,
+      stockQuantity: product.stockQuantity,
+      lowStockThreshold: product.lowStockThreshold
+    });
 
     const primaryMedia =
       product.media.find((item) => item.isPrimary) ||
@@ -530,13 +561,13 @@ const getProductFeed = async () => {
       categoryId: categoryIds[0] || product.categoryId || null,
       categoryIds,
       categories,
-      available: product.status === 'active' && product.isActive && !isOutOfStock,
-      stockQuantity,
+      available: availability.available,
+      stockQuantity: availability.stockQuantity,
       purchaseLimit: product.purchaseLimit,
-      lowStockThreshold,
-      isLowStock,
-      isOutOfStock,
-      stockStatus,
+      lowStockThreshold: availability.lowStockThreshold,
+      isLowStock: availability.isLowStock,
+      isOutOfStock: availability.isOutOfStock,
+      stockStatus: availability.stockStatus,
       allergens: product.allergens,
       metadata: product.metadata || {},
       imageAlt: product.imageAlt,
@@ -562,5 +593,6 @@ module.exports = {
   updateProduct,
   archiveProduct,
   getProductById,
-  getProductFeed
+  getProductFeed,
+  deriveProductAvailability
 };

@@ -4,7 +4,10 @@ const { randomUUID } = require('crypto');
 const statusService = require('./statusService');
 
 const EVENT_TYPES = {
-  STATUS_UPDATE: 'status:update'
+  STATUS_INIT: 'status:init',
+  STATUS_UPDATE: 'status:update',
+  INVENTORY_UPDATE: 'inventory:update',
+  TRACKING_UPDATE: 'inventory:tracking'
 };
 
 const POLL_INTERVAL_MS = 5000;
@@ -14,7 +17,14 @@ const clients = new Map();
 let pollTimer = null;
 let keepAliveTimer = null;
 let latestStatus = null;
+let latestTrackingState = null;
+const latestInventorySnapshots = new Map();
 let evaluating = false;
+
+const writeEvent = (res, type, payload) => {
+  const data = payload === undefined ? {} : payload;
+  res.write(`event: ${type}\ndata: ${JSON.stringify(data)}\n\n`);
+};
 
 const removeClient = (id) => {
   const client = clients.get(id);
@@ -39,16 +49,57 @@ const removeClient = (id) => {
   }
 };
 
-const broadcast = (status) => {
-  const payload = JSON.stringify(status);
+const broadcastToClients = (type, payload) => {
+  const serialized = JSON.stringify(payload === undefined ? {} : payload);
   for (const [id, client] of clients.entries()) {
     try {
-      client.res.write(`event: ${EVENT_TYPES.STATUS_UPDATE}\ndata: ${payload}\n\n`);
+      client.res.write(`event: ${type}\ndata: ${serialized}\n\n`);
     } catch (error) {
       console.error('[StatusEvents] Failed to notify client, removing subscription', { id, error });
       removeClient(id);
     }
   }
+};
+
+const broadcastStatus = (status) => {
+  latestStatus = status;
+  broadcastToClients(EVENT_TYPES.STATUS_UPDATE, status);
+};
+
+const broadcastInventoryAvailability = (payload) => {
+  if (!payload || !payload.productId) {
+    return;
+  }
+
+  const normalized = {
+    productId: payload.productId,
+    stockQuantity: typeof payload.stockQuantity === 'number' && Number.isFinite(payload.stockQuantity)
+      ? payload.stockQuantity
+      : null,
+    lowStockThreshold: typeof payload.lowStockThreshold === 'number' && Number.isFinite(payload.lowStockThreshold)
+      ? payload.lowStockThreshold
+      : null,
+    isLowStock: Boolean(payload.isLowStock),
+    isOutOfStock: Boolean(payload.isOutOfStock),
+    stockStatus: typeof payload.stockStatus === 'string' && payload.stockStatus.trim()
+      ? payload.stockStatus
+      : 'unavailable',
+    available: payload.available !== undefined ? Boolean(payload.available) : false,
+    emittedAt: payload.emittedAt || new Date().toISOString()
+  };
+
+  latestInventorySnapshots.set(normalized.productId, normalized);
+  broadcastToClients(EVENT_TYPES.INVENTORY_UPDATE, normalized);
+};
+
+const broadcastTrackingState = (payload) => {
+  const state = {
+    enabled: Boolean(payload?.enabled),
+    emittedAt: payload?.emittedAt || new Date().toISOString()
+  };
+
+  latestTrackingState = state;
+  broadcastToClients(EVENT_TYPES.TRACKING_UPDATE, state);
 };
 
 const evaluateAndBroadcast = async (force = false) => {
@@ -60,8 +111,7 @@ const evaluateAndBroadcast = async (force = false) => {
   try {
     const status = await statusService.getKioskStatus();
     if (force || statusService.statusHasChanged(latestStatus, status)) {
-      latestStatus = status;
-      broadcast(status);
+      broadcastStatus(status);
     }
   } catch (error) {
     console.error('[StatusEvents] Failed to evaluate kiosk status', error);
@@ -123,7 +173,13 @@ const registerClient = async ({ res }) => {
   try {
     const status = latestStatus || await statusService.getKioskStatus();
     latestStatus = status;
-    res.write(`event: status:init\ndata: ${JSON.stringify(status)}\n\n`);
+    writeEvent(res, EVENT_TYPES.STATUS_INIT, status);
+    if (latestTrackingState) {
+      writeEvent(res, EVENT_TYPES.TRACKING_UPDATE, latestTrackingState);
+    }
+    for (const snapshot of latestInventorySnapshots.values()) {
+      writeEvent(res, EVENT_TYPES.INVENTORY_UPDATE, snapshot);
+    }
   } catch (error) {
     console.error('[StatusEvents] Failed to send initial status payload', error);
   }
@@ -141,5 +197,7 @@ module.exports = {
   EVENT_TYPES,
   registerClient,
   removeClient,
-  triggerImmediateRefresh
+  triggerImmediateRefresh,
+  broadcastInventoryAvailability,
+  broadcastTrackingState
 };

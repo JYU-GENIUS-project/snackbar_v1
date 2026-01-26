@@ -3,6 +3,8 @@ const { ApiError } = require('../middleware/errorHandler');
 const { createAuditLog, AuditActions, EntityTypes } = require('./auditService');
 const notificationService = require('./notificationService');
 const inventoryEvents = require('./inventoryEvents');
+const statusEvents = require('./statusEvents');
+const { deriveProductAvailability } = require('./productService');
 
 const INVENTORY_TRACKING_CONFIG_KEY = 'inventory_tracking_enabled';
 const INVENTORY_TRACKING_DESCRIPTION = 'Toggle that controls whether automated inventory deductions are applied.';
@@ -96,6 +98,22 @@ const finalizeInventoryChange = async ({ productId, context }) => {
   const snapshot = await getInventoryItemByProductId(productId, { skipRefresh: true });
   await notifyLowStockChange({ snapshot, context });
   inventoryEvents.broadcastInventoryChange({ snapshot, context });
+  try {
+    const availability = deriveProductAvailability({
+      status: snapshot.deletedAt ? 'archived' : 'active',
+      isActive: snapshot.isActive && !snapshot.deletedAt,
+      stockQuantity: snapshot.currentStock,
+      lowStockThreshold: snapshot.lowStockThreshold
+    });
+
+    statusEvents.broadcastInventoryAvailability({
+      productId,
+      emittedAt: new Date().toISOString(),
+      ...availability
+    });
+  } catch (error) {
+    console.error('[Inventory] Failed to broadcast kiosk availability change', error);
+  }
   return snapshot;
 };
 
@@ -205,6 +223,14 @@ const setInventoryTrackingState = async (enabled, actor = null) => {
   });
 
   inventoryEvents.broadcastTrackingChange({ enabled: result, actor });
+  try {
+    statusEvents.broadcastTrackingState({
+      enabled: result,
+      emittedAt: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('[Inventory] Failed to broadcast kiosk tracking state', error);
+  }
 
   return { enabled: result, previous };
 };
