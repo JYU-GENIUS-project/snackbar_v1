@@ -503,6 +503,17 @@ const getProductFeed = async () => {
   return products.map((product) => {
     const categoryIds = Array.isArray(product.categoryIds) ? product.categoryIds.filter(Boolean) : [];
     const categories = Array.isArray(product.categories) ? product.categories : [];
+    const stockQuantity = typeof product.stockQuantity === 'number' ? product.stockQuantity : null;
+    const lowStockThreshold = typeof product.lowStockThreshold === 'number' ? product.lowStockThreshold : null;
+    const isOutOfStock = stockQuantity !== null && stockQuantity <= 0;
+    const isLowStock = !isOutOfStock && stockQuantity !== null && lowStockThreshold !== null && stockQuantity <= lowStockThreshold;
+    const stockStatus = !product.isActive
+      ? 'unavailable'
+      : isOutOfStock
+        ? 'out-of-stock'
+        : isLowStock
+          ? 'low-stock'
+          : 'available';
 
     const primaryMedia =
       product.media.find((item) => item.isPrimary) ||
@@ -519,13 +530,13 @@ const getProductFeed = async () => {
       categoryId: categoryIds[0] || product.categoryId || null,
       categoryIds,
       categories,
-      available:
-        product.status === 'active' &&
-        product.isActive &&
-        (product.stockQuantity === null || product.stockQuantity > 0),
-      stockQuantity: product.stockQuantity,
+      available: product.status === 'active' && product.isActive && !isOutOfStock,
+      stockQuantity,
       purchaseLimit: product.purchaseLimit,
-      lowStockThreshold: product.lowStockThreshold,
+      lowStockThreshold,
+      isLowStock,
+      isOutOfStock,
+      stockStatus,
       allergens: product.allergens,
       metadata: product.metadata || {},
       imageAlt: product.imageAlt,
