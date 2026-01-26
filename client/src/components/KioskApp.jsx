@@ -4,6 +4,94 @@ import useKioskStatus from '../hooks/useKioskStatus.js';
 import ProductGridSkeleton from './ProductGridSkeleton.jsx';
 import ProductDetailModal from './ProductDetailModal.jsx';
 import { OFFLINE_FEED_STORAGE_KEY } from '../utils/offlineCache.js';
+import { logKioskEvent } from '../utils/analytics.js';
+
+const TRUST_MODE_STORAGE_KEY = 'snackbar-trust-mode-disabled';
+const OUT_OF_STOCK_DIALOG_TITLE_ID = 'kiosk-out-of-stock-title';
+const OUT_OF_STOCK_DIALOG_MESSAGE_ID = 'kiosk-out-of-stock-message';
+
+const formatLocalizedDateTime = (isoValue, timeZone) => {
+    if (!isoValue) {
+        return null;
+    }
+    const date = new Date(isoValue);
+    if (Number.isNaN(date.getTime())) {
+        return null;
+    }
+    try {
+        const formatter = new Intl.DateTimeFormat(undefined, {
+            weekday: 'short',
+            hour: 'numeric',
+            minute: '2-digit',
+            timeZone: timeZone || undefined
+        });
+        return formatter.format(date);
+    } catch (error) {
+        if (import.meta?.env?.DEV) {
+            console.warn('Unable to format localized datetime', error);
+        }
+        return date.toLocaleString();
+    }
+};
+
+const formatDurationUntil = (isoValue) => {
+    if (!isoValue) {
+        return null;
+    }
+    const target = new Date(isoValue);
+    if (Number.isNaN(target.getTime())) {
+        return null;
+    }
+    const diffMs = target.getTime() - Date.now();
+    if (diffMs <= 0) {
+        return 'starting soon';
+    }
+    const totalMinutes = Math.round(diffMs / 60000);
+    const totalHours = Math.floor(totalMinutes / 60);
+    if (totalHours >= 24) {
+        const days = Math.floor(totalHours / 24);
+        const remHours = totalHours % 24;
+        return `${days} day${days === 1 ? '' : 's'}${remHours ? ` ${remHours}h` : ''}`;
+    }
+    if (totalHours > 0) {
+        const remMinutes = totalMinutes % 60;
+        return `${totalHours}h${remMinutes ? ` ${remMinutes}m` : ''}`;
+    }
+    return `${Math.max(totalMinutes, 1)}m`;
+};
+
+const formatRelativeTimestamp = (isoValue) => {
+    if (!isoValue) {
+        return null;
+    }
+    const date = new Date(isoValue);
+    if (Number.isNaN(date.getTime())) {
+        return null;
+    }
+    const diffMs = Date.now() - date.getTime();
+    if (diffMs < 30000) {
+        return 'just now';
+    }
+    const minutes = Math.floor(diffMs / 60000);
+    if (minutes < 60) {
+        return `${minutes} minute${minutes === 1 ? '' : 's'} ago`;
+    }
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) {
+        return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+    }
+    try {
+        return new Intl.DateTimeFormat(undefined, {
+            dateStyle: 'medium',
+            timeStyle: 'short'
+        }).format(date);
+    } catch (error) {
+        if (import.meta?.env?.DEV) {
+            console.warn('Unable to format relative timestamp', error);
+        }
+        return date.toLocaleString();
+    }
+};
 
 const formatPrice = (value) => `${Number(value ?? 0).toFixed(2)}€`;
 
@@ -56,6 +144,53 @@ const normalizeProduct = (product) => {
     };
 };
 
+const buildStatusOverlay = (statusPayload, lastUpdatedAt) => {
+    if (!statusPayload || typeof statusPayload !== 'object') {
+        return { active: false };
+    }
+
+    const statusValue = statusPayload.status;
+    if (statusValue !== 'maintenance' && statusValue !== 'closed') {
+        return { active: false };
+    }
+
+    const timezone = statusPayload.timezone;
+    const nextOpenLabel = formatLocalizedDateTime(statusPayload.nextOpen, timezone);
+    const nextOpenEta = formatDurationUntil(statusPayload.nextOpen);
+    const lastUpdatedLabel = formatRelativeTimestamp(lastUpdatedAt || statusPayload.generatedAt);
+
+    if (statusValue === 'maintenance') {
+        const maintenanceMessage = statusPayload.maintenance?.message || statusPayload.message;
+        const maintenanceSince = statusPayload.maintenance?.since
+            ? formatLocalizedDateTime(statusPayload.maintenance.since, timezone)
+            : null;
+
+        return {
+            active: true,
+            variant: 'maintenance',
+            icon: '🛠️',
+            title: 'Maintenance in Progress',
+            message: maintenanceMessage || 'The kiosk is undergoing maintenance.',
+            detail: maintenanceSince ? `Started ${maintenanceSince}` : null,
+            next: nextOpenLabel,
+            eta: nextOpenEta,
+            lastUpdated: lastUpdatedLabel
+        };
+    }
+
+    return {
+        active: true,
+        variant: 'closed',
+        icon: '🔒',
+        title: 'Kiosk Closed',
+        message: statusPayload.message || 'The kiosk is currently closed.',
+        detail: null,
+        next: nextOpenLabel,
+        eta: nextOpenEta,
+        lastUpdated: lastUpdatedLabel
+    };
+};
+
 const updateQuantityInCart = (cart, productId, updater) => {
     return cart
         .map((item) => {
@@ -77,19 +212,101 @@ const updateQuantityInCart = (cart, productId, updater) => {
 const KioskApp = () => {
     const { data, isLoading, isFetching, error, refetch } = useProductFeed({ refetchInterval: 15000, staleTime: 10000 });
     const kioskStatus = useKioskStatus({ refetchInterval: 45000 });
-    const products = useMemo(() => {
+
+    const baseInventoryTrackingEnabled = kioskStatus.inventoryTrackingEnabled;
+    const inventoryTrackingEnabled = typeof baseInventoryTrackingEnabled === 'boolean'
+        ? baseInventoryTrackingEnabled
+        : data?.inventoryTrackingEnabled !== false;
+
+    const [trackingDisabled, setTrackingDisabled] = useState(() => {
+        if (typeof window !== 'undefined') {
+            const persisted = window.sessionStorage.getItem(TRUST_MODE_STORAGE_KEY);
+            if (persisted !== null) {
+                return persisted === 'true';
+            }
+        }
+        return typeof inventoryTrackingEnabled === 'boolean' ? !inventoryTrackingEnabled : false;
+    });
+
+    useEffect(() => {
+        if (typeof inventoryTrackingEnabled === 'boolean') {
+            const disabled = !inventoryTrackingEnabled;
+            setTrackingDisabled((current) => (current === disabled ? current : disabled));
+            if (typeof window !== 'undefined') {
+                window.sessionStorage.setItem(TRUST_MODE_STORAGE_KEY, disabled ? 'true' : 'false');
+            }
+        }
+    }, [inventoryTrackingEnabled]);
+
+    const usingOfflineFeed = data?.source === 'offline';
+    const kioskConnectionState = kioskStatus.connectionState;
+    const statusPayload = kioskStatus.status;
+    const lastStatusUpdate = kioskStatus.lastUpdatedAt;
+    const overlayInfo = useMemo(
+        () => buildStatusOverlay(statusPayload, lastStatusUpdate),
+        [statusPayload, lastStatusUpdate]
+    );
+    const overlayVariant = overlayInfo.variant;
+    const kioskUnavailable = overlayInfo.active;
+    const kioskUnavailableMessage = overlayVariant === 'maintenance'
+        ? 'Ordering is paused while maintenance is in progress.'
+        : 'Ordering is currently unavailable while the kiosk is closed.';
+
+    const baseProducts = useMemo(() => {
         if (!Array.isArray(data?.products)) {
             return [];
         }
+
         return data.products
             .map(normalizeProduct)
             .filter((product) => product.status !== 'archived');
     }, [data]);
-    const inventoryTrackingEnabled = kioskStatus.inventoryTrackingEnabled ?? (data?.inventoryTrackingEnabled !== false);
-    const trackingDisabled = !inventoryTrackingEnabled;
-    const usingOfflineFeed = data?.source === 'offline';
-    const kioskConnectionState = kioskStatus.connectionState;
-    const latestAvailabilityTimestampRef = useRef(null);
+
+    const products = useMemo(() => {
+        if (!Array.isArray(baseProducts) || baseProducts.length === 0) {
+            return baseProducts;
+        }
+
+        const availability = kioskStatus.inventoryAvailability || {};
+
+        return baseProducts.map((product) => {
+            const override = availability[product.id];
+            if (!override) {
+                return product;
+            }
+
+            const stockQuantity = typeof override.stockQuantity === 'number' && Number.isFinite(override.stockQuantity)
+                ? override.stockQuantity
+                : product.stockQuantity;
+
+            const lowStockThreshold = typeof override.lowStockThreshold === 'number' && Number.isFinite(override.lowStockThreshold)
+                ? override.lowStockThreshold
+                : product.lowStockThreshold;
+
+            const isOutOfStock = typeof override.isOutOfStock === 'boolean'
+                ? override.isOutOfStock
+                : stockQuantity !== null && stockQuantity <= 0;
+
+            const isLowStock = typeof override.isLowStock === 'boolean'
+                ? override.isLowStock
+                : !isOutOfStock && stockQuantity !== null && lowStockThreshold !== null && stockQuantity <= lowStockThreshold;
+
+            const available = typeof override.available === 'boolean'
+                ? override.available
+                : inventoryTrackingEnabled
+                    ? !isOutOfStock
+                    : product.available;
+
+            return {
+                ...product,
+                stockQuantity,
+                lowStockThreshold,
+                isOutOfStock,
+                isLowStock,
+                available
+            };
+        });
+    }, [baseProducts, kioskStatus.inventoryAvailability, inventoryTrackingEnabled]);
 
     const categoryFilters = useMemo(() => {
         const seen = new Set();
@@ -116,6 +333,12 @@ const KioskApp = () => {
     const [limitMessage, setLimitMessage] = useState('');
     const [outOfStockPrompt, setOutOfStockPrompt] = useState(null);
     const [selectedProduct, setSelectedProduct] = useState(null);
+    const outOfStockDialogRef = useRef(null);
+    const outOfStockConfirmRef = useRef(null);
+    const outOfStockCancelRef = useRef(null);
+    const previousFocusRef = useRef(null);
+    const statusOverlayRef = useRef(null);
+    const previousOverlayFocusRef = useRef(null);
 
     useEffect(() => {
         if (selectedCategory === 'All Products') {
@@ -138,31 +361,93 @@ const KioskApp = () => {
     }, [products, selectedCategory]);
 
     useEffect(() => {
-        if (!kioskStatus.inventoryAvailability) {
+        if (!kioskUnavailable) {
             return;
         }
-        const updates = Object.values(kioskStatus.inventoryAvailability);
-        if (!updates.length) {
+        setOutOfStockPrompt(null);
+        setSelectedProduct(null);
+        setCartOpen(false);
+        setLimitMessage('');
+    }, [kioskUnavailable]);
+
+    useEffect(() => {
+        if (typeof document === 'undefined') {
             return;
         }
-        const newest = updates.reduce((acc, entry) => {
-            if (!entry?.emittedAt) {
-                return acc;
+        if (!overlayInfo.active) {
+            const previous = previousOverlayFocusRef.current;
+            if (previous && typeof previous.focus === 'function') {
+                previous.focus({ preventScroll: true });
             }
-            if (!acc || entry.emittedAt > acc.emittedAt) {
-                return entry;
+            previousOverlayFocusRef.current = null;
+            return;
+        }
+
+        previousOverlayFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        const node = statusOverlayRef.current;
+        if (node && typeof node.focus === 'function') {
+            node.focus({ preventScroll: true });
+        }
+    }, [overlayInfo.active, overlayVariant]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined' || typeof document === 'undefined' || !outOfStockPrompt) {
+            return undefined;
+        }
+
+        const dialogNode = outOfStockDialogRef.current;
+        const confirmButton = outOfStockConfirmRef.current;
+        const cancelButton = outOfStockCancelRef.current;
+        const focusables = [confirmButton, cancelButton].filter((node) => node && typeof node.focus === 'function');
+
+        previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
+        if (focusables.length > 0) {
+            focusables[0].focus({ preventScroll: true });
+        } else if (dialogNode && typeof dialogNode.focus === 'function') {
+            dialogNode.focus({ preventScroll: true });
+        }
+
+        const handleKeyDown = (event) => {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                logKioskEvent('kiosk.out_of_stock_cancelled', {
+                    productId: outOfStockPrompt.id,
+                    productName: outOfStockPrompt.name,
+                    reason: 'escapeKey'
+                });
+                setOutOfStockPrompt(null);
+                return;
             }
-            return acc;
-        }, null);
-        if (!newest?.emittedAt) {
-            return;
-        }
-        if (latestAvailabilityTimestampRef.current === newest.emittedAt) {
-            return;
-        }
-        latestAvailabilityTimestampRef.current = newest.emittedAt;
-        refetch();
-    }, [kioskStatus.inventoryAvailability, refetch]);
+
+            if (event.key !== 'Tab' || focusables.length === 0) {
+                return;
+            }
+
+            const activeElement = document.activeElement;
+            const currentIndex = focusables.indexOf(activeElement);
+            const fallbackIndex = event.shiftKey ? focusables.length - 1 : 0;
+            const nextIndex = currentIndex === -1
+                ? fallbackIndex
+                : event.shiftKey
+                    ? (currentIndex <= 0 ? focusables.length - 1 : currentIndex - 1)
+                    : (currentIndex >= focusables.length - 1 ? 0 : currentIndex + 1);
+
+            focusables[nextIndex]?.focus({ preventScroll: true });
+            event.preventDefault();
+        };
+
+        dialogNode?.addEventListener('keydown', handleKeyDown);
+
+        return () => {
+            dialogNode?.removeEventListener('keydown', handleKeyDown);
+            const previous = previousFocusRef.current;
+            if (previous && typeof previous.focus === 'function') {
+                previous.focus({ preventScroll: true });
+            }
+            previousFocusRef.current = null;
+        };
+    }, [outOfStockPrompt]);
 
     useEffect(() => {
         if (!toastMessage || typeof window === 'undefined') {
@@ -260,14 +545,35 @@ const KioskApp = () => {
     };
 
     const handleAddToCart = (product) => {
+        if (kioskUnavailable) {
+            setToastMessage(kioskUnavailableMessage);
+            logKioskEvent('kiosk.order_blocked_unavailable', {
+                productId: product.id,
+                productName: product.name,
+                state: overlayVariant || 'unknown',
+                status: statusPayload?.status || null
+            });
+            return;
+        }
+
         if (inventoryTrackingEnabled && product.isOutOfStock) {
             setOutOfStockPrompt(product);
             setLimitMessage('');
+            logKioskEvent('kiosk.out_of_stock_prompted', {
+                productId: product.id,
+                productName: product.name,
+                stockQuantity: product.stockQuantity,
+                available: product.available
+            });
             return;
         }
 
         if (product.available === false && !product.isOutOfStock) {
             setToastMessage('This item is currently unavailable.');
+            logKioskEvent('kiosk.unavailable_item_selected', {
+                productId: product.id,
+                productName: product.name
+            });
             return;
         }
 
@@ -275,13 +581,39 @@ const KioskApp = () => {
     };
 
     const confirmOutOfStockSelection = (accept) => {
-        if (!accept) {
+        const promptProduct = outOfStockPrompt;
+        if (!promptProduct) {
             setOutOfStockPrompt(null);
             return;
         }
-        if (outOfStockPrompt) {
-            addProductToCart(outOfStockPrompt);
+
+        if (kioskUnavailable) {
+            logKioskEvent('kiosk.out_of_stock_cancelled', {
+                productId: promptProduct.id,
+                productName: promptProduct.name,
+                reason: 'unavailable',
+                state: overlayVariant || 'unknown'
+            });
+            setOutOfStockPrompt(null);
+            setToastMessage(kioskUnavailableMessage);
+            return;
         }
+
+        const baseEvent = {
+            productId: promptProduct.id,
+            productName: promptProduct.name,
+            stockQuantity: promptProduct.stockQuantity,
+            available: promptProduct.available,
+            trigger: 'button'
+        };
+
+        if (accept) {
+            logKioskEvent('kiosk.out_of_stock_confirmed', baseEvent);
+            addProductToCart(promptProduct);
+        } else {
+            logKioskEvent('kiosk.out_of_stock_cancelled', { ...baseEvent, reason: 'button' });
+        }
+
         setOutOfStockPrompt(null);
     };
 
@@ -317,17 +649,32 @@ const KioskApp = () => {
         if (!hasCartItems) {
             return;
         }
+        if (kioskUnavailable) {
+            setToastMessage(kioskUnavailableMessage);
+            logKioskEvent('kiosk.checkout_blocked_unavailable', {
+                cartSize: cart.length,
+                state: overlayVariant || 'unknown'
+            });
+            return;
+        }
         setToastMessage('Checkout flow coming soon');
     };
 
     const handleToggleCart = () => {
+        if (kioskUnavailable) {
+            setToastMessage(kioskUnavailableMessage);
+            logKioskEvent('kiosk.cart_blocked_unavailable', {
+                state: overlayVariant || 'unknown'
+            });
+            return;
+        }
         setCartOpen((current) => !current);
     };
 
     const hasCartItems = cart.length > 0;
 
     return (
-        <div className="kiosk-app">
+        <div className={`kiosk-app${overlayInfo.active ? ' kiosk-unavailable' : ''}`}>
             <header className="kiosk-header">
                 <h1>Snackbar Kiosk</h1>
                 <button
@@ -337,6 +684,9 @@ const KioskApp = () => {
                     onClick={handleToggleCart}
                     aria-expanded={cartOpen}
                     aria-controls="cart-panel"
+                    disabled={kioskUnavailable}
+                    aria-disabled={kioskUnavailable}
+                    title={kioskUnavailable ? kioskUnavailableMessage : undefined}
                 >
                     Cart
                     <span id="cart-badge" className="cart-badge">
@@ -385,7 +735,41 @@ const KioskApp = () => {
                 </div>
             )}
 
-            <main className="kiosk-main">
+            {overlayInfo.active && (
+                <div
+                    id="kiosk-status-overlay"
+                    className={`kiosk-status-overlay${overlayVariant ? ` ${overlayVariant}` : ''}`}
+                    role="alert"
+                    aria-live="assertive"
+                    tabIndex={-1}
+                    ref={statusOverlayRef}
+                >
+                    <div className="overlay-panel">
+                        <div className="overlay-icon" aria-hidden="true">{overlayInfo.icon}</div>
+                        <h2 className="overlay-title">{overlayInfo.title}</h2>
+                        {overlayInfo.message && (
+                            <p className="overlay-message">{overlayInfo.message}</p>
+                        )}
+                        {overlayInfo.detail && (
+                            <p className="overlay-detail">{overlayInfo.detail}</p>
+                        )}
+                        {overlayInfo.next && (
+                            <p className="overlay-next">
+                                Next opening <strong>{overlayInfo.next}</strong>
+                                {overlayInfo.eta ? <span className="overlay-eta"> · {overlayInfo.eta}</span> : null}
+                            </p>
+                        )}
+                        {overlayInfo.next === null && overlayInfo.eta && (
+                            <p className="overlay-eta-only">{overlayInfo.eta}</p>
+                        )}
+                        {overlayInfo.lastUpdated && (
+                            <p className="overlay-updated">Status updated {overlayInfo.lastUpdated}</p>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            <main className="kiosk-main" aria-hidden={overlayInfo.active ? 'true' : undefined}>
                 {error && (
                     <div className="kiosk-error" role="alert">
                         {error.message || 'Unable to load products.'}
@@ -454,11 +838,28 @@ const KioskApp = () => {
                             if (product.available === false && !inventoryTrackingEnabled) {
                                 cardClasses.push('trust-mode');
                             }
+                            if (kioskUnavailable) {
+                                cardClasses.push('status-locked');
+                            }
 
                             const stockValue =
                                 typeof product.stockQuantity === 'number' && Number.isFinite(product.stockQuantity)
                                     ? product.stockQuantity
                                     : '';
+
+                            const addToCartDisabled = kioskUnavailable || (
+                                inventoryTrackingEnabled &&
+                                product.available === false &&
+                                !product.isOutOfStock
+                            );
+
+                            const addToCartLabel = kioskUnavailable
+                                ? 'Ordering unavailable'
+                                : inventoryTrackingEnabled && product.isOutOfStock
+                                    ? 'Request cabinet check'
+                                    : inventoryTrackingEnabled && product.available === false
+                                        ? 'Unavailable'
+                                        : 'Add to cart';
 
                             return (
                                 <div
@@ -469,11 +870,20 @@ const KioskApp = () => {
                                     data-stock={stockValue}
                                     data-low-stock={Boolean(product.isLowStock && inventoryTrackingEnabled)}
                                 >
-                                    <div className="product-image" role="img" aria-label={product.imageAlt}>
+                                    <div className="product-image">
                                         {product.imageUrl ? (
-                                            <img src={product.imageUrl} alt={product.imageAlt} />
+                                            <img
+                                                src={product.imageUrl}
+                                                alt={product.imageAlt}
+                                                loading="lazy"
+                                                decoding="async"
+                                                width="400"
+                                                height="300"
+                                            />
                                         ) : (
-                                            'No Image'
+                                            <span className="product-image-placeholder" aria-hidden="true">
+                                                No image available
+                                            </span>
                                         )}
                                     </div>
                                     <div className="product-info">
@@ -502,20 +912,10 @@ const KioskApp = () => {
                                             type="button"
                                             className="add-to-cart add-to-cart-button"
                                             onClick={() => handleAddToCart(product)}
-                                            disabled={
-                                                inventoryTrackingEnabled &&
-                                                product.available === false &&
-                                                !product.isOutOfStock
-                                            }
-                                            aria-disabled={
-                                                inventoryTrackingEnabled &&
-                                                product.available === false &&
-                                                !product.isOutOfStock
-                                            }
+                                            disabled={addToCartDisabled}
+                                            aria-disabled={addToCartDisabled}
                                         >
-                                            {inventoryTrackingEnabled && product.isOutOfStock
-                                                ? 'Request cabinet check'
-                                                : 'Add to cart'}
+                                            {addToCartLabel}
                                         </button>
                                     </div>
                                 </div>
@@ -528,7 +928,7 @@ const KioskApp = () => {
             <aside
                 id="cart-panel"
                 className={`cart-panel${cartOpen ? ' open' : ''}`}
-                aria-hidden={!cartOpen}
+                aria-hidden={kioskUnavailable || !cartOpen}
             >
                 <div className="cart-header">
                     <h2>Shopping Cart</h2>
@@ -593,8 +993,9 @@ const KioskApp = () => {
                         type="button"
                         className="checkout-button"
                         onClick={handleCheckout}
-                        disabled={!hasCartItems}
-                        aria-disabled={!hasCartItems}
+                        disabled={!hasCartItems || kioskUnavailable}
+                        aria-disabled={!hasCartItems || kioskUnavailable}
+                        title={kioskUnavailable ? kioskUnavailableMessage : undefined}
                     >
                         Proceed to checkout
                     </button>
@@ -616,14 +1017,19 @@ const KioskApp = () => {
                         className="out-of-stock-dialog"
                         role="dialog"
                         aria-modal="true"
+                        aria-labelledby={OUT_OF_STOCK_DIALOG_TITLE_ID}
+                        aria-describedby={OUT_OF_STOCK_DIALOG_MESSAGE_ID}
+                        tabIndex={-1}
+                        ref={outOfStockDialogRef}
                     >
-                        <h2 className="dialog-title">Out of stock confirmation</h2>
-                        <p className="dialog-message">Can you see it in the cabinet?</p>
+                        <h2 id={OUT_OF_STOCK_DIALOG_TITLE_ID} className="dialog-title">Out of stock confirmation</h2>
+                        <p id={OUT_OF_STOCK_DIALOG_MESSAGE_ID} className="dialog-message">Can you see it in the cabinet?</p>
                         <div className="dialog-actions">
                             <button
                                 id="confirm-yes-button"
                                 type="button"
                                 className="button"
+                                ref={outOfStockConfirmRef}
                                 onClick={() => confirmOutOfStockSelection(true)}
                             >
                                 Yes, I see it
@@ -632,6 +1038,7 @@ const KioskApp = () => {
                                 id="confirm-no-button"
                                 type="button"
                                 className="button secondary"
+                                ref={outOfStockCancelRef}
                                 onClick={() => confirmOutOfStockSelection(false)}
                             >
                                 No, go back

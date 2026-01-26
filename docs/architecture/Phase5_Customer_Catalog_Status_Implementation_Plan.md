@@ -79,7 +79,7 @@
    - Ensure overlay toggles checkout disabled state and product visibility as asserted in customer_system_status.robot – US-016 cases.
 
 9. **Accessibility, Styling, and Performance Hardening**
-   - Audit typography tokens and button components to guarantee 16/24 px minimums and WCAG AA contrast ratios; add CSS variables or classes as needed in [client/src/styles.css](client/src/styles.css).
+   - Audit typography tokens and button components to guarantee 16/24 px minimums and WCAG AA contrast ratios; add CSS variables or clases as needed in [client/src/styles.css](client/src/styles.css).
    - Introduce automated linting via `eslint-plugin-jsx-a11y` rules or axe integration in CI for kiosk bundle to catch regressions targeted by US-018 suites.
    - Optimize image loading (lazy loading, aspect-ratio boxes) and reduce layout shifts to maintain <300 ms perceived responsiveness during filter interactions.
 

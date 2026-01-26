@@ -191,13 +191,14 @@ const AdminAccountsManager = () => {
                                 className={`admin-list-item${isSelected ? ' selected' : ''}`}
                                 data-email={account.email}
                                 data-primary={account.isPrimary ? 'true' : 'false'}
-                                onClick={() => handleSelectAdmin(account.id)}
-                                style={{ cursor: 'pointer' }}
+                                role="presentation"
                             >
                                 <button
                                     type="button"
                                     className="button secondary"
                                     style={{ width: '100%', justifyContent: 'space-between' }}
+                                    onClick={() => handleSelectAdmin(account.id)}
+                                    aria-pressed={isSelected}
                                 >
                                     <span>
                                         <strong>{account.name}</strong>

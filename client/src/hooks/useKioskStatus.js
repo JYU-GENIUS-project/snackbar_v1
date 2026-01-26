@@ -275,15 +275,16 @@ export const useKioskStatus = (options = {}) => {
     });
 
     const inventoryAvailability = useMemo(() => {
-        if (!(availabilityRef.current instanceof Map)) {
-            return {};
+        const version = availabilityVersion;
+        const source = availabilityRef.current instanceof Map ? availabilityRef.current : null;
+        if (!source || source.size === 0) {
+            return version > 0 ? {} : {};
         }
-        const result = {};
-        availabilityRef.current.forEach((value, key) => {
-            result[key] = value;
+        const snapshot = {};
+        source.forEach((value, key) => {
+            snapshot[key] = value;
         });
-        return result;
-        // availabilityVersion is used to trigger recomputation on updates
+        return snapshot;
     }, [availabilityVersion]);
 
     return {

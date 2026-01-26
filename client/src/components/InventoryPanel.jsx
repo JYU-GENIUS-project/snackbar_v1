@@ -1,13 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-    INVENTORY_QUERY_KEY,
     useInventorySnapshot,
     useRecordInventoryAdjustment,
     useRecordStockUpdate
 } from '../hooks/useInventory.js';
 import { cloneItemsCollection, readInventoryCache, writeInventoryCache } from '../utils/inventoryCache.js';
-
-const API_BASE_PATH = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '');
 
 const FALLBACK_ITEMS = [
     {

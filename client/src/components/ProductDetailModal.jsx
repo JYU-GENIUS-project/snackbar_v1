@@ -96,7 +96,14 @@ const ProductDetailModal = ({ product, onDismiss, connectionState }) => {
                 <section className="product-detail-body">
                     <div className="product-detail-media" aria-hidden={!product.imageUrl}>
                         {product.imageUrl ? (
-                            <img src={product.imageUrl} alt={product.imageAlt} />
+                            <img
+                                src={product.imageUrl}
+                                alt={product.imageAlt}
+                                loading="lazy"
+                                decoding="async"
+                                width="640"
+                                height="480"
+                            />
                         ) : (
                             <div className="product-detail-placeholder">No image available</div>
                         )}

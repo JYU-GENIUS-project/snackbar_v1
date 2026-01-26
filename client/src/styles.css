@@ -3,6 +3,14 @@
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   background-color: #f5f7fb;
   color: #1f2937;
+  --kiosk-font-size-base: 16px;
+  --kiosk-line-height-base: 1.6;
+  --kiosk-heading-line-height: 1.3;
+  --kiosk-font-size-title: clamp(1.75rem, 4vw, 2.4rem);
+  --kiosk-font-size-subtitle: clamp(1.2rem, 3vw, 1.6rem);
+  --kiosk-font-size-body: clamp(1rem, 2.2vw, 1.1rem);
+  --kiosk-font-size-label: clamp(0.95rem, 2vw, 1rem);
+  --kiosk-price-font-size: clamp(1.1rem, 2.8vw, 1.45rem);
 }
 
 * {
@@ -12,6 +20,22 @@
 body {
   margin: 0;
   min-height: 100vh;
+  font-size: var(--kiosk-font-size-base);
+  line-height: var(--kiosk-line-height-base);
+  -webkit-text-size-adjust: 100%;
+}
+
+p {
+  line-height: var(--kiosk-line-height-base);
+  font-size: var(--kiosk-font-size-body);
+}
+
+h1,
+h2,
+h3 {
+  line-height: var(--kiosk-heading-line-height);
+  margin: 0;
+  font-weight: 700;
 }
 
 a {
@@ -21,6 +45,7 @@ a {
 
 button {
   font: inherit;
+  line-height: 1.2;
 }
 
 input,
@@ -121,6 +146,7 @@ textarea {
   border-radius: 999px;
   font-weight: 600;
   transition: transform 0.15s ease, background-color 0.15s ease;
+  font-size: var(--kiosk-font-size-body);
 }
 
 .category-filter-button.active {
@@ -157,7 +183,7 @@ textarea {
 
 .form-field label {
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: var(--kiosk-font-size-label);
 }
 
 .form-field input,
@@ -320,6 +346,11 @@ textarea {
   justify-content: space-between;
 }
 
+.kiosk-header h1 {
+  font-size: var(--kiosk-font-size-title);
+  line-height: var(--kiosk-heading-line-height);
+}
+
 .cart-toggle {
   position: relative;
   background: #2563eb;
@@ -329,6 +360,7 @@ textarea {
   padding: 0.65rem 1rem;
   cursor: pointer;
   font-weight: 600;
+  font-size: var(--kiosk-font-size-body);
 }
 
 .cart-badge {
@@ -357,6 +389,7 @@ textarea {
   border-radius: 8px;
   max-width: 420px;
   box-shadow: 0 4px 10px rgba(15, 23, 42, 0.1);
+  font-size: var(--kiosk-font-size-body);
 }
 
 .kiosk-warning-banner,
@@ -369,6 +402,7 @@ textarea {
   align-items: center;
   gap: 0.5rem;
   box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+  font-size: var(--kiosk-font-size-body);
 }
 
 .kiosk-warning-banner {
@@ -389,6 +423,95 @@ textarea {
 .kiosk-limit-message {
   background: rgba(248, 113, 113, 0.15);
   color: #b91c1c;
+}
+
+.kiosk-app.kiosk-unavailable .cart-toggle,
+.kiosk-app.kiosk-unavailable .checkout-button {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.kiosk-status-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(17, 24, 39, 0.82);
+  color: #f9fafb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(1.5rem, 4vw, 3rem);
+  z-index: 2000;
+  pointer-events: auto;
+  backdrop-filter: blur(6px);
+  overflow-y: auto;
+}
+
+.kiosk-status-overlay:focus-visible {
+  outline: 4px solid rgba(251, 191, 36, 0.9);
+  outline-offset: 6px;
+}
+
+.kiosk-status-overlay .overlay-panel {
+  max-width: 560px;
+  width: min(560px, 100%);
+  background: rgba(17, 24, 39, 0.88);
+  border-radius: 28px;
+  padding: clamp(1.75rem, 3vw, 2.5rem);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  text-align: center;
+  box-shadow: 0 30px 70px rgba(15, 23, 42, 0.6);
+}
+
+.kiosk-status-overlay .overlay-icon {
+  font-size: clamp(2.25rem, 5vw, 3.25rem);
+}
+
+.kiosk-status-overlay .overlay-title {
+  margin: 0;
+  font-size: clamp(1.5rem, 3.5vw, 2.15rem);
+  font-weight: 700;
+}
+
+.kiosk-status-overlay .overlay-message,
+.kiosk-status-overlay .overlay-detail,
+.kiosk-status-overlay .overlay-next,
+.kiosk-status-overlay .overlay-updated,
+.kiosk-status-overlay .overlay-eta-only,
+.kiosk-status-overlay .overlay-eta {
+  margin: 0;
+  font-size: clamp(1rem, 2.3vw, 1.1rem);
+  line-height: 1.5;
+}
+
+.kiosk-status-overlay .overlay-next strong {
+  font-weight: 700;
+}
+
+.kiosk-status-overlay.closed .overlay-panel {
+  background: linear-gradient(145deg, rgba(239, 68, 68, 0.92), rgba(127, 29, 29, 0.92));
+}
+
+.kiosk-status-overlay.maintenance .overlay-panel {
+  background: linear-gradient(145deg, rgba(251, 191, 36, 0.95), rgba(180, 83, 9, 0.9));
+  color: #1f2937;
+}
+
+.kiosk-status-overlay.maintenance .overlay-title,
+.kiosk-status-overlay.maintenance .overlay-message,
+.kiosk-status-overlay.maintenance .overlay-detail,
+.kiosk-status-overlay.maintenance .overlay-next,
+.kiosk-status-overlay.maintenance .overlay-updated,
+.kiosk-status-overlay.maintenance .overlay-eta-only,
+.kiosk-status-overlay.maintenance .overlay-eta {
+  color: #1f2937;
+}
+
+.product-card.status-locked {
+  filter: grayscale(0.4);
+  opacity: 0.6;
+  pointer-events: none;
 }
 
 .product-grid {
@@ -547,14 +670,16 @@ textarea {
 .product-image img {
   width: 100%;
   height: 100%;
-  .add-to-cart-button {
-    min-height: 52px;
-    border-radius: 999px;
-    font-weight: 700;
-    letter-spacing: 0.01em;
-  }
   object-fit: cover;
   border-radius: 12px;
+  display: block;
+}
+
+.product-image-placeholder {
+  font-size: var(--kiosk-font-size-label);
+  color: #4b5563;
+  text-align: center;
+  padding: 0 1rem;
 }
 
 .product-info {
@@ -565,6 +690,17 @@ textarea {
 
 .product-price {
   font-weight: 700;
+  font-size: var(--kiosk-price-font-size);
+}
+
+.product-name {
+  font-size: var(--kiosk-font-size-subtitle);
+}
+
+.product-description {
+  font-size: var(--kiosk-font-size-body);
+  line-height: var(--kiosk-line-height-base);
+  color: #374151;
 }
 
 .badge.out-of-stock-badge {
@@ -586,6 +722,13 @@ textarea {
   cursor: pointer;
   font-weight: 600;
   transition: background 0.2s ease;
+}
+
+.add-to-cart-button {
+  min-height: 52px;
+  border-radius: 999px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
 }
 
 .add-to-cart:hover {
@@ -625,6 +768,7 @@ textarea {
   color: #2563eb;
   font-weight: 600;
   cursor: pointer;
+  font-size: var(--kiosk-font-size-body);
 }
 
 .cart-items {
@@ -638,7 +782,7 @@ textarea {
 
 .cart-empty {
   color: #6b7280;
-  font-size: 0.9rem;
+  font-size: var(--kiosk-font-size-body);
 }
 
 .cart-item {
@@ -649,12 +793,14 @@ textarea {
   border-radius: 12px;
   padding: 1rem;
   background: #f9fafb;
+  font-size: var(--kiosk-font-size-body);
 }
 
 .cart-item-info {
   display: flex;
   justify-content: space-between;
   font-weight: 600;
+  font-size: var(--kiosk-font-size-body);
 }
 
 .cart-item-controls {
@@ -687,6 +833,7 @@ textarea {
 
 .item-subtotal {
   font-weight: 600;
+  font-size: var(--kiosk-font-size-body);
 }
 
 .cart-footer {
@@ -702,7 +849,7 @@ textarea {
 
 .cart-total {
   font-weight: 700;
-  font-size: 1.1rem;
+  font-size: var(--kiosk-price-font-size);
 }
 
 .checkout-button {
@@ -791,13 +938,13 @@ textarea {
 
 .product-detail-header h2 {
   margin: 0;
-  font-size: clamp(1.5rem, 2.5vw, 1.85rem);
+  font-size: var(--kiosk-font-size-subtitle);
 }
 
 .product-detail-subtitle {
   margin: 0.35rem 0 0;
   color: #4b5563;
-  font-size: 0.95rem;
+  font-size: var(--kiosk-font-size-label);
 }
 
 .product-detail-body {
@@ -820,17 +967,20 @@ textarea {
   justify-content: center;
   min-height: 240px;
   overflow: hidden;
+  aspect-ratio: 4 / 3;
 }
 
 .product-detail-media img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  display: block;
 }
 
 .product-detail-placeholder {
   color: #6b7280;
   font-weight: 600;
+  font-size: var(--kiosk-font-size-label);
 }
 
 .product-detail-content {
@@ -840,15 +990,15 @@ textarea {
 }
 
 .product-detail-price {
-  font-size: 1.5rem;
+  font-size: var(--kiosk-price-font-size);
   font-weight: 700;
   margin: 0;
 }
 
 .product-detail-description {
   margin: 0;
-  line-height: 1.5;
-  font-size: 1rem;
+  line-height: var(--kiosk-line-height-base);
+  font-size: var(--kiosk-font-size-body);
 }
 
 .product-detail-meta {
@@ -861,7 +1011,7 @@ textarea {
   display: flex;
   justify-content: space-between;
   gap: 1rem;
-  font-size: 0.95rem;
+  font-size: var(--kiosk-font-size-label);
 }
 
 .product-detail-row .label {
@@ -880,7 +1030,7 @@ textarea {
 
 .product-detail-allergens h3 {
   margin: 0 0 0.75rem;
-  font-size: 1.1rem;
+  font-size: var(--kiosk-font-size-body);
 }
 
 .product-detail-allergens ul {
@@ -893,6 +1043,17 @@ textarea {
 .product-detail-allergens p {
   margin: 0;
   color: #374151;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 .close-detail-button {
