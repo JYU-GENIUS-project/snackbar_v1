@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useProductFeed } from '../hooks/useProductFeed.js';
 import useKioskStatus from '../hooks/useKioskStatus.js';
+import ProductGridSkeleton from './ProductGridSkeleton.jsx';
 import { OFFLINE_FEED_STORAGE_KEY } from '../utils/offlineCache.js';
 
 const formatPrice = (value) => `${Number(value ?? 0).toFixed(2)}€`;
@@ -398,6 +399,7 @@ const KioskApp = () => {
                             className={`button secondary category-filter-button${selectedCategory === 'All Products' ? ' active' : ' muted'}`}
                             data-category="All Products"
                             aria-pressed={selectedCategory === 'All Products'}
+                            aria-controls="product-grid"
                             onClick={() => setSelectedCategory('All Products')}
                         >
                             All Products
@@ -409,6 +411,7 @@ const KioskApp = () => {
                                 className={`button secondary category-filter-button${selectedCategory === category.name ? ' active' : ' muted'}`}
                                 data-category={category.name}
                                 aria-pressed={selectedCategory === category.name}
+                                aria-controls="product-grid"
                                 onClick={() => setSelectedCategory(category.name)}
                             >
                                 {category.name}
@@ -417,13 +420,20 @@ const KioskApp = () => {
                     </div>
                 )}
                 {isLoading ? (
-                    <div className="loading-placeholder">Loading products…</div>
+                    <ProductGridSkeleton />
                 ) : products.length === 0 ? (
                     <div className="loading-placeholder">No products available.</div>
                 ) : filteredProducts.length === 0 ? (
-                    <div className="loading-placeholder">No products in this category</div>
+                    <div className="loading-placeholder" role="status" aria-live="polite">
+                        No products found for {selectedCategory}. Try another category.
+                    </div>
                 ) : (
-                    <div id="product-grid" className="product-grid" aria-live={isFetching ? 'polite' : 'off'}>
+                    <div
+                        id="product-grid"
+                        className="product-grid"
+                        aria-live={isFetching ? 'polite' : 'off'}
+                        aria-busy={isFetching}
+                    >
                         {filteredProducts.map((product) => {
                             const categoryLabels = (product.categories || [])
                                 .map((category) => category?.name)
