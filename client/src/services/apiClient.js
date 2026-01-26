@@ -1,4 +1,4 @@
-const BASE_URL = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '');
+export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '');
 
 const buildHeaders = (token, customHeaders, { skipContentType } = {}) => {
   const headers = new Headers(customHeaders || {});
@@ -12,7 +12,7 @@ const buildHeaders = (token, customHeaders, { skipContentType } = {}) => {
 };
 
 export const apiRequest = async ({ path, method = 'GET', token, body, signal, searchParams, headers }) => {
-  const url = new URL(`${BASE_URL}${path.startsWith('/') ? path : `/${path}`}`, window.location.origin);
+  const url = new URL(`${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`, window.location.origin);
 
   if (searchParams) {
     Object.entries(searchParams).forEach(([key, value]) => {

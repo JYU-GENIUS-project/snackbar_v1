@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useProductFeed } from '../hooks/useProductFeed.js';
+import useKioskStatus from '../hooks/useKioskStatus.js';
 import { OFFLINE_FEED_STORAGE_KEY } from '../utils/offlineCache.js';
 
 const formatPrice = (value) => `${Number(value ?? 0).toFixed(2)}€`;
@@ -70,6 +71,7 @@ const updateQuantityInCart = (cart, productId, updater) => {
 
 const KioskApp = () => {
     const { data, isLoading, isFetching, error, refetch } = useProductFeed({ refetchInterval: 15000, staleTime: 10000 });
+    const kioskStatus = useKioskStatus({ refetchInterval: 45000 });
     const products = useMemo(() => {
         if (!Array.isArray(data?.products)) {
             return [];
@@ -78,9 +80,11 @@ const KioskApp = () => {
             .map(normalizeProduct)
             .filter((product) => product.status !== 'archived');
     }, [data]);
-    const inventoryTrackingEnabled = data?.inventoryTrackingEnabled !== false;
+    const inventoryTrackingEnabled = kioskStatus.inventoryTrackingEnabled ?? (data?.inventoryTrackingEnabled !== false);
     const trackingDisabled = !inventoryTrackingEnabled;
     const usingOfflineFeed = data?.source === 'offline';
+    const kioskConnectionState = kioskStatus.connectionState;
+    const latestAvailabilityTimestampRef = useRef(null);
 
     const categoryFilters = useMemo(() => {
         const seen = new Set();
@@ -126,6 +130,33 @@ const KioskApp = () => {
             (product.categories || []).some((category) => category.name === selectedCategory)
         );
     }, [products, selectedCategory]);
+
+    useEffect(() => {
+        if (!kioskStatus.inventoryAvailability) {
+            return;
+        }
+        const updates = Object.values(kioskStatus.inventoryAvailability);
+        if (!updates.length) {
+            return;
+        }
+        const newest = updates.reduce((acc, entry) => {
+            if (!entry?.emittedAt) {
+                return acc;
+            }
+            if (!acc || entry.emittedAt > acc.emittedAt) {
+                return entry;
+            }
+            return acc;
+        }, null);
+        if (!newest?.emittedAt) {
+            return;
+        }
+        if (latestAvailabilityTimestampRef.current === newest.emittedAt) {
+            return;
+        }
+        latestAvailabilityTimestampRef.current = newest.emittedAt;
+        refetch();
+    }, [kioskStatus.inventoryAvailability, refetch]);
 
     useEffect(() => {
         if (!toastMessage || typeof window === 'undefined') {
@@ -327,6 +358,12 @@ const KioskApp = () => {
                     aria-live="polite"
                 >
                     You are viewing cached inventory data. Availability may differ from the cabinet.
+                </div>
+            )}
+
+            {kioskConnectionState === 'disconnected' && (
+                <div className="kiosk-offline-banner" role="status" aria-live="polite">
+                    Attempting to reconnect to live status updates…
                 </div>
             )}
 
