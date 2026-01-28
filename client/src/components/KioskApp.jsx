@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useProductFeed } from '../hooks/useProductFeed.js';
 import useKioskStatus from '../hooks/useKioskStatus.js';
 import ProductGridSkeleton from './ProductGridSkeleton.jsx';
@@ -6,9 +6,152 @@ import ProductDetailModal from './ProductDetailModal.jsx';
 import { OFFLINE_FEED_STORAGE_KEY } from '../utils/offlineCache.js';
 import { logKioskEvent } from '../utils/analytics.js';
 
+const TEST_CONTROL_STORAGE_KEY = 'snackbar-test-controls';
+const TEST_CONTROL_ALLOWED_STATUSES = new Set(['open', 'closed', 'maintenance']);
+
 const TRUST_MODE_STORAGE_KEY = 'snackbar-trust-mode-disabled';
 const OUT_OF_STOCK_DIALOG_TITLE_ID = 'kiosk-out-of-stock-title';
 const OUT_OF_STOCK_DIALOG_MESSAGE_ID = 'kiosk-out-of-stock-message';
+
+const normalizeTestControls = (input) => {
+    if (!input || typeof input !== 'object') {
+        return null;
+    }
+
+    if (input.reset === true) {
+        return { __reset: true };
+    }
+
+    const normalized = {};
+
+    if (Object.prototype.hasOwnProperty.call(input, 'statusOverride')) {
+        const candidate = input.statusOverride;
+        if (candidate === null || candidate === undefined) {
+            normalized.statusOverride = null;
+        } else if (typeof candidate === 'string' && TEST_CONTROL_ALLOWED_STATUSES.has(candidate)) {
+            normalized.statusOverride = candidate;
+        } else {
+            normalized.statusOverride = null;
+        }
+    }
+
+    if (Object.prototype.hasOwnProperty.call(input, 'statusMessage')) {
+        normalized.statusMessage = typeof input.statusMessage === 'string' ? input.statusMessage : null;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(input, 'statusNextOpen')) {
+        normalized.statusNextOpen = typeof input.statusNextOpen === 'string' ? input.statusNextOpen : null;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(input, 'inventoryTrackingEnabled')) {
+        const candidate = input.inventoryTrackingEnabled;
+        if (candidate === null || candidate === undefined) {
+            normalized.inventoryTrackingEnabled = null;
+        } else {
+            normalized.inventoryTrackingEnabled = Boolean(candidate);
+        }
+    }
+
+    return normalized;
+};
+
+const mergeTestControls = (current, update) => {
+    const base = current && typeof current === 'object' ? { ...current } : {};
+    if (!update || typeof update !== 'object') {
+        return base;
+    }
+
+    const normalized = normalizeTestControls(update);
+    if (!normalized) {
+        return base;
+    }
+
+    if (normalized.__reset === true) {
+        return {};
+    }
+
+    let changed = false;
+    const next = { ...base };
+
+    Object.keys(normalized).forEach((key) => {
+        if (key === '__reset') {
+            return;
+        }
+        const value = normalized[key];
+        if (value === null || value === undefined) {
+            if (Object.prototype.hasOwnProperty.call(next, key)) {
+                delete next[key];
+                changed = true;
+            }
+            return;
+        }
+        if (next[key] !== value) {
+            next[key] = value;
+            changed = true;
+        }
+    });
+
+    return changed ? next : base;
+};
+
+const persistTestControls = (controls) => {
+    if (typeof window === 'undefined') {
+        return;
+    }
+    try {
+        const keys = controls && typeof controls === 'object' ? Object.keys(controls) : [];
+        if (!keys.length) {
+            window.localStorage.removeItem(TEST_CONTROL_STORAGE_KEY);
+            return;
+        }
+        window.localStorage.setItem(TEST_CONTROL_STORAGE_KEY, JSON.stringify(controls));
+    } catch (error) {
+        if (import.meta?.env?.DEV) {
+            console.warn('Failed to persist kiosk test controls', error);
+        }
+    }
+};
+
+const readTestControls = () => {
+    if (typeof window === 'undefined') {
+        return {};
+    }
+    try {
+        const stored = window.localStorage.getItem(TEST_CONTROL_STORAGE_KEY);
+        if (!stored) {
+            return {};
+        }
+        const parsed = JSON.parse(stored);
+        if (!parsed || typeof parsed !== 'object') {
+            return {};
+        }
+        const normalized = normalizeTestControls(parsed);
+        if (!normalized || normalized.__reset) {
+            return {};
+        }
+        const sanitized = {};
+        if (Object.prototype.hasOwnProperty.call(normalized, 'statusOverride')) {
+            sanitized.statusOverride = normalized.statusOverride;
+        }
+        if (normalized.statusMessage) {
+            sanitized.statusMessage = normalized.statusMessage;
+        }
+        if (normalized.statusNextOpen) {
+            sanitized.statusNextOpen = normalized.statusNextOpen;
+        }
+        if (Object.prototype.hasOwnProperty.call(normalized, 'inventoryTrackingEnabled')
+            && normalized.inventoryTrackingEnabled !== null
+            && normalized.inventoryTrackingEnabled !== undefined) {
+            sanitized.inventoryTrackingEnabled = normalized.inventoryTrackingEnabled;
+        }
+        return sanitized;
+    } catch (error) {
+        if (import.meta?.env?.DEV) {
+            console.warn('Failed to read kiosk test controls', error);
+        }
+        return {};
+    }
+};
 
 const formatLocalizedDateTime = (isoValue, timeZone) => {
     if (!isoValue) {
@@ -135,7 +278,6 @@ const normalizeProduct = (product) => {
         isOutOfStock,
         isLowStock,
         status: product.status || 'active',
-        imageUrl: product.primaryMedia?.url || '',
         imageAlt: product.primaryMedia?.alt || product.name || 'Product image',
         description: product.description || product.metadata?.description || '',
         allergens: typeof product.allergens === 'string' && product.allergens.trim()
@@ -147,7 +289,6 @@ const normalizeProduct = (product) => {
         available: product.available !== false
     };
 };
-
 const buildStatusOverlay = (statusPayload, lastUpdatedAt) => {
     if (!statusPayload || typeof statusPayload !== 'object') {
         return { active: false };
@@ -195,6 +336,41 @@ const buildStatusOverlay = (statusPayload, lastUpdatedAt) => {
     };
 };
 
+const applyTestStatusOverride = (overlay, controls, statusPayload) => {
+    const baseOverlay = overlay || { active: false };
+    if (!controls || typeof controls !== 'object' || !controls.statusOverride) {
+        return baseOverlay;
+    }
+
+    if (controls.statusOverride === 'open') {
+        return { active: false };
+    }
+
+    const variant = controls.statusOverride === 'maintenance' ? 'maintenance' : 'closed';
+    const timezone = statusPayload?.timezone;
+    const nextOpenIso = controls.statusNextOpen || statusPayload?.nextOpen || null;
+    const nextOpenLabel = formatLocalizedDateTime(nextOpenIso, timezone);
+    const etaLabel = formatDurationUntil(nextOpenIso);
+
+    const message = controls.statusMessage
+        || baseOverlay.message
+        || (variant === 'maintenance'
+            ? 'The kiosk is undergoing maintenance.'
+            : 'The kiosk is currently closed.');
+
+    return {
+        active: true,
+        variant,
+        icon: variant === 'maintenance' ? '🛠️' : '🔒',
+        title: variant === 'maintenance' ? 'Maintenance in Progress' : 'Kiosk Closed',
+        message,
+        detail: variant === 'maintenance' ? baseOverlay.detail || null : null,
+        next: nextOpenLabel || null,
+        eta: etaLabel || null,
+        lastUpdated: formatRelativeTimestamp(new Date().toISOString())
+    };
+};
+
 const updateQuantityInCart = (cart, productId, updater) => {
     return cart
         .map((item) => {
@@ -217,44 +393,164 @@ const KioskApp = () => {
     const { data, isLoading, isFetching, error, refetch } = useProductFeed({ refetchInterval: 15000, staleTime: 10000 });
     const kioskStatus = useKioskStatus({ refetchInterval: 45000 });
 
+    const [testControls, setTestControls] = useState(() => readTestControls());
+    const applyTestControls = useCallback((update) => {
+        setTestControls((current) => {
+            const next = mergeTestControls(current, update);
+            persistTestControls(next);
+            return next;
+        });
+    }, []);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') {
+            return;
+        }
+
+        const storageHandler = (event) => {
+            if (event.key === TEST_CONTROL_STORAGE_KEY) {
+                setTestControls(readTestControls());
+            }
+        };
+
+        window.snackbarApplyTestControls = applyTestControls;
+        window.addEventListener('storage', storageHandler);
+
+        return () => {
+            window.removeEventListener('storage', storageHandler);
+            if (window.snackbarApplyTestControls === applyTestControls) {
+                delete window.snackbarApplyTestControls;
+            }
+        };
+    }, [applyTestControls]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') {
+            return;
+        }
+        window.snackbarDebugReadTestControls = () => readTestControls();
+        return () => {
+            if (window.snackbarDebugReadTestControls) {
+                delete window.snackbarDebugReadTestControls;
+            }
+        };
+    }, []);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') {
+            return;
+        }
+        window.snackbarCurrentTestControls = testControls;
+        return () => {
+            if (window.snackbarCurrentTestControls === testControls) {
+                delete window.snackbarCurrentTestControls;
+            }
+        };
+    }, [testControls]);
+
     const baseInventoryTrackingEnabled = kioskStatus.inventoryTrackingEnabled;
-    const inventoryTrackingEnabled = typeof baseInventoryTrackingEnabled === 'boolean'
+    const sourceInventoryTrackingEnabled = typeof baseInventoryTrackingEnabled === 'boolean'
         ? baseInventoryTrackingEnabled
         : data?.inventoryTrackingEnabled !== false;
 
+    const forcedInventoryTracking = Object.prototype.hasOwnProperty.call(testControls, 'inventoryTrackingEnabled')
+        ? testControls.inventoryTrackingEnabled
+        : undefined;
+
+    const inventoryTrackingEnabled = typeof forcedInventoryTracking === 'boolean'
+        ? forcedInventoryTracking
+        : sourceInventoryTrackingEnabled;
+
     const [trackingDisabled, setTrackingDisabled] = useState(() => {
+        if (typeof forcedInventoryTracking === 'boolean') {
+            return !forcedInventoryTracking;
+        }
         if (typeof window !== 'undefined') {
             const persisted = window.sessionStorage.getItem(TRUST_MODE_STORAGE_KEY);
             if (persisted !== null) {
                 return persisted === 'true';
             }
         }
-        return typeof inventoryTrackingEnabled === 'boolean' ? !inventoryTrackingEnabled : false;
+        return typeof sourceInventoryTrackingEnabled === 'boolean' ? !sourceInventoryTrackingEnabled : false;
     });
 
     useEffect(() => {
         if (typeof inventoryTrackingEnabled === 'boolean') {
             const disabled = !inventoryTrackingEnabled;
             setTrackingDisabled((current) => (current === disabled ? current : disabled));
-            if (typeof window !== 'undefined') {
+            if (typeof window !== 'undefined' && typeof forcedInventoryTracking !== 'boolean') {
                 window.sessionStorage.setItem(TRUST_MODE_STORAGE_KEY, disabled ? 'true' : 'false');
             }
         }
-    }, [inventoryTrackingEnabled]);
+    }, [inventoryTrackingEnabled, forcedInventoryTracking]);
 
     const usingOfflineFeed = data?.source === 'offline';
     const kioskConnectionState = kioskStatus.connectionState;
     const statusPayload = kioskStatus.status;
     const lastStatusUpdate = kioskStatus.lastUpdatedAt;
-    const overlayInfo = useMemo(
+    const derivedOverlayInfo = useMemo(
         () => buildStatusOverlay(statusPayload, lastStatusUpdate),
         [statusPayload, lastStatusUpdate]
+    );
+    const overlayInfo = useMemo(
+        () => applyTestStatusOverride(derivedOverlayInfo, testControls, statusPayload),
+        [derivedOverlayInfo, testControls, statusPayload]
     );
     const overlayVariant = overlayInfo.variant;
     const kioskUnavailable = overlayInfo.active;
     const kioskUnavailableMessage = overlayVariant === 'maintenance'
-        ? 'Ordering is paused while maintenance is in progress.'
-        : 'Ordering is currently unavailable while the kiosk is closed.';
+        ? overlayInfo.message || 'Ordering is paused while maintenance is in progress.'
+        : overlayInfo.message || 'Ordering is currently unavailable while the kiosk is closed.';
+
+    const closedNextOpenLabel = useMemo(() => {
+        if (overlayVariant !== 'closed') {
+            return null;
+        }
+        return formatLocalizedDateTime(statusPayload?.nextOpen, statusPayload?.timezone);
+    }, [overlayVariant, statusPayload?.nextOpen, statusPayload?.timezone]);
+
+    const closedOperatingHours = useMemo(() => {
+        if (overlayVariant !== 'closed') {
+            return null;
+        }
+        if (statusPayload?.operatingWindow?.start && statusPayload?.operatingWindow?.end) {
+            return `${statusPayload.operatingWindow.start}–${statusPayload.operatingWindow.end}`;
+        }
+        const windows = Array.isArray(statusPayload?.windows) ? statusPayload.windows : [];
+        if (windows.length > 0) {
+            const window = windows[0];
+            if (window?.start && window?.end) {
+                return `${window.start}–${window.end}`;
+            }
+        }
+        return null;
+    }, [overlayVariant, statusPayload?.operatingWindow, statusPayload?.windows]);
+
+    const closedBannerMessage = useMemo(() => {
+        if (overlayVariant !== 'closed') {
+            return null;
+        }
+        const baseMessage = (overlayInfo.message || '').trim();
+        if (baseMessage) {
+            let composed = baseMessage;
+            if (closedNextOpenLabel && !baseMessage.includes(closedNextOpenLabel)) {
+                composed = `${composed} · Opens ${closedNextOpenLabel}`;
+            }
+            if (closedOperatingHours && !/hour/i.test(baseMessage)) {
+                composed = `${composed} · Opening hours ${closedOperatingHours}`;
+            }
+            return composed;
+        }
+        const parts = ['🔒 Closed'];
+        if (closedNextOpenLabel) {
+            parts.push(`Opens ${closedNextOpenLabel}`);
+        }
+        if (closedOperatingHours) {
+            parts.push(`Opening hours ${closedOperatingHours}`);
+        }
+        parts.push('Please check back soon');
+        return parts.join(' · ');
+    }, [overlayVariant, overlayInfo.message, closedNextOpenLabel, closedOperatingHours]);
 
     const baseProducts = useMemo(() => {
         if (!Array.isArray(data?.products)) {
@@ -356,6 +652,7 @@ const KioskApp = () => {
     const [selectedCategory, setSelectedCategory] = useState('All Products');
     const [cart, setCart] = useState([]);
     const [cartOpen, setCartOpen] = useState(false);
+    const [checkoutVisible, setCheckoutVisible] = useState(false);
     const [toastMessage, setToastMessage] = useState('');
     const [limitMessage, setLimitMessage] = useState('');
     const [outOfStockPrompt, setOutOfStockPrompt] = useState(null);
@@ -366,6 +663,33 @@ const KioskApp = () => {
     const previousFocusRef = useRef(null);
     const statusOverlayRef = useRef(null);
     const previousOverlayFocusRef = useRef(null);
+    const checkoutDialogRef = useRef(null);
+    const checkoutPrimaryActionRef = useRef(null);
+    const previousCheckoutFocusRef = useRef(null);
+    const inventoryWarningLoggedRef = useRef(false);
+    const categoryFilterTimingRef = useRef(null);
+
+    const markCategoryFilterSelection = (category) => {
+        if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
+            categoryFilterTimingRef.current = {
+                category,
+                startedAt: performance.now()
+            };
+            return;
+        }
+        categoryFilterTimingRef.current = {
+            category,
+            startedAt: Date.now()
+        };
+    };
+
+    const handleCategorySelection = (category) => {
+        if (category === selectedCategory) {
+            return;
+        }
+        markCategoryFilterSelection(category);
+        setSelectedCategory(category);
+    };
 
     useEffect(() => {
         if (selectedCategory === 'All Products') {
@@ -394,6 +718,7 @@ const KioskApp = () => {
         setOutOfStockPrompt(null);
         setSelectedProduct(null);
         setCartOpen(false);
+        setCheckoutVisible(false);
         setLimitMessage('');
     }, [kioskUnavailable]);
 
@@ -416,6 +741,72 @@ const KioskApp = () => {
             node.focus({ preventScroll: true });
         }
     }, [overlayInfo.active, overlayVariant]);
+
+    useEffect(() => {
+        if (typeof document === 'undefined') {
+            return;
+        }
+        if (!checkoutVisible) {
+            const previous = previousCheckoutFocusRef.current;
+            if (previous && typeof previous.focus === 'function') {
+                previous.focus({ preventScroll: true });
+            }
+            previousCheckoutFocusRef.current = null;
+            return;
+        }
+
+        previousCheckoutFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        const primaryButton = checkoutPrimaryActionRef.current;
+        if (primaryButton && typeof primaryButton.focus === 'function') {
+            primaryButton.focus({ preventScroll: true });
+            return;
+        }
+        const dialogNode = checkoutDialogRef.current;
+        if (dialogNode && typeof dialogNode.focus === 'function') {
+            dialogNode.focus({ preventScroll: true });
+        }
+    }, [checkoutVisible]);
+
+    useEffect(() => {
+        if (trackingDisabled && !inventoryWarningLoggedRef.current) {
+            logKioskEvent('kiosk.inventory_tracking_warning_displayed', {
+                reason: 'tracking-disabled',
+                status: statusPayload?.status || 'unknown',
+                statusVariant: overlayVariant || 'none'
+            });
+            inventoryWarningLoggedRef.current = true;
+            return;
+        }
+
+        if (!trackingDisabled) {
+            inventoryWarningLoggedRef.current = false;
+        }
+    }, [trackingDisabled, statusPayload, overlayVariant]);
+
+    useEffect(() => {
+        const timing = categoryFilterTimingRef.current;
+        if (!timing) {
+            return;
+        }
+        const now = typeof performance !== 'undefined' && typeof performance.now === 'function'
+            ? performance.now()
+            : Date.now();
+        const durationMs = Math.max(0, now - timing.startedAt);
+
+        if (import.meta?.env?.DEV) {
+            console.info('[kiosk-perf] Category filter render', {
+                category: timing.category,
+                durationMs: Math.round(durationMs)
+            });
+        }
+
+        logKioskEvent('kiosk.category_filter_render_complete', {
+            category: timing.category,
+            durationMs: Math.round(durationMs)
+        });
+
+        categoryFilterTimingRef.current = null;
+    }, [filteredProducts]);
 
     useEffect(() => {
         if (typeof window === 'undefined' || typeof document === 'undefined' || !outOfStockPrompt) {
@@ -723,6 +1114,7 @@ const KioskApp = () => {
     const clearCart = () => {
         setCart([]);
         setLimitMessage('');
+        setCheckoutVisible(false);
     };
 
     const handleCheckout = () => {
@@ -737,7 +1129,13 @@ const KioskApp = () => {
             });
             return;
         }
-        setToastMessage('Checkout flow coming soon');
+        setCheckoutVisible(true);
+        setCartOpen(false);
+        setToastMessage('');
+        logKioskEvent('kiosk.checkout_started', {
+            cartSize: cart.length,
+            totalEuros: Number.isFinite(cartTotal) ? Number(cartTotal.toFixed(2)) : 0
+        });
     };
 
     const handleToggleCart = () => {
@@ -748,10 +1146,19 @@ const KioskApp = () => {
             });
             return;
         }
+        if (checkoutVisible) {
+            setCheckoutVisible(false);
+        }
         setCartOpen((current) => !current);
     };
 
     const hasCartItems = cart.length > 0;
+
+    useEffect(() => {
+        if (!hasCartItems) {
+            setCheckoutVisible(false);
+        }
+    }, [hasCartItems]);
 
     return (
         <div className={`kiosk-app${overlayInfo.active ? ' kiosk-unavailable' : ''}`}>
@@ -827,9 +1234,18 @@ const KioskApp = () => {
                     <div className="overlay-panel">
                         <div className="overlay-icon" aria-hidden="true">{overlayInfo.icon}</div>
                         <h2 className="overlay-title">{overlayInfo.title}</h2>
-                        {overlayInfo.message && (
+                        {overlayVariant === 'closed' ? (
+                            <p
+                                id="closed-message"
+                                className="overlay-message"
+                                role="status"
+                                aria-live="assertive"
+                            >
+                                {closedBannerMessage}
+                            </p>
+                        ) : overlayInfo.message ? (
                             <p className="overlay-message">{overlayInfo.message}</p>
-                        )}
+                        ) : null}
                         {overlayInfo.detail && (
                             <p className="overlay-detail">{overlayInfo.detail}</p>
                         )}
@@ -849,250 +1265,259 @@ const KioskApp = () => {
                 </div>
             )}
 
-            <main className="kiosk-main" aria-hidden={overlayInfo.active ? 'true' : undefined}>
-                {error && (
-                    <div className="kiosk-error" role="alert">
-                        {error.message || 'Unable to load products.'}
-                    </div>
-                )}
-                {!isLoading && categoryFilters.length > 0 && (
-                    <div
-                        id="category-filters"
-                        className="category-filters"
-                        role="group"
-                        aria-label="Filter by category"
-                        style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}
-                    >
-                        <button
-                            type="button"
-                            className={`button secondary category-filter-button${selectedCategory === 'All Products' ? ' active' : ' muted'}`}
-                            data-category="All Products"
-                            aria-pressed={selectedCategory === 'All Products'}
-                            aria-controls="product-grid"
-                            onClick={() => setSelectedCategory('All Products')}
-                        >
-                            All Products
-                        </button>
-                        {categoryFilters.map((category) => (
-                            <button
-                                key={category.id || category.name}
-                                type="button"
-                                className={`button secondary category-filter-button${selectedCategory === category.name ? ' active' : ' muted'}`}
-                                data-category={category.name}
-                                aria-pressed={selectedCategory === category.name}
-                                aria-controls="product-grid"
-                                onClick={() => setSelectedCategory(category.name)}
-                            >
-                                {category.name}
-                            </button>
-                        ))}
-                    </div>
-                )}
-                {isLoading ? (
-                    <ProductGridSkeleton />
-                ) : (sortedProducts?.length ?? 0) === 0 ? (
-                    <div className="loading-placeholder">No products available.</div>
-                ) : filteredProducts.length === 0 ? (
-                    <div className="loading-placeholder" role="status" aria-live="polite">
-                        No products in this category
-                    </div>
-                ) : (
-                    <div
-                        id="product-grid"
-                        className="product-grid"
-                        aria-live={isFetching ? 'polite' : 'off'}
-                        aria-busy={isFetching}
-                    >
-                        {filteredProducts.map((product) => {
-                            const categoryLabels = (product.categories || [])
-                                .map((category) => category?.name)
-                                .filter(Boolean);
-                            const primaryCategory = categoryLabels[0] || 'Uncategorized';
-                            const cardClasses = ['product-card'];
-                            const allergenValue = typeof product.allergens === 'string'
-                                ? product.allergens.trim()
-                                : '';
-                            const hasAllergenInfo = allergenValue.length > 0;
-                            if (inventoryTrackingEnabled && product.isOutOfStock) {
-                                cardClasses.push('out-of-stock');
-                            }
-                            if (inventoryTrackingEnabled && !product.isOutOfStock && product.isLowStock) {
-                                cardClasses.push('low-stock');
-                            }
-                            if (product.available === false && !inventoryTrackingEnabled) {
-                                cardClasses.push('trust-mode');
-                            }
-                            if (kioskUnavailable) {
-                                cardClasses.push('status-locked');
-                            }
-
-                            const stockValue =
-                                typeof product.stockQuantity === 'number' && Number.isFinite(product.stockQuantity)
-                                    ? product.stockQuantity
-                                    : '';
-
-                            const addToCartDisabled = kioskUnavailable || (
-                                inventoryTrackingEnabled &&
-                                product.available === false &&
-                                !product.isOutOfStock
-                            );
-
-                            const addToCartLabel = kioskUnavailable
-                                ? 'Ordering unavailable'
-                                : inventoryTrackingEnabled && product.isOutOfStock
-                                    ? 'Request cabinet check'
-                                    : inventoryTrackingEnabled && product.available === false
-                                        ? 'Unavailable'
-                                        : 'Add to cart';
-
-                            return (
-                                <div
-                                    key={product.id}
-                                    className={cardClasses.join(' ')}
-                                    data-product-name={product.name}
-                                    data-category={categoryLabels.join(', ') || primaryCategory}
-                                    data-stock={stockValue}
-                                    data-low-stock={Boolean(product.isLowStock && inventoryTrackingEnabled)}
-                                    data-has-allergen={hasAllergenInfo ? 'true' : 'false'}
-                                    role="button"
-                                    tabIndex={0}
-                                    onClick={(event) => handleProductCardClick(event, product)}
-                                    onKeyDown={(event) => handleProductCardKeyDown(event, product)}
-                                >
-                                    <div className="product-image-wrapper">
-                                        <img
-                                            src={product.imageUrl || DEFAULT_PRODUCT_IMAGE}
-                                            alt={product.imageAlt}
-                                            loading="lazy"
-                                            decoding="async"
-                                            width="400"
-                                            height="300"
-                                            className="product-image"
-                                        />
-                                    </div>
-                                    <div className="product-info">
-                                        <strong className="product-name">{product.name}</strong>
-                                        <span className="product-price">{formatPrice(product.price)}</span>
-                                        {inventoryTrackingEnabled && product.isOutOfStock && (
-                                            <span className="badge out-of-stock-badge">Out of Stock</span>
-                                        )}
-                                        {inventoryTrackingEnabled && !product.isOutOfStock && product.isLowStock && (
-                                            <span className="badge low-stock-badge">Low stock</span>
-                                        )}
-                                        {product.description && (
-                                            <p className="product-description">{product.description}</p>
-                                        )}
-                                    </div>
-                                    <div className="product-card-actions">
-                                        <button
-                                            type="button"
-                                            className="button tertiary details-button"
-                                            onClick={() => setSelectedProduct(product)}
-                                            aria-label={`View details for ${product.name}`}
-                                        >
-                                            View details
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className="add-to-cart add-to-cart-button"
-                                            onClick={() => handleAddToCart(product)}
-                                            disabled={addToCartDisabled}
-                                            aria-disabled={addToCartDisabled}
-                                        >
-                                            {addToCartLabel}
-                                        </button>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
-            </main>
-
-            <aside
-                id="cart-panel"
-                className={`cart-panel${cartOpen ? ' open' : ''}`}
-                aria-hidden={kioskUnavailable || !cartOpen}
-            >
-                <div className="cart-header">
-                    <h2>Shopping Cart</h2>
-                    <button type="button" className="close-cart" onClick={handleToggleCart}>
-                        Close
-                    </button>
-                </div>
-                <div id="cart-items" className="cart-items">
-                    {!hasCartItems && <p className="cart-empty">Your cart is empty</p>}
-                    {cart.map((item) => {
-                        const limitReached = item.purchaseLimit && item.quantity >= item.purchaseLimit;
-                        return (
-                            <div key={item.id} className="cart-item" data-product-name={item.name}>
-                                <div className="cart-item-info">
-                                    <span className="item-name">{item.name}</span>
-                                    <span className="item-price">{formatPrice(item.price)}</span>
-                                </div>
-                                <div className="cart-item-controls">
-                                    <button
-                                        type="button"
-                                        className="quantity-minus-button"
-                                        onClick={() => decrementQuantity(item.id)}
-                                        aria-label={`Decrease quantity for ${item.name}`}
-                                        style={{ width: '48px', height: '48px' }}
-                                    >
-                                        −
-                                    </button>
-                                    <span className="quantity-display">
-                                        <span className="quantity-value cart-item-quantity">{item.quantity}</span>
-                                    </span>
-                                    <button
-                                        type="button"
-                                        className="quantity-plus-button"
-                                        onClick={() => incrementQuantity(item.id)}
-                                        aria-label={`Increase quantity for ${item.name}`}
-                                        disabled={Boolean(limitReached)}
-                                        style={{ width: '48px', height: '48px' }}
-                                    >
-                                        +
-                                    </button>
-                                    <span className="item-subtotal">{formatPrice(item.price * item.quantity)}</span>
-                                    <button
-                                        type="button"
-                                        className="remove-button"
-                                        onClick={() => removeItem(item.id)}
-                                        aria-label={`Remove ${item.name} from cart`}
-                                        style={{ width: '48px', height: '48px' }}
-                                    >
-                                        Remove
-                                    </button>
-                                </div>
+            {!overlayInfo.active ? (
+                <>
+                    <main className="kiosk-main">
+                        {error && (
+                            <div className="kiosk-error" role="alert">
+                                {error.message || 'Unable to load products.'}
                             </div>
-                        );
-                    })}
-                </div>
-                <div className="cart-footer">
-                    <div id="cart-total" className="cart-total">
-                        Total: {formatPrice(cartTotal)}
+                        )}
+                        {!isLoading && categoryFilters.length > 0 && (
+                            <div
+                                id="category-filters"
+                                className="category-filters"
+                                role="group"
+                                aria-label="Filter by category"
+                                style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}
+                            >
+                                <button
+                                    type="button"
+                                    className={`button secondary category-filter-button${selectedCategory === 'All Products' ? ' active' : ' muted'}`}
+                                    data-category="All Products"
+                                    aria-pressed={selectedCategory === 'All Products'}
+                                    aria-controls="product-grid"
+                                    onClick={() => handleCategorySelection('All Products')}
+                                >
+                                    All Products
+                                </button>
+                                {categoryFilters.map((category) => (
+                                    <button
+                                        key={category.id || category.name}
+                                        type="button"
+                                        className={`button secondary category-filter-button${selectedCategory === category.name ? ' active' : ' muted'}`}
+                                        data-category={category.name}
+                                        aria-pressed={selectedCategory === category.name}
+                                        aria-controls="product-grid"
+                                        onClick={() => handleCategorySelection(category.name)}
+                                    >
+                                        {category.name}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                        {isLoading ? (
+                            <ProductGridSkeleton />
+                        ) : (sortedProducts?.length ?? 0) === 0 ? (
+                            <div className="loading-placeholder">No products available.</div>
+                        ) : filteredProducts.length === 0 ? (
+                            <div className="loading-placeholder" role="status" aria-live="polite">
+                                No products in this category
+                            </div>
+                        ) : (
+                            <div
+                                id="product-grid"
+                                className="product-grid"
+                                aria-live={isFetching ? 'polite' : 'off'}
+                                aria-busy={isFetching}
+                            >
+                                {filteredProducts.map((product) => {
+                                    const categoryLabels = (product.categories || [])
+                                        .map((category) => category?.name)
+                                        .filter(Boolean);
+                                    const primaryCategory = categoryLabels[0] || 'Uncategorized';
+                                    const cardClasses = ['product-card'];
+                                    const allergenValue = typeof product.allergens === 'string'
+                                        ? product.allergens.trim()
+                                        : '';
+                                    const hasAllergenInfo = allergenValue.length > 0;
+                                    if (inventoryTrackingEnabled && product.isOutOfStock) {
+                                        cardClasses.push('out-of-stock');
+                                    }
+                                    if (inventoryTrackingEnabled && !product.isOutOfStock && product.isLowStock) {
+                                        cardClasses.push('low-stock');
+                                    }
+                                    if (product.available === false && !inventoryTrackingEnabled) {
+                                        cardClasses.push('trust-mode');
+                                    }
+
+                                    const stockValue =
+                                        typeof product.stockQuantity === 'number' && Number.isFinite(product.stockQuantity)
+                                            ? product.stockQuantity
+                                            : '';
+
+                                    const addToCartDisabled =
+                                        inventoryTrackingEnabled &&
+                                        product.available === false &&
+                                        !product.isOutOfStock;
+
+                                    const addToCartLabel = inventoryTrackingEnabled && product.isOutOfStock
+                                        ? 'Request cabinet check'
+                                        : inventoryTrackingEnabled && product.available === false
+                                            ? 'Unavailable'
+                                            : 'Add to cart';
+
+                                    return (
+                                        <div
+                                            key={product.id}
+                                            className={cardClasses.join(' ')}
+                                            data-product-name={product.name}
+                                            data-category={categoryLabels.join(', ') || primaryCategory}
+                                            data-stock={stockValue}
+                                            data-low-stock={Boolean(product.isLowStock && inventoryTrackingEnabled)}
+                                            data-has-allergen={hasAllergenInfo ? 'true' : 'false'}
+                                            role="button"
+                                            tabIndex={0}
+                                            onClick={(event) => handleProductCardClick(event, product)}
+                                            onKeyDown={(event) => handleProductCardKeyDown(event, product)}
+                                        >
+                                            <div className="product-image-wrapper">
+                                                <img
+                                                    src={product.imageUrl || DEFAULT_PRODUCT_IMAGE}
+                                                    alt={product.imageAlt}
+                                                    loading="lazy"
+                                                    decoding="async"
+                                                    width="400"
+                                                    height="300"
+                                                    className="product-image"
+                                                />
+                                            </div>
+                                            <div className="product-info">
+                                                <strong className="product-name">{product.name}</strong>
+                                                <span className="product-price">{formatPrice(product.price)}</span>
+                                                {inventoryTrackingEnabled && product.isOutOfStock && (
+                                                    <span className="badge out-of-stock-badge">Out of Stock</span>
+                                                )}
+                                                {inventoryTrackingEnabled && !product.isOutOfStock && product.isLowStock && (
+                                                    <span className="badge low-stock-badge">Low stock</span>
+                                                )}
+                                                {product.description && (
+                                                    <p className="product-description">{product.description}</p>
+                                                )}
+                                            </div>
+                                            <div className="product-card-actions">
+                                                <button
+                                                    type="button"
+                                                    className="add-to-cart add-to-cart-button"
+                                                    onClick={() => handleAddToCart(product)}
+                                                    disabled={addToCartDisabled}
+                                                    aria-disabled={addToCartDisabled}
+                                                >
+                                                    {addToCartLabel}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="button tertiary details-button"
+                                                    onClick={() => setSelectedProduct(product)}
+                                                    aria-label={`View details for ${product.name}`}
+                                                >
+                                                    View details
+                                                </button>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </main>
+
+                    <aside
+                        id="cart-panel"
+                        className={`cart-panel${cartOpen ? ' open' : ''}`}
+                        aria-hidden={!cartOpen}
+                    >
+                        <div className="cart-header">
+                            <h2>Shopping Cart</h2>
+                            <button type="button" className="close-cart" onClick={handleToggleCart}>
+                                Close
+                            </button>
+                        </div>
+                        <div id="cart-items" className="cart-items">
+                            {!hasCartItems && <p className="cart-empty">Your cart is empty</p>}
+                            {cart.map((item) => {
+                                const limitReached = item.purchaseLimit && item.quantity >= item.purchaseLimit;
+                                return (
+                                    <div key={item.id} className="cart-item" data-product-name={item.name}>
+                                        <div className="cart-item-info">
+                                            <span className="item-name">{item.name}</span>
+                                            <span className="item-price">{formatPrice(item.price)}</span>
+                                        </div>
+                                        <div className="cart-item-controls">
+                                            <button
+                                                type="button"
+                                                className="quantity-minus quantity-minus-button"
+                                                onClick={() => decrementQuantity(item.id)}
+                                                aria-label={`Decrease quantity for ${item.name}`}
+                                                style={{ width: '48px', height: '48px' }}
+                                            >
+                                                −
+                                            </button>
+                                            <span className="quantity-display">
+                                                <span className="quantity-value cart-item-quantity">{item.quantity}</span>
+                                            </span>
+                                            <button
+                                                type="button"
+                                                className="quantity-plus quantity-plus-button"
+                                                onClick={() => incrementQuantity(item.id)}
+                                                aria-label={`Increase quantity for ${item.name}`}
+                                                disabled={Boolean(limitReached)}
+                                                style={{ width: '48px', height: '48px' }}
+                                            >
+                                                +
+                                            </button>
+                                            <span className="item-subtotal">{formatPrice(item.price * item.quantity)}</span>
+                                            <button
+                                                type="button"
+                                                className="remove-item-button remove-button"
+                                                onClick={() => removeItem(item.id)}
+                                                aria-label={`Remove ${item.name} from cart`}
+                                                style={{ width: '48px', height: '48px' }}
+                                            >
+                                                Remove
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        <div className="cart-footer">
+                            <div id="cart-total" className="cart-total">
+                                Total: {formatPrice(cartTotal)}
+                            </div>
+                            <button
+                                id="checkout-button"
+                                type="button"
+                                className="checkout-button"
+                                onClick={handleCheckout}
+                                disabled={!hasCartItems}
+                                aria-disabled={!hasCartItems}
+                            >
+                                Proceed to checkout
+                            </button>
+                            <button
+                                id="clear-cart-button"
+                                type="button"
+                                className="clear-cart"
+                                onClick={clearCart}
+                            >
+                                Clear cart
+                            </button>
+                        </div>
+                    </aside>
+                </>
+            ) : (
+                <main className="kiosk-main kiosk-main-unavailable" aria-hidden="true">
+                    <div
+                        className="kiosk-unavailable-placeholder"
+                        role="status"
+                        aria-live="polite"
+                    >
+                        {overlayVariant === 'maintenance'
+                            ? overlayInfo.message || kioskUnavailableMessage
+                            : closedBannerMessage || overlayInfo.message || kioskUnavailableMessage}
                     </div>
-                    <button
-                        id="checkout-button"
-                        type="button"
-                        className="checkout-button"
-                        onClick={handleCheckout}
-                        disabled={!hasCartItems || kioskUnavailable}
-                        aria-disabled={!hasCartItems || kioskUnavailable}
-                        title={kioskUnavailable ? kioskUnavailableMessage : undefined}
-                    >
-                        Proceed to checkout
-                    </button>
-                    <button
-                        id="clear-cart-button"
-                        type="button"
-                        className="clear-cart"
-                        onClick={clearCart}
-                    >
-                        Clear cart
-                    </button>
-                </div>
-            </aside>
+                </main>
+            )}
 
             {outOfStockPrompt && (
                 <div className="modal-backdrop out-of-stock-backdrop" role="presentation">
@@ -1126,6 +1551,65 @@ const KioskApp = () => {
                                 onClick={() => confirmOutOfStockSelection(false)}
                             >
                                 No, go back
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {checkoutVisible && (
+                <div
+                    className="modal-backdrop checkout-backdrop"
+                    role="presentation"
+                    onClick={(event) => {
+                        if (event.target === event.currentTarget) {
+                            setCheckoutVisible(false);
+                        }
+                    }}
+                >
+                    <div
+                        id="checkout-dialog"
+                        className="checkout-dialog"
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="checkout-dialog-title"
+                        tabIndex={-1}
+                        ref={checkoutDialogRef}
+                    >
+                        <h2 id="checkout-dialog-title" className="dialog-title">Complete your purchase</h2>
+                        <p className="dialog-message">Scan the code or choose a payment option.</p>
+                        <div
+                            id="payment-qr-code"
+                            className="payment-qr-code"
+                            role="img"
+                            aria-label="QR code to complete payment"
+                        />
+                        <div className="checkout-summary">
+                            <span className="checkout-total-label">Total due</span>
+                            <span className="checkout-total-amount">{formatPrice(cartTotal)}</span>
+                        </div>
+                        <div className="checkout-actions">
+                            <button
+                                type="button"
+                                className="payment-action-button"
+                                ref={checkoutPrimaryActionRef}
+                                onClick={() => logKioskEvent('kiosk.payment_action_selected', { action: 'mobile-pay' })}
+                            >
+                                Pay with mobile
+                            </button>
+                            <button
+                                type="button"
+                                className="payment-action-button"
+                                onClick={() => logKioskEvent('kiosk.payment_action_selected', { action: 'print-receipt' })}
+                            >
+                                Print receipt
+                            </button>
+                            <button
+                                type="button"
+                                className="payment-action-button secondary"
+                                onClick={() => setCheckoutVisible(false)}
+                            >
+                                Cancel
                             </button>
                         </div>
                     </div>
