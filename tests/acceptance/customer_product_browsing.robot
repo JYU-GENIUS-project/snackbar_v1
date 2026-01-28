@@ -134,25 +134,27 @@ Products should be displayed in a grid layout
 
 Each product should show an image
     [Documentation]    Verifies all products display images
-    ${products}=    Get WebElements    css=.product-card
-    FOR    ${product}    IN    @{products}
-        Element Should Be Visible    ${product}/descendant::img[@class='product-image']
+    ${cards}=    Get WebElements    css=.product-card
+    ${images}=    Get WebElements    css=.product-card img.product-image
+    ${card_count}=    Get Length    ${cards}
+    ${image_count}=    Get Length    ${images}
+    Should Be Equal    ${image_count}    ${card_count}    Each product card should include exactly one image
+    FOR    ${image}    IN    @{images}
+        Element Should Be Visible    ${image}
     END
 
 Each product should show a name
     [Documentation]    Verifies all products display names with minimum font size
-    ${products}=    Get WebElements    css=.product-card
-    FOR    ${product}    IN    @{products}
-        ${name_element}=    Get WebElement    ${product}/descendant::*[@class='product-name']
+    ${names}=    Get WebElements    css=.product-card .product-name
+    FOR    ${name_element}    IN    @{names}
         Element Should Be Visible    ${name_element}
         Verify Element Font Size    ${name_element}    16
     END
 
 Each product should show a price
     [Documentation]    Verifies all products display prices with minimum font size
-    ${products}=    Get WebElements    css=.product-card
-    FOR    ${product}    IN    @{products}
-        ${price_element}=    Get WebElement    ${product}/descendant::*[@class='product-price']
+    ${prices}=    Get WebElements    css=.product-card .product-price
+    FOR    ${price_element}    IN    @{prices}
         Element Should Be Visible    ${price_element}
         Verify Element Font Size    ${price_element}    18
         ${price_text}=    Get Text    ${price_element}
@@ -278,16 +280,16 @@ The customer views the product grid
 The product should display an "Out of Stock" badge
     [Documentation]    Verifies out-of-stock badge is shown
     ${out_of_stock_products}=    Get WebElements    css=.product-card[data-stock='0']
-    ${badge}=    Get WebElement    ${out_of_stock_products}[0]/descendant::*[@class='out-of-stock-badge']
+    ${badge}=    Get WebElement    css=.product-card[data-stock='0'] .out-of-stock-badge
     Element Should Be Visible    ${badge}
     ${text}=    Get Text    ${badge}
-    Should Contain    ${text}    Out of Stock
+    ${normalized_text}=    Convert To Uppercase    ${text}
+    Should Contain    ${normalized_text}    OUT OF STOCK
 
 The product card should be visually greyed out or dimmed
     [Documentation]    Verifies visual dimming of out-of-stock products
-    ${out_of_stock_product}=    Get WebElement    css=.product-card[data-stock='0']:first-child
-    ${opacity}=    Get Element Attribute    ${out_of_stock_product}    style
-    # Verify some visual dimming applied (opacity or grayscale filter)
+    ${out_of_stock_product}=    Get WebElement    css=.product-card[data-stock='0']
+    ${opacity}=    Call Method    ${out_of_stock_product}    value_of_css_property    opacity
     Log    Visual dimming applied: ${opacity}
 
 The badge should use red color for visibility

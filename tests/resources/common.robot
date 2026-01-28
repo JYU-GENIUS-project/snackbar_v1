@@ -107,10 +107,20 @@ Clear Shopping Cart
 Verify Touch Target Size
     [Arguments]    ${locator}    ${min_width}=44    ${min_height}=44
     [Documentation]    Verifies that a touch target meets minimum size requirements (44x44px)
-    ${width}=    Get Element Attribute    ${locator}    offsetWidth
-    ${height}=    Get Element Attribute    ${locator}    offsetHeight
-    Should Be True    ${width} >= ${min_width}    Element width ${width}px is less than minimum ${min_width}px
-    Should Be True    ${height} >= ${min_height}    Element height ${height}px is less than minimum ${min_height}px
+    ${status}    ${candidate}=    Run Keyword And Ignore Error    Get WebElement    ${locator}
+    IF    '${status}' == 'PASS'
+        ${element}=    Set Variable    ${candidate}
+    ELSE
+        ${is_string}=    Evaluate    isinstance($locator, str)
+        Run Keyword If    ${is_string}    Fail    Could not locate element '${locator}'
+        ${element}=    Set Variable    ${locator}
+    END
+    ${width}=    Call Method    ${element}    get_property    offsetWidth
+    ${height}=    Call Method    ${element}    get_property    offsetHeight
+    ${width_value}=    Convert To Number    ${width}
+    ${height_value}=    Convert To Number    ${height}
+    Should Be True    ${width_value} >= ${min_width}    Element width ${width_value}px is less than minimum ${min_width}px
+    Should Be True    ${height_value} >= ${min_height}    Element height ${height_value}px is less than minimum ${min_height}px
 
 Verify Color Contrast Ratio
     [Arguments]    ${locator}    ${min_ratio}=4.5
@@ -134,9 +144,18 @@ Take Screenshot With Timestamp
 Verify Element Font Size
     [Arguments]    ${locator}    ${min_size_px}
     [Documentation]    Verifies that element has minimum font size
-    ${font_size}=    Execute Javascript    return window.getComputedStyle(document.querySelector('${locator}')).fontSize
+    ${status}    ${candidate}=    Run Keyword And Ignore Error    Get WebElement    ${locator}
+    IF    '${status}' == 'PASS'
+        ${element}=    Set Variable    ${candidate}
+    ELSE
+        ${is_string}=    Evaluate    isinstance($locator, str)
+        Run Keyword If    ${is_string}    Fail    Could not locate element '${locator}'
+        ${element}=    Set Variable    ${locator}
+    END
+    ${font_size}=    Call Method    ${element}    value_of_css_property    font-size
     ${size_value}=    Remove String    ${font_size}    px
-    Should Be True    ${size_value} >= ${min_size_px}    Font size ${size_value}px is less than minimum ${min_size_px}px
+    ${font_numeric}=    Convert To Number    ${size_value}
+    Should Be True    ${font_numeric} >= ${min_size_px}    Font size ${font_numeric}px is less than minimum ${min_size_px}px
 
 Simulate Inactivity
     [Arguments]    ${duration_seconds}

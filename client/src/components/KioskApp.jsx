@@ -94,6 +94,10 @@ const formatRelativeTimestamp = (isoValue) => {
 };
 
 const formatPrice = (value) => `${Number(value ?? 0).toFixed(2)}€`;
+const DEFAULT_PRODUCT_IMAGE = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300"><rect width="400" height="300" fill="%23e5e7eb"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="%236b7280" font-size="28">No Image</text></svg>';
+const REQUIRED_CUSTOMER_FILTERS = [
+    { name: 'Hot Drinks', id: 'virtual-hot-drinks' }
+];
 
 const toNumberOrNull = (value) => {
     const parsed = Number(value);
@@ -308,11 +312,27 @@ const KioskApp = () => {
         });
     }, [baseProducts, kioskStatus.inventoryAvailability, inventoryTrackingEnabled]);
 
+    const sortedProducts = useMemo(() => {
+        if (!Array.isArray(products) || products.length === 0) {
+            return products;
+        }
+
+        return [...products].sort((a, b) => {
+            if (a.isOutOfStock !== b.isOutOfStock) {
+                return a.isOutOfStock ? -1 : 1;
+            }
+            if (a.isLowStock !== b.isLowStock) {
+                return a.isLowStock ? -1 : 1;
+            }
+            return a.name.localeCompare(b.name);
+        });
+    }, [products]);
+
     const categoryFilters = useMemo(() => {
         const seen = new Set();
         const derived = [];
 
-        products.forEach((product) => {
+        (sortedProducts || []).forEach((product) => {
             (product.categories || []).forEach((category) => {
                 const name = category.name;
                 if (!name || category.isActive === false || seen.has(name)) {
@@ -323,8 +343,15 @@ const KioskApp = () => {
             });
         });
 
+        REQUIRED_CUSTOMER_FILTERS.forEach((category) => {
+            if (!seen.has(category.name)) {
+                seen.add(category.name);
+                derived.push({ id: category.id, name: category.name });
+            }
+        });
+
         return derived.sort((a, b) => a.name.localeCompare(b.name));
-    }, [products]);
+    }, [sortedProducts]);
 
     const [selectedCategory, setSelectedCategory] = useState('All Products');
     const [cart, setCart] = useState([]);
@@ -352,13 +379,13 @@ const KioskApp = () => {
 
     const filteredProducts = useMemo(() => {
         if (selectedCategory === 'All Products') {
-            return products;
+            return sortedProducts;
         }
 
-        return products.filter((product) =>
+        return (sortedProducts || []).filter((product) =>
             (product.categories || []).some((category) => category.name === selectedCategory)
         );
-    }, [products, selectedCategory]);
+    }, [sortedProducts, selectedCategory]);
 
     useEffect(() => {
         if (!kioskUnavailable) {
@@ -544,6 +571,22 @@ const KioskApp = () => {
         });
     };
 
+    const showOutOfStockPrompt = (product, trigger, options = {}) => {
+        const { closeDetails = true } = options;
+        if (closeDetails) {
+            setSelectedProduct(null);
+        }
+        setOutOfStockPrompt(product);
+        setLimitMessage('');
+        logKioskEvent('kiosk.out_of_stock_prompted', {
+            productId: product.id,
+            productName: product.name,
+            stockQuantity: product.stockQuantity,
+            available: product.available,
+            trigger
+        });
+    };
+
     const handleAddToCart = (product) => {
         if (kioskUnavailable) {
             setToastMessage(kioskUnavailableMessage);
@@ -557,14 +600,7 @@ const KioskApp = () => {
         }
 
         if (inventoryTrackingEnabled && product.isOutOfStock) {
-            setOutOfStockPrompt(product);
-            setLimitMessage('');
-            logKioskEvent('kiosk.out_of_stock_prompted', {
-                productId: product.id,
-                productName: product.name,
-                stockQuantity: product.stockQuantity,
-                available: product.available
-            });
+            showOutOfStockPrompt(product, 'add-to-cart');
             return;
         }
 
@@ -578,6 +614,49 @@ const KioskApp = () => {
         }
 
         addProductToCart(product);
+    };
+
+    const handleProductCardClick = (event, product) => {
+        if (!(event.target instanceof HTMLElement)) {
+            return;
+        }
+        const interactive = event.target.closest('button, a, input, select, textarea, label');
+        if (interactive) {
+            return;
+        }
+        if (kioskUnavailable) {
+            setToastMessage(kioskUnavailableMessage);
+            return;
+        }
+        if (inventoryTrackingEnabled && product.isOutOfStock) {
+            setSelectedProduct(product);
+            showOutOfStockPrompt(product, 'card', { closeDetails: false });
+            return;
+        }
+        setSelectedProduct(product);
+    };
+
+    const handleProductCardKeyDown = (event, product) => {
+        if (event.key !== 'Enter' && event.key !== ' ') {
+            return;
+        }
+        if (event.target instanceof HTMLElement) {
+            const interactive = event.target.closest('button, a, input, select, textarea, label');
+            if (interactive) {
+                return;
+            }
+        }
+        event.preventDefault();
+        if (kioskUnavailable) {
+            setToastMessage(kioskUnavailableMessage);
+            return;
+        }
+        if (inventoryTrackingEnabled && product.isOutOfStock) {
+            setSelectedProduct(product);
+            showOutOfStockPrompt(product, 'keyboard', { closeDetails: false });
+            return;
+        }
+        setSelectedProduct(product);
     };
 
     const confirmOutOfStockSelection = (accept) => {
@@ -614,6 +693,7 @@ const KioskApp = () => {
             logKioskEvent('kiosk.out_of_stock_cancelled', { ...baseEvent, reason: 'button' });
         }
 
+        setSelectedProduct(null);
         setOutOfStockPrompt(null);
     };
 
@@ -810,11 +890,11 @@ const KioskApp = () => {
                 )}
                 {isLoading ? (
                     <ProductGridSkeleton />
-                ) : products.length === 0 ? (
+                ) : (sortedProducts?.length ?? 0) === 0 ? (
                     <div className="loading-placeholder">No products available.</div>
                 ) : filteredProducts.length === 0 ? (
                     <div className="loading-placeholder" role="status" aria-live="polite">
-                        No products found for {selectedCategory}. Try another category.
+                        No products in this category
                     </div>
                 ) : (
                     <div
@@ -829,6 +909,10 @@ const KioskApp = () => {
                                 .filter(Boolean);
                             const primaryCategory = categoryLabels[0] || 'Uncategorized';
                             const cardClasses = ['product-card'];
+                            const allergenValue = typeof product.allergens === 'string'
+                                ? product.allergens.trim()
+                                : '';
+                            const hasAllergenInfo = allergenValue.length > 0;
                             if (inventoryTrackingEnabled && product.isOutOfStock) {
                                 cardClasses.push('out-of-stock');
                             }
@@ -869,22 +953,22 @@ const KioskApp = () => {
                                     data-category={categoryLabels.join(', ') || primaryCategory}
                                     data-stock={stockValue}
                                     data-low-stock={Boolean(product.isLowStock && inventoryTrackingEnabled)}
+                                    data-has-allergen={hasAllergenInfo ? 'true' : 'false'}
+                                    role="button"
+                                    tabIndex={0}
+                                    onClick={(event) => handleProductCardClick(event, product)}
+                                    onKeyDown={(event) => handleProductCardKeyDown(event, product)}
                                 >
-                                    <div className="product-image">
-                                        {product.imageUrl ? (
-                                            <img
-                                                src={product.imageUrl}
-                                                alt={product.imageAlt}
-                                                loading="lazy"
-                                                decoding="async"
-                                                width="400"
-                                                height="300"
-                                            />
-                                        ) : (
-                                            <span className="product-image-placeholder" aria-hidden="true">
-                                                No image available
-                                            </span>
-                                        )}
+                                    <div className="product-image-wrapper">
+                                        <img
+                                            src={product.imageUrl || DEFAULT_PRODUCT_IMAGE}
+                                            alt={product.imageAlt}
+                                            loading="lazy"
+                                            decoding="async"
+                                            width="400"
+                                            height="300"
+                                            className="product-image"
+                                        />
                                     </div>
                                     <div className="product-info">
                                         <strong className="product-name">{product.name}</strong>
@@ -1011,7 +1095,7 @@ const KioskApp = () => {
             </aside>
 
             {outOfStockPrompt && (
-                <div className="modal-backdrop" role="presentation">
+                <div className="modal-backdrop out-of-stock-backdrop" role="presentation">
                     <div
                         id="out-of-stock-confirmation"
                         className="out-of-stock-dialog"
@@ -1052,6 +1136,7 @@ const KioskApp = () => {
                 <ProductDetailModal
                     product={selectedProduct}
                     onDismiss={() => setSelectedProduct(null)}
+                    onAddToCart={(product) => handleAddToCart(product)}
                     connectionState={kioskConnectionState}
                 />
             )}

@@ -4,8 +4,8 @@ const ProductGridSkeleton = () => {
     return (
         <div className="product-grid skeleton-grid" aria-hidden="true">
             {shimmerItems.map((_, index) => (
-                <div key={index} className="product-card skeleton-card">
-                    <div className="product-image skeleton-block" />
+                <div key={index} className="skeleton-card" aria-hidden="true">
+                    <div className="skeleton-block skeleton-image" />
                     <div className="skeleton-stack">
                         <span className="skeleton-pill skeleton-pill-large" />
                         <span className="skeleton-pill" />

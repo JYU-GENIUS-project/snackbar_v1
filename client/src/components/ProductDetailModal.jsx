@@ -13,7 +13,7 @@ const buildAllergenList = (allergens) => {
         .filter(Boolean);
 };
 
-const ProductDetailModal = ({ product, onDismiss, connectionState }) => {
+const ProductDetailModal = ({ product, onDismiss, onAddToCart, connectionState }) => {
     const closeButtonRef = useRef(null);
     const dialogRef = useRef(null);
 
@@ -67,6 +67,7 @@ const ProductDetailModal = ({ product, onDismiss, connectionState }) => {
     return (
         <div className="modal-backdrop" role="presentation">
             <div
+                id="product-detail-modal"
                 ref={dialogRef}
                 className="product-detail-dialog"
                 role="dialog"
@@ -140,7 +141,7 @@ const ProductDetailModal = ({ product, onDismiss, connectionState }) => {
                             </div>
                         </div>
 
-                        <section className="product-detail-allergens" aria-live="polite">
+                        <section id="allergen-information" className="product-detail-allergens" aria-live="polite">
                             <h3>Allergens</h3>
                             {hasAllergens ? (
                                 <ul>
@@ -149,9 +150,20 @@ const ProductDetailModal = ({ product, onDismiss, connectionState }) => {
                                     ))}
                                 </ul>
                             ) : (
-                                <p>No allergen information provided.</p>
+                                <p>No allergen information available</p>
                             )}
                         </section>
+                        <div className="product-detail-actions">
+                            <button
+                                id="add-to-cart-button"
+                                type="button"
+                                className="button primary"
+                                onClick={() => onAddToCart && onAddToCart(product)}
+                                disabled={!onAddToCart}
+                            >
+                                Add to cart
+                            </button>
+                        </div>
                     </div>
                 </section>
             </div>
