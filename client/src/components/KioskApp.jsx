@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useProductFeed } from '../hooks/useProductFeed.js';
 import useKioskStatus from '../hooks/useKioskStatus.js';
 import ProductGridSkeleton from './ProductGridSkeleton.jsx';
-import ProductDetailModal from './ProductDetailModal.jsx';
+import ProductDetailModal from './ProductDetailModal';
 import { OFFLINE_FEED_STORAGE_KEY } from '../utils/offlineCache.js';
 import { logKioskEvent } from '../utils/analytics.js';
 

@@ -1,0 +1,26 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "allowJs": true,
+    "checkJs": false,
+    "types": ["node", "jest"],
+    "baseUrl": ".",
+    "paths": {
+      "@snackbar/shared-types": ["../packages/shared-types/src"],
+      "@snackbar/shared-types/*": ["../packages/shared-types/src/*"]
+    }
+  },
+  "include": [
+    "src/**/*",
+    "scripts/**/*"
+  ],
+  "references": [
+    {
+      "path": "../packages/shared-types"
+    }
+  ]
+}

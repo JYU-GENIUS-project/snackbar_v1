@@ -2,9 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useArchiveProduct, useCreateProduct, useProducts, useUpdateProduct } from '../hooks/useProducts.js';
 import { useDebouncedValue } from '../hooks/useDebouncedValue.js';
-import ProductTable from './ProductTable.jsx';
-import ProductForm from './ProductForm.jsx';
-import ProductMediaManager from './ProductMediaManager.jsx';
+import ProductTable from './ProductTable';
+import ProductForm from './ProductForm';
+import ProductMediaManager from './ProductMediaManager';
 import InventoryPanel from './InventoryPanel.jsx';
 import KioskPreview from './KioskPreview.jsx';
 import CategoryManager from './CategoryManager.jsx';
@@ -18,7 +18,7 @@ import {
   useCreateCategory,
   useDeleteCategory,
   useUpdateCategory
-} from '../hooks/useCategories.js';
+} from '../hooks/useCategories';
 import { useInventoryTracking, useSetInventoryTracking } from '../hooks/useInventory.js';
 import { saveOfflineProductSnapshot, readOfflineProductSnapshot } from '../utils/offlineCache.js';
 

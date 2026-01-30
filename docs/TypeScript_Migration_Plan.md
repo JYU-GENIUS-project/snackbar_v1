@@ -30,55 +30,76 @@
 
 ## Phase 0 – Project Preparation
 
-- [ ] Audit existing tooling versions for TypeScript compatibility (Node >=18 already satisfied).
-- [ ] Decide on minimum TypeScript version (recommended: 5.3+) and linting strategy (ESLint with `@typescript-eslint`).
-- [ ] Establish branch strategy for migration (feature branches per module, merge via PR with mandatory review/tests).
-- [ ] Communicate migration guidelines to all contributors (coding standards, null handling, type strictness).
+- [x] Audit existing tooling versions for TypeScript compatibility (Node >=18 already satisfied).
+  - Node 18+ verified via `server/package.json` engines field; Vite 5 and Express 5 toolchains support TS 5.x without upgrades.
+- [x] Decide on minimum TypeScript version (recommended: 5.3+) and linting strategy (ESLint with `@typescript-eslint`).
+  - Adopt TypeScript 5.4.x baseline with ESLint + `@typescript-eslint` plugin suite; align formatting with Prettier where already used.
+- [x] Establish branch strategy for migration (feature branches per module, merge via PR with mandatory review/tests).
+  - Enforce feature branches per logical module (e.g., `chore/ts-client-hooks`), require green CI (lint, test, type-check) before merge.
+- [x] Communicate migration guidelines to all contributors (coding standards, null handling, type strictness).
+  - Published baseline in `docs/TypeScript_Guidelines.md`; share link in next team sync and keep updated as rules evolve.
 
 ## Phase 1 – Shared Foundation
 
-- [ ] Add root-level documentation describing coding conventions (`docs/TypeScript_Guidelines.md`).
-- [ ] Introduce shared type package (e.g., new workspace folder `packages/shared-types`) with initial scaffolding and tsconfig references.
-- [ ] Configure pnpm/npm workspaces if shared types will be published locally; otherwise plan for path aliases.
-- [ ] Define base tsconfig templates (`tsconfig.base.json`) reused by client/server to enforce consistent compiler options.
-- [ ] Decide on strictness level (target `"strict": true`) and document exceptions policy.
+- [x] Add root-level documentation describing coding conventions (`docs/TypeScript_Guidelines.md`).
+  - Shared standards published in `docs/TypeScript_Guidelines.md`; treat as living document.
+- [x] Introduce shared type package (e.g., new workspace folder `packages/shared-types`) with initial scaffolding and tsconfig references.
+  - `@snackbar/shared-types` scaffolded with placeholder export and build script; ready for incremental DTO additions.
+- [x] Configure pnpm/npm workspaces if shared types will be published locally; otherwise plan for path aliases.
+  - Root `package.json` now defines npm workspaces (`client`, `server`, `packages/*`) enabling local linking and shared scripts.
+- [x] Define base tsconfig templates (`tsconfig.base.json`) reused by client/server to enforce consistent compiler options.
+  - Added `tsconfig.base.json` and project reference root `tsconfig.json`; shared settings include strict nullability and node resolution.
+- [x] Decide on strictness level (target `"strict": true`) and document exceptions policy.
+  - Base config enforces strict mode plus `noUncheckedIndexedAccess`, `noImplicitOverride`, `exactOptionalPropertyTypes`; deviations require ADR per guidelines.
 
 ## Phase 2 – Client Tooling Enablement
 
-- [ ] Install TypeScript, React type packages, and ESLint TypeScript plugins in `client`.
-- [ ] Create `client/tsconfig.json` extending base config; configure Vite to respect TS paths.
-- [ ] Update Vite config (`client/vite.config.js`) to TypeScript (`vite.config.ts`) and ensure plugin settings compile.
-- [ ] Adjust npm scripts (e.g., `build`, `dev`, `test`) if needed for TypeScript entry files.
-- [ ] Update ESLint configuration to include `.ts`/`.tsx` extensions and TypeScript parser.
+- [x] Install TypeScript, React type packages, and ESLint TypeScript plugins in `client`.
+  - Added `typescript`, `tslib`, React type definitions, and `@typescript-eslint` tooling to `client/package.json`; shared types package linked via workspace.
+- [x] Create `client/tsconfig.json` extending base config; configure Vite to respect TS paths.
+  - Introduced project config referencing base settings plus path mapping to `@snackbar/shared-types`; supplemental `tsconfig.node.json` covers Vite/Vitest configs.
+- [x] Update Vite config (`client/vite.config.js`) to TypeScript (`vite.config.ts`) and ensure plugin settings compile.
+  - Converted Vite and Vitest configs to `.ts` preserving proxy setup and test environment options.
+- [x] Adjust npm scripts (e.g., `build`, `dev`, `test`) if needed for TypeScript entry files.
+  - Updated lint target to include `.ts`/`.tsx` and added `type-check` script invoking `tsc --noEmit`.
+- [x] Update ESLint configuration to include `.ts`/`.tsx` extensions and TypeScript parser.
+  - Switched parser to `@typescript-eslint` and enabled recommended rule set while retaining existing React/A11y policies.
 
 ## Phase 3 – Client Code Migration
 
-- [ ] Convert entry points (`main.jsx`, `App.jsx`) to `.tsx`, adding minimal types for props/state.
-- [ ] Migrate top-level providers/hooks (`hooks/useAuth.js`, `useCategories.js`, etc.) to TypeScript with explicit return types.
+- [x] Convert entry points (`main.jsx`, `App.jsx`) to `.tsx`, adding minimal types for props/state.
+  - `main.tsx` and `App.tsx` now type the auth/session state, API error handling, and history wrappers; HTML entry updated.
+- [x] Migrate top-level providers/hooks (`hooks/useAuth.js`, `useCategories.js`, etc.) to TypeScript with explicit return types.
+  - Converted `useAuth` and `useCategories` to `.ts` with typed payloads and React Query generics; JS shims now re-export from TS.
 - [ ] Convert components directory iteratively; prioritize shared primitives (forms, tables) before specialized views.
   - [ ] `components/ProductManager.jsx`
-  - [ ] `components/ProductTable.jsx`
-  - [ ] `components/ProductDetailModal.jsx`
-  - [ ] `components/ProductForm.jsx`
-  - [ ] `components/ProductMediaManager.jsx`
+  - [x] `components/ProductTable.jsx`
+  - [x] `components/ProductDetailModal.jsx`
+  - [x] `components/ProductForm.jsx`
+  - [x] `components/ProductMediaManager.jsx`
   - [ ] `components/InventoryPanel.jsx`
   - [ ] `components/AdminAccountsManager.jsx`
   - [ ] `components/AuditTrailViewer.jsx`
   - [ ] `components/CategoryManager.jsx`
   - [ ] `components/KioskApp.jsx`
   - [ ] `components/KioskPreview.jsx`
-  - [ ] `components/LoginPanel.jsx`
+  - [x] `components/LoginPanel.jsx`
 - [ ] Update utility modules in `client/src/utils` and API layer `services/apiClient.js` to TypeScript, leveraging shared DTOs.
 - [ ] Migrate test files to `.tsx`/`.ts` and ensure Vitest typings are configured via `vitest.config.ts` and `vitest.setup.ts` updates.
 - [ ] Remove residual `.js/.jsx` files once equivalents exist and imports updated.
 
 ## Phase 4 – Server Tooling Enablement
 
-- [ ] Install TypeScript, `ts-node`, and `@types` packages for Node/Express ecosystem in `server`.
-- [ ] Create `server/tsconfig.json` extending base config; configure outDir (e.g., `dist`).
-- [ ] Migrate build scripts: introduce `build` script running `tsc`, update `start` to launch compiled output (`node dist/server.js`).
-- [ ] Update Jest config (`jest.config.js`) to support TypeScript (e.g., use `ts-jest` or `babel-jest`).
-- [ ] Configure ESLint with TypeScript parser and updated ruleset.
+- [x] Install TypeScript, `ts-node`, and `@types` packages for Node/Express ecosystem in `server`.
+  - Server `package.json` now includes TypeScript compiler/runtime helpers plus ambient typings for core dependencies.
+- [x] Create `server/tsconfig.json` extending base config; configure outDir (e.g., `dist`).
+  - Added build and project configs targeting `dist/` with temporary `allowJs` to support existing JS during migration; paths wired to shared types.
+- [x] Migrate build scripts: introduce `build` script running `tsc`, update `start` to launch compiled output (`node dist/server.js`).
+  - Build + type-check scripts added; `npm start` now runs `tsc -b` via `prestart` then executes compiled output, with `start:js` fallback retained for rollbacks.
+- [x] Update Jest config (`jest.config.js`) to support TypeScript (e.g., use `ts-jest` or `babel-jest`).
+  - Jest leverages `ts-jest` transform and expanded glob patterns to cover mixed JS/TS sources.
+- [x] Configure ESLint with TypeScript parser and updated ruleset.
+  - Flat config imports `@typescript-eslint` plugin with `recommended-type-checked` rules gated by project-aware parser options.
 
 ## Phase 5 – Server Code Migration
 
