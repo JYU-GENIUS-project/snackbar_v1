@@ -30,6 +30,7 @@ const REQUIRED_CATEGORIES = [
   { name: 'Cold Beverages', description: 'Chilled drinks displayed on the kiosk cold shelf.' },
   { name: 'Cold Drinks', description: 'Grab-and-go cold beverages for kiosk filtering.' },
   { name: 'Soft Drinks', description: 'Carbonated refreshments highlighted in customer filters.' },
+  { name: 'Hot Drinks', description: 'Steaming beverage options for kiosk filtering tests.' },
   { name: 'Healthy Snacks', description: 'Better-for-you snack items for wellness minded customers.' },
   { name: 'Snacks', description: 'Popular snack aisle staples for vending flows.' },
   { name: 'Candy', description: 'Confectionery treats showcased in sweet selections.' },
@@ -47,10 +48,11 @@ const PRODUCT_FIXTURES = [
     description: 'Energy drink 250ml can.',
     price: 2.99,
     status: 'active',
-    stockQuantity: 120,
+    stockQuantity: 0,
     purchaseLimit: 4,
     lowStockThreshold: 20,
-    categoryNames: ['Cold Drinks']
+    categoryNames: ['Cold Drinks'],
+    displayOrder: 0
   },
   {
     name: 'Coca-Cola',
@@ -60,7 +62,9 @@ const PRODUCT_FIXTURES = [
     stockQuantity: 5,
     purchaseLimit: 6,
     lowStockThreshold: 5,
-    categoryNames: ['Cold Beverages', 'Cold Drinks', 'Soft Drinks']
+    categoryNames: ['Cold Beverages', 'Cold Drinks', 'Soft Drinks'],
+    allergens: 'Caramel color, Caffeine',
+    displayOrder: 1
   },
   {
     name: 'Pepsi',
@@ -70,7 +74,8 @@ const PRODUCT_FIXTURES = [
     stockQuantity: 160,
     purchaseLimit: 6,
     lowStockThreshold: 25,
-    categoryNames: ['Cold Beverages', 'Cold Drinks', 'Soft Drinks']
+    categoryNames: ['Cold Beverages', 'Cold Drinks', 'Soft Drinks'],
+    displayOrder: 2
   },
   {
     name: 'Sprite',
@@ -80,7 +85,8 @@ const PRODUCT_FIXTURES = [
     stockQuantity: 150,
     purchaseLimit: 6,
     lowStockThreshold: 25,
-    categoryNames: ['Cold Beverages', 'Cold Drinks', 'Soft Drinks']
+    categoryNames: ['Cold Beverages'],
+    displayOrder: 3
   },
   {
     name: 'Iced Tea',
@@ -90,7 +96,8 @@ const PRODUCT_FIXTURES = [
     stockQuantity: 110,
     purchaseLimit: 5,
     lowStockThreshold: 20,
-    categoryNames: ['Cold Beverages']
+    categoryNames: ['Cold Beverages'],
+    displayOrder: 4
   },
   {
     name: 'Sparkling Water',
@@ -100,7 +107,8 @@ const PRODUCT_FIXTURES = [
     stockQuantity: 140,
     purchaseLimit: 8,
     lowStockThreshold: 20,
-    categoryNames: ['Cold Beverages']
+    categoryNames: ['Cold Beverages'],
+    displayOrder: 5
   },
   {
     name: 'Cold Brew Coffee',
@@ -110,7 +118,8 @@ const PRODUCT_FIXTURES = [
     stockQuantity: 90,
     purchaseLimit: 4,
     lowStockThreshold: 15,
-    categoryNames: ['Cold Beverages']
+    categoryNames: ['Cold Beverages'],
+    displayOrder: 6
   },
   {
     name: 'Chocolate Bar',
@@ -120,7 +129,9 @@ const PRODUCT_FIXTURES = [
     stockQuantity: 180,
     purchaseLimit: 8,
     lowStockThreshold: 25,
-    categoryNames: ['Snacks', 'Candy']
+    categoryNames: ['Snacks', 'Candy'],
+    allergens: 'Milk',
+    displayOrder: 7
   },
   {
     name: 'Trail Mix',
@@ -130,8 +141,22 @@ const PRODUCT_FIXTURES = [
     stockQuantity: 130,
     purchaseLimit: 6,
     lowStockThreshold: 20,
-    categoryNames: ['Snacks', 'Healthy Snacks']
+    categoryNames: ['Snacks', 'Healthy Snacks'],
+    allergens: 'Peanuts, Tree nuts',
+    displayOrder: 8
   }
+];
+
+const CUSTOMER_BROWSING_ORDER = [
+  'Red Bull',
+  'Coca-Cola',
+  'Pepsi',
+  'Sprite',
+  'Iced Tea',
+  'Sparkling Water',
+  'Cold Brew Coffee',
+  'Chocolate Bar',
+  'Trail Mix'
 ];
 
 const buildProductPayload = (fixture, categoryIds) => ({
@@ -143,10 +168,10 @@ const buildProductPayload = (fixture, categoryIds) => ({
   stockQuantity: fixture.stockQuantity,
   purchaseLimit: fixture.purchaseLimit,
   lowStockThreshold: fixture.lowStockThreshold,
-  allergens: null,
+  allergens: fixture.allergens ?? null,
   imageAlt: null,
   metadata: { seeded: true },
-  displayOrder: 0,
+  displayOrder: fixture.displayOrder ?? 0,
   isActive: true,
   categoryIds,
   categoryId: categoryIds[0]
@@ -219,6 +244,33 @@ const ensureReferenceProducts = async (actor, categoryMap) => {
   }
 };
 
+const applyCustomerBrowsingFixtures = async () => {
+  console.log('\nConfiguring customer browsing fixtures...');
+
+  await db.query(
+    `WITH ordering AS (
+       SELECT LOWER(value) AS name, ord - 1 AS position
+       FROM UNNEST($1::text[]) WITH ORDINALITY AS listed(value, ord)
+     )
+     UPDATE products AS p
+     SET display_order = ordering.position
+     FROM ordering
+     WHERE LOWER(p.name) = ordering.name`,
+    [CUSTOMER_BROWSING_ORDER]
+  );
+
+  await db.query(
+    `UPDATE products AS p
+     SET allergens = data.allergens
+     FROM (VALUES
+       ('red bull', NULL),
+       ('chocolate bar', 'Milk'),
+       ('trail mix', 'Peanuts, Tree nuts')
+     ) AS data(name, allergens)
+     WHERE LOWER(p.name) = data.name`
+  );
+};
+
 const ensureInventoryFixtures = async (actor) => {
   console.log('\nEnsuring inventory ledger fixtures...');
 
@@ -229,9 +281,9 @@ const ensureInventoryFixtures = async (actor) => {
        FROM products
        WHERE LOWER(name) = ANY($1::text[])
      )`,
-    [['coca-cola', 'trail mix']]
+    [['coca-cola', 'trail mix', 'red bull']]
   );
-  console.log('  Reset ledger history for Coca-Cola and Trail Mix.');
+  console.log('  Reset ledger history for Coca-Cola, Trail Mix, and Red Bull.');
 
   const discrepancyDelta = -3;
   const discrepancyTag = 'inventory-discrepancy-trailmix';
@@ -258,14 +310,14 @@ const ensureInventoryFixtures = async (actor) => {
         GREATEST(tp.stock_quantity + $2::integer, 0),
         'manual_adjustment',
         'Seeded discrepancy for acceptance tests',
-        $3,
+        $3::uuid,
         jsonb_build_object('seedTag', $4::text)
     FROM target_product tp
     WHERE tp.id IS NOT NULL
       AND NOT EXISTS (
         SELECT 1
         FROM inventory_ledger l
-        WHERE l.product_id = tp.id AND l.metadata ->> 'seedTag' = $4
+        WHERE l.product_id = tp.id AND l.metadata ->> 'seedTag' = $4::text
     );`,
     ['Trail Mix', discrepancyDelta, actor?.id || null, discrepancyTag]
   );
@@ -274,6 +326,49 @@ const ensureInventoryFixtures = async (actor) => {
     console.log('  Seeded Trail Mix ledger discrepancy (3 units).');
   } else {
     console.log('  Trail Mix ledger discrepancy already present.');
+  }
+
+  const redBullResult = await db.query(
+    `WITH target_product AS (
+        SELECT id
+        FROM products
+        WHERE LOWER(name) = LOWER($1)
+        LIMIT 1
+    )
+    UPDATE products AS p
+    SET stock_quantity = 0
+    FROM target_product tp
+    WHERE p.id = tp.id
+    RETURNING tp.id`,
+    ['Red Bull']
+  );
+
+  if (redBullResult.rows.length > 0) {
+    const productId = redBullResult.rows[0].id;
+    console.log('  Seeding Red Bull zero stock ledger entry...');
+    await db.query(
+      `INSERT INTO inventory_ledger (
+         product_id,
+         delta,
+         resulting_quantity,
+         source,
+         reason,
+         admin_id,
+         metadata
+       ) VALUES (
+         $1::uuid,
+         0,
+         0,
+         'manual_adjustment',
+         'Seeded zero stock for acceptance tests',
+         $2::uuid,
+         '{"seedTag":"inventory-seed-red-bull-zero-stock"}'::jsonb
+       )`,
+      [productId, actor?.id || null]
+    );
+    console.log('  Seeded Red Bull zero stock ledger entry.');
+  } else {
+    console.log('  Skipped Red Bull zero stock seed; product missing.');
   }
 
   await db.query('SELECT refresh_inventory_snapshot();');
@@ -322,6 +417,7 @@ async function seed() {
 
     const categoryMap = await ensureReferenceCategories(adminActor);
     await ensureReferenceProducts(adminActor, categoryMap);
+    await applyCustomerBrowsingFixtures();
     await ensureInventoryFixtures(adminActor);
 
     console.log('\n' + '='.repeat(60));

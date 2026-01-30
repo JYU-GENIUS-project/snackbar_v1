@@ -590,7 +590,7 @@ const ProductManager = ({ auth }) => {
     );
   };
 
-  const archiveProductLocally = (productId, productName) => {
+  const archiveProductLocally = (productId) => {
     setMockProducts((current) => current.filter((product) => product.id !== productId));
   };
 

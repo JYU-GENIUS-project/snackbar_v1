@@ -2,6 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const productService = require('../services/productService');
 const inventoryService = require('../services/inventoryService');
+const statusService = require('../services/statusService');
 
 const router = express.Router();
 
@@ -20,12 +21,18 @@ const computeLastModified = (products) => {
 
 router.get('/products', async (req, res, next) => {
   try {
-    const [products, inventoryTrackingEnabled] = await Promise.all([
+    const [products, inventoryTrackingEnabled, kioskStatus] = await Promise.all([
       productService.getProductFeed(),
-      inventoryService.getInventoryTrackingState()
+      inventoryService.getInventoryTrackingState(),
+      statusService.getKioskStatus()
     ]);
 
-    const serializedPayload = JSON.stringify({ products, inventoryTrackingEnabled });
+    const statusFingerprint = statusService.buildStatusFingerprint(kioskStatus);
+    const serializedPayload = JSON.stringify({
+      products,
+      inventoryTrackingEnabled,
+      statusFingerprint
+    });
     const etag = buildEtag(serializedPayload);
 
     const lastModified = computeLastModified(products);
@@ -42,7 +49,9 @@ router.get('/products', async (req, res, next) => {
     const payload = {
       generatedAt: new Date().toISOString(),
       products,
-      inventoryTrackingEnabled
+      inventoryTrackingEnabled,
+      status: kioskStatus,
+      statusFingerprint
     };
 
     res.set({

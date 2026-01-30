@@ -263,12 +263,12 @@ US-028: Product Changes Reflect On Kiosk Immediately
     [Tags]    US-028    real-time-sync    performance
     
     [Setup]    Admin Login And Open Kiosk
-    Skip    Kiosk UI not available yet; track in GitHub issue #7 (phase 5: catalog & status UX)
     Given the admin updates a product price
     When the admin saves the changes
     Then the changes should appear on the kiosk within 5 seconds
     And the kiosk should display the updated information
     And no manual refresh should be required
+    And the admin restores the product price to default
 
 
 US-027: Remove Products From System
@@ -544,6 +544,22 @@ No manual refresh should be required
     # Updates should appear without user action
     Log    Kiosk updated automatically without manual refresh
 
+The admin restores the product price to default
+    [Documentation]    Resets the product price after synchronization verification
+    ${switched}=    Run Keyword And Return Status    Switch Window    MAIN
+    IF    not ${switched}
+        Switch Window    index=0
+        Sleep    0.5s
+    END
+    Click Element    id=products-menu
+    Wait Until Element Is Visible    id=product-list    timeout=10s
+    Click Element    xpath=//tr[contains(., 'Coca-Cola')]//button[contains(., 'Edit')]
+    Wait Until Element Is Visible    id=product-form    timeout=5s
+    Clear Element Text    id=product-price
+    Input Text    id=product-price    ${TEST_PRODUCT_PRICE}
+    Click Button    id=save-product-button
+    Wait Until Page Contains    Product updated    timeout=5s
+
 A product exists that should be discontinued
     [Documentation]    Product exists for deletion
     The admin is on the product management page
@@ -589,7 +605,10 @@ Admin Login And Open Kiosk
     Admin Login
     # Open kiosk in new window
     Execute Javascript    window.open('${KIOSK_URL}', 'kiosk')
-    Sleep    2s
+    Sleep    1s
+    Switch Window    NEW
+    Wait Until Element Is Visible    id=product-grid    timeout=10s
+    Switch Window    MAIN
 
 # US-021 Keywords
 The primary admin is logged in

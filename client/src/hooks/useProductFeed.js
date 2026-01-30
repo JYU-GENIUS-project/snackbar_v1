@@ -5,9 +5,37 @@ import { readOfflineProductSnapshot, saveOfflineProductSnapshot } from '../utils
 
 const FEED_QUERY_KEY = ['product-feed'];
 
+const normalizeStatusPayload = (input) => {
+  if (!input || typeof input !== 'object') {
+    return null;
+  }
+
+  return {
+    status: typeof input.status === 'string' ? input.status : null,
+    reason: typeof input.reason === 'string' ? input.reason : null,
+    message: typeof input.message === 'string' ? input.message : null,
+    nextOpen: typeof input.nextOpen === 'string' ? input.nextOpen : null,
+    nextClose: typeof input.nextClose === 'string' ? input.nextClose : null,
+    maintenance: {
+      enabled: Boolean(input?.maintenance?.enabled),
+      message: typeof input?.maintenance?.message === 'string' ? input.maintenance.message : null,
+      since: typeof input?.maintenance?.since === 'string' ? input.maintenance.since : null
+    },
+    timezone: typeof input.timezone === 'string' ? input.timezone : null,
+    generatedAt: typeof input.generatedAt === 'string' ? input.generatedAt : null,
+    windows: Array.isArray(input.windows) ? input.windows : []
+  };
+};
+
 const buildFeedFromOfflineSnapshot = (snapshot) => {
   if (!snapshot || !Array.isArray(snapshot.products)) {
-    return { products: [], source: 'offline', inventoryTrackingEnabled: true };
+    return {
+      products: [],
+      source: 'offline',
+      inventoryTrackingEnabled: true,
+      status: null,
+      statusFingerprint: null
+    };
   }
 
   const feedProducts = snapshot.products.map((product) => {
@@ -49,16 +77,26 @@ const buildFeedFromOfflineSnapshot = (snapshot) => {
     products: feedProducts,
     source: snapshot.source || 'offline',
     generatedAt: snapshot.generatedAt || new Date().toISOString(),
+    lastUpdatedAt: snapshot.lastUpdatedAt || snapshot.generatedAt || new Date().toISOString(),
     inventoryTrackingEnabled:
       typeof snapshot.inventoryTrackingEnabled === 'boolean'
         ? snapshot.inventoryTrackingEnabled
-        : true
+        : true,
+    statusFingerprint: snapshot.statusFingerprint || null,
+    status: normalizeStatusPayload(snapshot.status)
   };
 };
 
 const normalizeFeedPayload = (payload) => {
   if (!payload || typeof payload !== 'object') {
-    return { products: [], source: 'api', generatedAt: new Date().toISOString(), inventoryTrackingEnabled: true };
+    return {
+      products: [],
+      source: 'api',
+      generatedAt: new Date().toISOString(),
+      inventoryTrackingEnabled: true,
+      status: null,
+      statusFingerprint: null
+    };
   }
 
   const products = Array.isArray(payload.products) ? payload.products : [];
@@ -67,9 +105,12 @@ const normalizeFeedPayload = (payload) => {
     ...payload,
     products,
     generatedAt: payload.generatedAt || new Date().toISOString(),
+    lastUpdatedAt: payload.lastUpdatedAt || payload.generatedAt || new Date().toISOString(),
     source: payload.source || 'api',
     inventoryTrackingEnabled:
-      typeof payload.inventoryTrackingEnabled === 'boolean' ? payload.inventoryTrackingEnabled : true
+      typeof payload.inventoryTrackingEnabled === 'boolean' ? payload.inventoryTrackingEnabled : true,
+    statusFingerprint: typeof payload.statusFingerprint === 'string' ? payload.statusFingerprint : null,
+    status: normalizeStatusPayload(payload.status)
   };
 };
 
@@ -96,7 +137,9 @@ const fetchProductFeed = async ({ signal }) => {
         products: selected.products,
         generatedAt: selected.generatedAt || new Date().toISOString(),
         source: 'api',
-        inventoryTrackingEnabled: selected.inventoryTrackingEnabled
+        inventoryTrackingEnabled: selected.inventoryTrackingEnabled,
+        status: selected.status,
+        statusFingerprint: selected.statusFingerprint
       });
       return selected;
     }
@@ -113,7 +156,13 @@ const fetchProductFeed = async ({ signal }) => {
     if (fallbackSnapshot?.products?.length) {
       return buildFeedFromOfflineSnapshot(fallbackSnapshot);
     }
-    return { products: [], source: 'offline', inventoryTrackingEnabled: true };
+    return {
+      products: [],
+      source: 'offline',
+      inventoryTrackingEnabled: true,
+      status: null,
+      statusFingerprint: null
+    };
   }
 };
 

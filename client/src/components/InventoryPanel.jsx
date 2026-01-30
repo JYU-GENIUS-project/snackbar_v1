@@ -1,13 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-    INVENTORY_QUERY_KEY,
     useInventorySnapshot,
     useRecordInventoryAdjustment,
     useRecordStockUpdate
 } from '../hooks/useInventory.js';
 import { cloneItemsCollection, readInventoryCache, writeInventoryCache } from '../utils/inventoryCache.js';
-
-const API_BASE_PATH = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '');
 
 const FALLBACK_ITEMS = [
     {
@@ -627,7 +624,7 @@ const InventoryPanel = ({
 
             <div style={{ overflowX: 'auto', marginTop: '1rem' }}>
                 <table id="inventory-table" className="table" style={{ minWidth: '640px' }}>
-                        <thead>
+                    <thead>
                         <tr>
                             <th
                                 scope="col"
@@ -663,8 +660,8 @@ const InventoryPanel = ({
                             <th scope="col">Last Activity</th>
                             <th scope="col">Actions</th>
                         </tr>
-                        </thead>
-                        <tbody>
+                    </thead>
+                    <tbody>
                         {sortedItems.length === 0 && (
                             <tr>
                                 <td colSpan={7} style={{ textAlign: 'center', padding: '1.5rem' }}>
@@ -788,7 +785,7 @@ const InventoryPanel = ({
                                 </tr>
                             );
                         })}
-                        </tbody>
+                    </tbody>
                 </table>
             </div>
 

@@ -4,6 +4,7 @@ Library          SeleniumLibrary
 Library          String
 Library          DateTime
 Library          OperatingSystem
+Library          Collections
 
 
 *** Variables ***
@@ -35,6 +36,30 @@ Open Kiosk Browser
     Maximize Browser Window
     Set Selenium Timeout    ${SELENIUM_TIMEOUT}
     Set Selenium Implicit Wait    ${SELENIUM_IMPLICIT_WAIT}
+    Reset Kiosk Test Controls
+    Seed Default Kiosk Products
+    Go To    ${KIOSK_URL}
+    Wait For Page Load Complete
+    Wait Until Element Is Visible    id=cart-icon    timeout=10s
+
+Reset Kiosk Test Controls
+    [Documentation]    Clears kiosk overrides to ensure deterministic test state
+    &{reset_payload}=    Create Dictionary    reset=${TRUE}
+    Apply Kiosk Test Controls    ${reset_payload}
+    Execute Javascript    try { window.sessionStorage.removeItem('snackbar-trust-mode-disabled'); } catch (error) {}
+    Execute Javascript    try { window.localStorage.removeItem('snackbar-offline-products'); } catch (error) {}
+
+Seed Default Kiosk Products
+    [Documentation]    Seeds an offline product snapshot so kiosk UI has deterministic data without backend dependencies
+    ${timestamp}=    Get Current Timestamp ISO8601
+    ${snapshot_json}=    Set Variable    {"products":[{"id":"product-coca-cola","name":"Coca-Cola","price":2.5,"currency":"EUR","stockQuantity":25,"lowStockThreshold":5,"purchaseLimit":5,"categoryId":"cold-drinks","categoryIds":["cold-drinks"],"categories":[{"id":"cold-drinks","name":"Cold Drinks","isActive":true}],"description":"Classic cola beverage","metadata":{},"primaryMedia":{"url":"","alt":"Coca-Cola"}}],"generatedAt":"${timestamp}","lastUpdatedAt":"${timestamp}","inventoryTrackingEnabled":true,"statusFingerprint":"offline-default","status":null,"source":"offline"}
+    Execute Javascript    window.localStorage.setItem('snackbar-offline-products', '${snapshot_json}');
+
+Apply Kiosk Test Controls
+    [Arguments]    ${controls}
+    [Documentation]    Applies kiosk simulator overrides via browser helper
+    ${controls_json}=    Evaluate    json.dumps(${controls})    json
+    Execute Javascript    (function(){ const payload = JSON.parse('${controls_json}'); if (window.snackbarApplyTestControls) { window.snackbarApplyTestControls(payload); } else { try { window.localStorage.setItem('snackbar-test-controls', JSON.stringify(payload)); } catch (error) {} } })();
 
 Open Admin Browser
     [Documentation]    Opens the admin portal in a browser
@@ -94,7 +119,7 @@ Verify Cart Total
 Add Product To Cart
     [Arguments]    ${product_name}
     [Documentation]    Adds a product to the shopping cart
-    Click Element    xpath=//div[@data-product-name='${product_name}']//button[@class='add-to-cart']
+    Click Element    xpath=//div[@data-product-name='${product_name}']//button[contains(@class, 'add-to-cart')]
     Wait Until Page Contains    Added to cart    timeout=5s
 
 Clear Shopping Cart
@@ -104,13 +129,45 @@ Clear Shopping Cart
     Click Button    id=clear-cart-button
     Wait Until Page Contains    Your cart is empty    timeout=5s
 
+Ensure Cart Panel Closed
+    [Documentation]    Closes the cart overlay if it is open to avoid UI overlays blocking touch targets
+    Execute Javascript    (function(){ const panel = document.getElementById('cart-panel'); if (!panel || !panel.classList.contains('open')) { return; } const closeButton = panel.querySelector('.close-cart'); if (closeButton) { closeButton.click(); return; } const toggle = document.getElementById('cart-icon'); if (toggle) { toggle.click(); } })();
+
+Close Checkout Modal
+    [Documentation]    Closes the checkout dialog when it is visible
+    ${is_open}=    Execute Javascript    return Boolean(document.getElementById('checkout-dialog'));
+    IF    not ${is_open}
+        Return From Keyword
+    END
+    Click Element    css=.checkout-dialog .payment-action-button.secondary
+    Wait Until Page Does Not Contain Element    id=checkout-dialog    timeout=5s
+
 Verify Touch Target Size
     [Arguments]    ${locator}    ${min_width}=44    ${min_height}=44
     [Documentation]    Verifies that a touch target meets minimum size requirements (44x44px)
-    ${width}=    Get Element Attribute    ${locator}    offsetWidth
-    ${height}=    Get Element Attribute    ${locator}    offsetHeight
-    Should Be True    ${width} >= ${min_width}    Element width ${width}px is less than minimum ${min_width}px
-    Should Be True    ${height} >= ${min_height}    Element height ${height}px is less than minimum ${min_height}px
+    ${status}    ${candidate}=    Run Keyword And Ignore Error    Get WebElement    ${locator}
+    IF    '${status}' == 'PASS'
+        ${element}=    Set Variable    ${candidate}
+    ELSE
+        ${is_string}=    Evaluate    isinstance($locator, str)
+        Run Keyword If    ${is_string}    Fail    Could not locate element '${locator}'
+        ${element}=    Set Variable    ${locator}
+    END
+    ${width}=    Call Method    ${element}    get_property    offsetWidth
+    ${height}=    Call Method    ${element}    get_property    offsetHeight
+    ${width_value}=    Convert To Number    ${width}
+    ${height_value}=    Convert To Number    ${height}
+    ${element_id}=    Call Method    ${element}    get_attribute    id
+    ${element_class}=    Call Method    ${element}    get_attribute    class
+    ${tag_value}=    Call Method    ${element}    get_attribute    tagName
+    IF    ${width_value} < ${min_width}
+        Log    Touch target width too small: tag=${tag_value}, id=${element_id}, class=${element_class}, width=${width_value}    WARN
+    END
+    IF    ${height_value} < ${min_height}
+        Log    Touch target height too small: tag=${tag_value}, id=${element_id}, class=${element_class}, height=${height_value}    WARN
+    END
+    Should Be True    ${width_value} >= ${min_width}    Element width ${width_value}px is less than minimum ${min_width}px
+    Should Be True    ${height_value} >= ${min_height}    Element height ${height_value}px is less than minimum ${min_height}px
 
 Verify Color Contrast Ratio
     [Arguments]    ${locator}    ${min_ratio}=4.5
@@ -134,9 +191,18 @@ Take Screenshot With Timestamp
 Verify Element Font Size
     [Arguments]    ${locator}    ${min_size_px}
     [Documentation]    Verifies that element has minimum font size
-    ${font_size}=    Execute Javascript    return window.getComputedStyle(document.querySelector('${locator}')).fontSize
+    ${status}    ${candidate}=    Run Keyword And Ignore Error    Get WebElement    ${locator}
+    IF    '${status}' == 'PASS'
+        ${element}=    Set Variable    ${candidate}
+    ELSE
+        ${is_string}=    Evaluate    isinstance($locator, str)
+        Run Keyword If    ${is_string}    Fail    Could not locate element '${locator}'
+        ${element}=    Set Variable    ${locator}
+    END
+    ${font_size}=    Call Method    ${element}    value_of_css_property    font-size
     ${size_value}=    Remove String    ${font_size}    px
-    Should Be True    ${size_value} >= ${min_size_px}    Font size ${size_value}px is less than minimum ${min_size_px}px
+    ${font_numeric}=    Convert To Number    ${size_value}
+    Should Be True    ${font_numeric} >= ${min_size_px}    Font size ${font_numeric}px is less than minimum ${min_size_px}px
 
 Simulate Inactivity
     [Arguments]    ${duration_seconds}

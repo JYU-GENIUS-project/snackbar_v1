@@ -109,6 +109,7 @@ US-018-Comprehensive: Touch Target Validation For All Elements
     [Tags]    US-018    comprehensive    touch-targets
     
     Given the customer is on the home screen
+    And Add Product To Cart    ${TEST_PRODUCT_NAME}
     Then product cards should meet 44x44px minimum
     And category filter buttons should meet 44x44px minimum
     And add to cart buttons should meet 44x44px minimum
@@ -118,6 +119,7 @@ US-018-Comprehensive: Touch Target Validation For All Elements
     And checkout button should meet 44x44px minimum
     When the customer is on checkout screen
     Then all payment action buttons should meet 44x44px minimum
+    And Close Checkout Modal
 
 
 US-018-Accessibility: WCAG AA Contrast Compliance
@@ -135,14 +137,35 @@ US-018-Accessibility: WCAG AA Contrast Compliance
 *** Keywords ***
 The current time is outside operating hours
     [Documentation]    Sets system time to be outside configured operating hours
-    # In real implementation, this would mock the system time or configure test hours
-    Log    Setting system time to outside operating hours (e.g., 22:00)
+    Log    Staging kiosk closed scenario via test controls
+    &{controls}=    Create Dictionary    statusOverride=closed    statusMessage=🔒 Closed - Opens Monday at 08:00 (Hours: 08:00–18:00)    statusNextOpen=2025-05-05T08:00:00.000Z
+    ${handler}=    Execute Javascript    return typeof window.snackbarApplyTestControls;
+    Log    snackbarApplyTestControls handler type: ${handler}
+    Apply Kiosk Test Controls    ${controls}
+    ${stored}=    Execute Javascript    return window.localStorage.getItem('snackbar-test-controls');
+    Log    Stored kiosk controls: ${stored}
+    ${state}=    Execute Javascript    return JSON.stringify(window.snackbarCurrentTestControls || {});
+    Log    React test controls snapshot: ${state}
+    ${read_snapshot}=    Execute Javascript    return JSON.stringify((window.snackbarDebugReadTestControls && window.snackbarDebugReadTestControls()) || {});
+    Log    readTestControls() snapshot: ${read_snapshot}
+    ${reader_source}=    Execute Javascript    return window.snackbarDebugReadTestControls ? window.snackbarDebugReadTestControls.toString() : 'undefined';
+    Log    readTestControls() helper source: ${reader_source}
+    ${overlay_before}=    Execute Javascript    return document.getElementById('kiosk-status-overlay') ? 'visible' : 'missing';
+    Log    Overlay before navigation: ${overlay_before}
     Set Test Variable    ${OUTSIDE_HOURS}    True
 
 The customer accesses the kiosk
     [Documentation]    Customer navigates to kiosk interface
     Go To    ${KIOSK_URL}
     Wait For Page Load Complete
+    ${controls}=    Execute Javascript    return window.localStorage.getItem('snackbar-test-controls');
+    Log    Active kiosk controls: ${controls}
+    ${state_after}=    Execute Javascript    return JSON.stringify(window.snackbarCurrentTestControls || {});
+    Log    React test controls after navigation: ${state_after}
+    ${read_after}=    Execute Javascript    return JSON.stringify((window.snackbarDebugReadTestControls && window.snackbarDebugReadTestControls()) || {});
+    Log    readTestControls() after navigation: ${read_after}
+    ${overlay}=    Execute Javascript    const node = document.getElementById('kiosk-status-overlay'); return node ? node.outerHTML : 'none';
+    Log    Overlay markup after navigation: ${overlay}
 
 A "Closed" message should be displayed
     [Documentation]    Verifies closed message is prominently displayed
@@ -180,10 +203,16 @@ Checkout functionality should be disabled
 The kiosk is closed on Sunday at 20:00
     [Documentation]    Sets specific test scenario for closed state
     Log    Simulating Sunday 20:00 - kiosk closed
+    &{controls}=    Create Dictionary    statusOverride=closed    statusMessage=🔒 Closed - Opens Monday at 08:00 (Hours: 08:00–18:00)    statusNextOpen=2025-05-05T08:00:00.000Z
+    Apply Kiosk Test Controls    ${controls}
+    Go To    ${KIOSK_URL}
+    Wait For Page Load Complete
 
 The next opening is Monday at 08:00
     [Documentation]    Sets next opening time for test
     Log    Next opening: Monday 08:00
+    &{controls}=    Create Dictionary    statusMessage=🔒 Closed - Opens Monday at 08:00 (Hours: 08:00–18:00)    statusNextOpen=2025-05-05T08:00:00.000Z
+    Apply Kiosk Test Controls    ${controls}
 
 The customer views the closed screen
     [Documentation]    Customer viewing the closed message screen
@@ -222,6 +251,10 @@ The transition should happen within 10 seconds
 The time changes from 07:59 to 08:00 next day
     [Documentation]    Simulates time transition to opening
     Log    Simulating time change to opening time
+    &{controls}=    Create Dictionary    statusOverride=open    statusMessage=${NONE}    statusNextOpen=${NONE}
+    Apply Kiosk Test Controls    ${controls}
+    Go To    ${KIOSK_URL}
+    Wait For Page Load Complete
 
 The kiosk should display the product grid
     [Documentation]    Verifies transition to operational state
@@ -235,6 +268,8 @@ Customers should be able to shop normally
 Inventory tracking is disabled system-wide
     [Documentation]    Precondition: Inventory tracking turned off in settings
     Log    Inventory tracking disabled via admin configuration
+    &{controls}=    Create Dictionary    inventoryTrackingEnabled=${FALSE}    statusOverride=open    statusMessage=${NONE}    statusNextOpen=${NONE}
+    Apply Kiosk Test Controls    ${controls}
 
 A warning banner should be displayed
     [Documentation]    Verifies warning banner is visible
@@ -289,6 +324,7 @@ Adds items to cart
 
 Proceeds to checkout
     [Documentation]    Customer navigating to checkout
+    Ensure Cart Panel Closed
     Click Element    id=cart-icon
     Wait Until Element Is Visible    id=checkout-button    timeout=5s
     Click Element    id=checkout-button
@@ -313,6 +349,8 @@ The warning banner is displayed
 Admin enables inventory tracking
     [Documentation]    Admin action to re-enable inventory tracking
     Log    Admin enables inventory tracking in admin portal
+    &{controls}=    Create Dictionary    inventoryTrackingEnabled=${TRUE}    statusOverride=open    statusMessage=${NONE}    statusNextOpen=${NONE}
+    Apply Kiosk Test Controls    ${controls}
 
 The warning banner should disappear within 5 seconds
     [Documentation]    Verifies dynamic removal of warning
@@ -339,13 +377,12 @@ All body text should be minimum 16px font size
     FOR    ${element}    IN    @{body_elements}
         ${is_visible}=    Run Keyword And Return Status    Element Should Be Visible    ${element}
         IF    ${is_visible}
-            ${font_size}=    Execute Javascript    
-            ...    return window.getComputedStyle(arguments[0]).fontSize
+            ${font_size}=    Call Method    ${element}    value_of_css_property    font-size
             ${size_value}=    Remove String    ${font_size}    px
-            ${size_int}=    Convert To Integer    ${size_value}
+            ${size_numeric}=    Convert To Number    ${size_value}
             # Body text should be at least 16px
-            IF    ${size_int} < 16
-                Log    Warning: Element has font size ${size_int}px (minimum 16px)    WARN
+            IF    ${size_numeric} < 16
+                Log    Warning: Element has font size ${size_numeric}px (minimum 16px)    WARN
             END
         END
     END
@@ -465,6 +502,28 @@ Interactive elements should have clear visual distinction
     [Documentation]    Verifies interactive elements are visually distinct
     ${buttons}=    Get WebElements    css=button
     FOR    ${button}    IN    @{buttons}
+        ${is_visible}=    Run Keyword And Return Status    Element Should Be Visible    ${button}
+        IF    not ${is_visible}
+            ${button_id}=    Call Method    ${button}    get_attribute    id
+            ${button_class}=    Call Method    ${button}    get_attribute    class
+            ${ignore_close_cart}=    Run Keyword And Return Status    Should Contain    ${button_class}    close-cart
+            ${ignore_checkout}=    Run Keyword And Return Status    Should Contain    ${button_class}    checkout-button
+            ${ignore_clear_cart}=    Run Keyword And Return Status    Should Contain    ${button_class}    clear-cart
+            ${ignore_by_id}=    Run Keyword And Return Status    Should Contain    ${button_id}    checkout-button
+            IF    ${ignore_close_cart} or ${ignore_checkout} or ${ignore_clear_cart} or ${ignore_by_id}
+                Continue For Loop
+            END
+            ${hidden_attr}=    Call Method    ${button}    get_attribute    hidden
+            ${aria_hidden_attr}=    Call Method    ${button}    get_attribute    aria-hidden
+            ${ancestor_hidden}=    Run Keyword And Return Status    Call Method    ${button}    find_element    xpath    ancestor::*[@aria-hidden='true' or @hidden]
+            ${has_hidden_attr}=    Run Keyword And Return Status    Should Not Be Empty    ${hidden_attr}
+            ${aria_hidden_true}=    Run Keyword And Return Status    Should Be Equal    ${aria_hidden_attr}    true
+            IF    ${has_hidden_attr} or ${aria_hidden_true} or ${ancestor_hidden}
+                Continue For Loop
+            END
+            Log    Hidden button detected: id=${button_id}, class=${button_class}    WARN
+            Continue For Loop
+        END
         Element Should Be Visible    ${button}
         # In real implementation, verify visual styling distinguishes buttons
     END

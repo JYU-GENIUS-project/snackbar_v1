@@ -30,6 +30,7 @@ const feedRoutes = require('./routes/feed');
 const inventoryRoutes = require('./routes/inventory');
 const notificationRoutes = require('./routes/notifications');
 const transactionRoutes = require('./routes/transactions');
+const statusRoutes = require('./routes/status');
 const mediaStorage = require('./utils/mediaStorage');
 const notificationService = require('./services/notificationService');
 
@@ -171,6 +172,9 @@ app.use('/api/products', rateLimiters.api, productRoutes);
 
 // Product feed routes
 app.use('/api/feed', rateLimiters.api, feedRoutes);
+
+// Kiosk status routes
+app.use('/api/status', rateLimiters.api, statusRoutes);
 
 // Inventory management routes
 app.use('/api/inventory', rateLimiters.api, inventoryRoutes);
