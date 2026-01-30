@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import LoginPanel from './components/LoginPanel';
-import ProductManager from './components/ProductManager.jsx';
+import ProductManager from './components/ProductManager';
 import KioskApp from './components/KioskApp.jsx';
 import { useLogout } from './hooks/useAuth';
 import { apiRequest } from './services/apiClient.js';

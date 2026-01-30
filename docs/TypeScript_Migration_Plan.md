@@ -72,14 +72,14 @@
 - [x] Migrate top-level providers/hooks (`hooks/useAuth.js`, `useCategories.js`, etc.) to TypeScript with explicit return types.
   - Converted `useAuth` and `useCategories` to `.ts` with typed payloads and React Query generics; JS shims now re-export from TS.
 - [ ] Convert components directory iteratively; prioritize shared primitives (forms, tables) before specialized views.
-  - [ ] `components/ProductManager.jsx`
+  - [x] `components/ProductManager.jsx`
   - [x] `components/ProductTable.jsx`
   - [x] `components/ProductDetailModal.jsx`
   - [x] `components/ProductForm.jsx`
   - [x] `components/ProductMediaManager.jsx`
   - [ ] `components/InventoryPanel.jsx`
-  - [ ] `components/AdminAccountsManager.jsx`
-  - [ ] `components/AuditTrailViewer.jsx`
+  - [x] `components/AdminAccountsManager.jsx`
+  - [x] `components/AuditTrailViewer.jsx`
   - [ ] `components/CategoryManager.jsx`
   - [ ] `components/KioskApp.jsx`
   - [ ] `components/KioskPreview.jsx`
