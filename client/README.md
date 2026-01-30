@@ -50,3 +50,10 @@ The first suite already passes with the current UI. Re-run the status suite afte
 - Provide `KIOSK_TIMEZONE` and system configuration rows for operating hours and maintenance messaging.
 - Configure the analytics endpoint via `VITE_KIOSK_ANALYTICS_ENDPOINT` if beacon uploads should be shipped server-side; otherwise events remain in the in-memory buffer.
 - Rebuild the kiosk (`npm run build`) and copy the `dist/` output to the Nginx container volume expected by the compose stack.
+
+### Status API Runbook
+
+- **Environment inputs**: set `KIOSK_TIMEZONE` to the kiosk’s local IANA zone and seed `system_config` keys `operating_hours` and `maintenance_mode`; the status service falls back to Helsinki defaults if these records are missing.
+- **Cache policy**: `/api/status/kiosk` must return `Cache-Control: no-cache` so intermediaries do not serve stale availability. Double-check CDN or Nginx rules preserve this header.
+- **SSE transport**: `/api/status/events` streams Server-Sent Events and expects `Content-Type: text/event-stream`, `Cache-Control: no-cache`, and `Connection: keep-alive`. On Nginx add `proxy_buffering off;` and `proxy_set_header Connection 'keep-alive';` (optionally `X-Accel-Buffering off;`) for that route to prevent buffering.
+- **Health verification**: curl the endpoints after deploy. You should see `success: true` JSON from `/api/status/kiosk` and the `: connected` comment when tailing `/api/status/events`.

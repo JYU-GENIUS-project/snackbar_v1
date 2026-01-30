@@ -84,9 +84,9 @@
    - Optimize image loading (lazy loading, aspect-ratio boxes) and reduce layout shifts to maintain <300 ms perceived responsiveness during filter interactions.
 
 10. **Testing, QA, and Rollout**
-    - Expand unit and integration tests on both client and server for new hooks, reducers, and endpoints; cover schedule edge cases (overnight transitions) and SSE propagation.
-    - Execute targeted Robot suites: [tests/acceptance/customer_product_browsing.robot](tests/acceptance/customer_product_browsing.robot) and [tests/acceptance/customer_system_status.robot](tests/acceptance/customer_system_status.robot) on staging before merge; incorporate into CI pipeline gating per Implementation_Roadmap step 33.
-    - Document kiosk deployment checklist (status API env vars, caching headers) and update README sections guiding kiosk operations.
+   - Expand unit and integration tests on both client and server for new hooks, reducers, and endpoints; cover schedule edge cases (overnight transitions) and SSE propagation.
+   - Execute targeted Robot suites: [tests/acceptance/customer_product_browsing.robot](tests/acceptance/customer_product_browsing.robot) and [tests/acceptance/customer_system_status.robot](tests/acceptance/customer_system_status.robot) on staging before merge; incorporate into CI pipeline gating per Implementation_Roadmap step 33.
+   - Finalize the kiosk status API runbook: document `KIOSK_TIMEZONE` and `system_config` dependencies, call out the `Cache-Control: no-cache` requirement for `/api/status/kiosk`, and note the reverse-proxy settings (`proxy_buffering off`, `X-Accel-Buffering off`) needed to keep `/api/status/events` SSE connections alive. Mirror the checklist in the README.
 
 ## Risks and Follow-Ups
 
