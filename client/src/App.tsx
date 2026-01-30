@@ -313,7 +313,7 @@ const App = () => {
 
   useEffect(() => {
     if (typeof window === 'undefined') {
-      return () => {};
+      return () => { };
     }
 
     const handleRouteChange = () => {
