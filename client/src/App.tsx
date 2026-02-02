@@ -299,7 +299,7 @@ const AdminApp = () => {
                 <span>Your session is about to expire. Any activity will extend it.</span>
               </div>
             )}
-            <ProductManager auth={auth} />
+            <ProductManager auth={auth as AuthPayload} />
           </div>
         ) : (
           <LoginPanel onSuccess={handleLogin} notice={authNotice} />

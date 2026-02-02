@@ -20,10 +20,10 @@ type DeleteError = {
 type CategoryManagerProps = {
   categories?: Category[];
   isLoading?: boolean;
-  error?: { message?: string } | null;
-  onCreate?: (payload: { name: string }) => Promise<void> | void;
-  onUpdate?: (payload: { id: string; name: string }) => Promise<void> | void;
-  onDelete?: (payload: { id: string }) => Promise<void> | void;
+  error?: { message?: string } | null | unknown;
+  onCreate?: (payload: { name: string }) => Promise<unknown> | void;
+  onUpdate?: (payload: { id: string; name: string }) => Promise<unknown> | void;
+  onDelete?: (payload: { id: string }) => Promise<unknown> | void;
   isCreating?: boolean;
   isUpdating?: boolean;
   isDeleting?: boolean;
@@ -267,6 +267,11 @@ const CategoryManager = ({
     return 'alert info';
   };
 
+  const errorMessage =
+    typeof error === 'object' && error && 'message' in error && typeof (error as { message?: unknown }).message === 'string'
+      ? (error as { message?: string }).message
+      : null;
+
   return (
     <section id="category-management-page" className="card stack" aria-live="polite">
       <div className="inline" style={{ justifyContent: 'space-between', alignItems: 'flex-end' }}>
@@ -294,9 +299,9 @@ const CategoryManager = ({
         </div>
       )}
 
-      {error && (
+      {Boolean(error) && (
         <div className="alert error" role="alert">
-          <span>{error.message || 'Failed to load categories.'}</span>
+          <span>{errorMessage || 'Failed to load categories.'}</span>
         </div>
       )}
 

@@ -13,6 +13,8 @@ vi.mock('../../utils/offlineCache', () => ({
 
 const mockUseQuery = vi.hoisted(() => vi.fn());
 
+let queryData: unknown = null;
+
 vi.mock('@tanstack/react-query', () => ({
     useQuery: mockUseQuery
 }));
@@ -33,6 +35,7 @@ describe('useKioskStatus', () => {
 
     beforeEach(() => {
         mockedReadOfflineProductSnapshot.mockReturnValue(null);
+        queryData = null;
         mockUseQuery.mockImplementation((params: any) => {
             const { queryFn, onSuccess } = params;
             const execute = async () => {
@@ -53,6 +56,7 @@ describe('useKioskStatus', () => {
                 isLoading: false,
                 isFetching: false,
                 error: null,
+                data: queryData,
                 refetch
             };
         });
@@ -78,16 +82,13 @@ describe('useKioskStatus', () => {
         };
 
         mockedApiRequest.mockResolvedValue(payload as any);
+        queryData = payload;
 
         const { result } = renderHook(() => useKioskStatus({ sse: false, refetchInterval: false }));
 
         await waitFor(() => {
             expect(apiRequest).toHaveBeenCalled();
         }, { timeout: 3000 });
-
-        await act(async () => {
-            await result.current.refetch();
-        });
 
         await waitFor(() => {
             expect(mockedSaveOfflineProductSnapshot).toHaveBeenCalled();

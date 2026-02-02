@@ -3,7 +3,7 @@ import type { ChangeEvent, FormEvent } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useArchiveProduct, useCreateProduct, useProducts, useUpdateProduct } from '../hooks/useProducts.js';
 import { useDebouncedValue } from '../hooks/useDebouncedValue.js';
-import ProductTable, { type Product as ProductTableProduct } from './ProductTable.js';
+import ProductTable, { type Product as ProductTableProduct, type ProductMedia as ProductTableMedia } from './ProductTable.js';
 import ProductForm from './ProductForm.js';
 import ProductMediaManager from './ProductMediaManager.js';
 import InventoryPanel from './InventoryPanel.js';
@@ -726,27 +726,51 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
             const limitValue = toNullableNumber(product.purchaseLimit);
             const updatedAt = product.updatedAt || product.createdAt || new Date().toISOString();
             const media = Array.isArray(product.media)
-                ? product.media.map((item) => ({
-                    id: item.id,
-                    variant: item.variant,
-                    format: item.format,
-                    isPrimary: item.isPrimary,
-                    deletedAt: item.deletedAt ?? null
-                }))
+                ? product.media.map((item) => {
+                    const nextMedia: ProductTableMedia = {
+                        deletedAt: item.deletedAt ?? null
+                    };
+
+                    if (typeof item.id === 'string') {
+                        nextMedia.id = item.id;
+                    }
+                    if (typeof item.variant === 'string') {
+                        nextMedia.variant = item.variant;
+                    }
+                    if (typeof item.format === 'string') {
+                        nextMedia.format = item.format;
+                    }
+                    if (typeof item.isPrimary === 'boolean') {
+                        nextMedia.isPrimary = item.isPrimary;
+                    }
+
+                    return nextMedia;
+                })
                 : undefined;
 
-            return {
+            const next: ProductTableProduct = {
                 id: product.id,
                 name: product.name,
-                status: product.status,
                 description: product.description ?? null,
-                price: priceValue,
-                stockQuantity: stockValue,
-                purchaseLimit: limitValue,
                 updatedAt,
                 deletedAt: product.deletedAt ?? null,
-                media
+                stockQuantity: stockValue,
+                purchaseLimit: limitValue
             };
+
+            if (typeof product.status === 'string') {
+                next.status = product.status;
+            }
+
+            if (priceValue !== undefined) {
+                next.price = priceValue;
+            }
+
+            if (media) {
+                next.media = media;
+            }
+
+            return next;
         });
     }, [effectiveProducts]);
     const inventoryProductMetadata = useMemo<InventoryMetadataLookup>(() => {
@@ -1344,7 +1368,7 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
                         onEdit={handleEditSelection}
                         onArchive={requestArchive}
                         archivePendingId={archiveMutation.variables ?? null}
-                        archivePending={archiveMutation.isPending}
+                        archivePending={Boolean(archiveMutation.isPending)}
                         onManageMedia={handleManageMedia}
                     />
                 </section>
