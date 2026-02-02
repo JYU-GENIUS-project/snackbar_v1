@@ -3,11 +3,11 @@ export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '/api').replac
 export type ApiRequestOptions<TBody = unknown> = {
   path: string;
   method?: string;
-  token?: string | null;
-  body?: TBody | null;
-  signal?: AbortSignal;
-  searchParams?: Record<string, unknown> | null;
-  headers?: HeadersInit;
+  token?: string | null | undefined;
+  body?: TBody | null | undefined;
+  signal?: AbortSignal | undefined;
+  searchParams?: Record<string, unknown> | null | undefined;
+  headers?: HeadersInit | undefined;
 };
 
 export type ApiError = Error & {
@@ -59,9 +59,9 @@ export const apiRequest = async <TResponse = unknown, TBody = unknown>({
     response = await fetch(url.toString(), {
       method,
       headers: buildHeaders(token, headers, { skipContentType: isFormData }),
-      body: isFormData ? body : body ? JSON.stringify(body) : undefined,
+      body: isFormData ? body : body ? JSON.stringify(body) : null,
       credentials: 'include',
-      signal
+      signal: signal ?? null
     });
   } catch (networkError) {
     const error = new Error('Network request failed') as ApiError;

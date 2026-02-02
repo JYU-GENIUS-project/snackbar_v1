@@ -1,35 +1,39 @@
 export type ProductCategory = {
-  id?: string | null;
-  name?: string | null;
+  id?: string | null | undefined;
+  name?: string | null | undefined;
 };
 
 export type ProductMedia = {
   url?: string | null;
+  previewUrl?: string | null;
+  localPath?: string | null;
+  alt?: string | null;
+  description?: string | null;
   isPrimary?: boolean;
   deletedAt?: string | null;
 };
 
 export type ProductRecord = {
-  id?: string;
-  name?: string;
+  id?: string | undefined;
+  name?: string | undefined;
   description?: string | null;
-  categoryId?: string | null;
-  categoryIds?: string[];
+  categoryId?: string | null | undefined;
+  categoryIds?: string[] | undefined;
   categories?: ProductCategory[];
   price?: number | string | null;
-  currency?: string | null;
-  status?: string | null;
+  currency?: string | null | undefined;
+  status?: string | null | undefined;
   stockQuantity?: number | string | null;
   purchaseLimit?: number | string | null;
   lowStockThreshold?: number | string | null;
   allergens?: string | null;
-  imageAlt?: string | null;
+  imageAlt?: string | null | undefined;
   metadata?: Record<string, unknown> | string | null;
   displayOrder?: number | string | null;
   isActive?: boolean;
-  createdAt?: string | null;
-  updatedAt?: string | null;
-  deletedAt?: string | null;
+  createdAt?: string | null | undefined;
+  updatedAt?: string | null | undefined;
+  deletedAt?: string | null | undefined;
   media?: ProductMedia[];
 };
 
@@ -53,7 +57,7 @@ export type ProductFormState = {
 };
 
 export type NormalizedProductPayload = {
-  name?: string;
+  name?: string | undefined;
   description: string | null;
   categoryIds: string[];
   categoryId: string | null;
@@ -118,7 +122,7 @@ const extractPrimaryImageUrl = (product?: ProductRecord | null): string => {
 export const normalizeProductPayload = (formValues: Partial<ProductFormState> & Record<string, unknown>): NormalizedProductPayload => {
   const metadata = parseMetadata(formValues.metadata);
   const normalizedCategoryIds = Array.isArray(formValues.categoryIds)
-    ? Array.from(new Set(formValues.categoryIds.filter(Boolean)))
+    ? Array.from(new Set(formValues.categoryIds.filter((id): id is string => Boolean(id))))
     : [];
 
   return {
@@ -165,9 +169,9 @@ export const productToFormState = (product?: ProductRecord | null): ProductFormS
   }
 
   const existingCategoryIds = Array.isArray(product.categoryIds)
-    ? product.categoryIds.filter(Boolean)
+    ? product.categoryIds.filter((id): id is string => Boolean(id))
     : Array.isArray(product.categories)
-      ? product.categories.map((category) => category.id).filter(Boolean)
+      ? product.categories.map((category) => category.id).filter((id): id is string => Boolean(id))
       : [];
 
   return {
@@ -194,7 +198,7 @@ export const productToFormState = (product?: ProductRecord | null): ProductFormS
 
 export const ensureMinimumProductShape = (product: ProductRecord): ProductRecord => {
   const categoryIds = Array.isArray(product.categoryIds)
-    ? product.categoryIds.filter(Boolean)
+    ? product.categoryIds.filter((id): id is string => Boolean(id))
     : product.categoryId
       ? [product.categoryId]
       : [];

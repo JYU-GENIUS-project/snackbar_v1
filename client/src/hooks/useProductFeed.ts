@@ -5,11 +5,19 @@ import { readOfflineProductSnapshot, saveOfflineProductSnapshot, type OfflinePro
 
 const FEED_QUERY_KEY = ['product-feed'];
 
+const toNumberOrNull = (value: unknown): number | null => {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
 export type ProductFeedStatus = OfflineStatusPayload | null;
 
 export type ProductFeedProduct = {
-  id?: string;
-  name?: string;
+  id?: string | undefined;
+  name?: string | undefined;
   price: number;
   currency?: string | null;
   available?: boolean;
@@ -17,11 +25,11 @@ export type ProductFeedProduct = {
   lowStockThreshold?: number | null;
   purchaseLimit?: number | null;
   imageAlt?: string | null;
-  categoryId?: string | null;
-  categoryIds?: string[];
+  categoryId?: string | null | undefined;
+  categoryIds?: string[] | undefined;
   categories?: unknown[];
-  metadata?: Record<string, unknown>;
-  primaryMedia?: { url?: string; alt?: string } | null;
+  metadata?: Record<string, unknown> | undefined;
+  primaryMedia?: { url?: string | undefined; alt?: string | undefined } | null;
 };
 
 export type ProductFeedPayload = {
@@ -88,14 +96,17 @@ const buildFeedFromOfflineSnapshot = (snapshot: OfflineProductSnapshot | null): 
       price: Number(normalized.price ?? 0),
       currency: normalized.currency || 'EUR',
       available: normalized.status !== 'archived',
-      stockQuantity: normalized.stockQuantity ?? null,
-      lowStockThreshold: normalized.lowStockThreshold ?? null,
-      purchaseLimit: normalized.purchaseLimit ?? null,
+      stockQuantity: toNumberOrNull(normalized.stockQuantity),
+      lowStockThreshold: toNumberOrNull(normalized.lowStockThreshold),
+      purchaseLimit: toNumberOrNull(normalized.purchaseLimit),
       imageAlt: normalized.imageAlt || normalized.name || 'Product image',
       categoryId: normalized.categoryId ?? normalized.categoryIds?.[0] ?? null,
       categoryIds: normalized.categoryIds || [],
       categories: normalized.categories || [],
-      metadata: normalized.metadata || {},
+      metadata:
+        typeof normalized.metadata === 'object' && normalized.metadata !== null
+          ? (normalized.metadata as Record<string, unknown>)
+          : {},
       primaryMedia: primaryCandidate
         ? {
           url: primaryCandidate.url || (primaryCandidate as any).previewUrl || (primaryCandidate as any).localPath || '',

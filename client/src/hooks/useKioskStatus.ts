@@ -1,25 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiRequest, API_BASE_URL } from '../services/apiClient.js';
-import { readOfflineProductSnapshot, saveOfflineProductSnapshot } from '../utils/offlineCache.js';
+import { readOfflineProductSnapshot, saveOfflineProductSnapshot, type OfflineStatusPayload } from '../utils/offlineCache.js';
 
 const STATUS_QUERY_KEY = ['kiosk-status'];
 
-export type KioskStatusPayload = {
-    status?: string | null;
-    reason?: string | null;
-    message?: string | null;
-    nextOpen?: string | null;
-    nextClose?: string | null;
-    maintenance?: {
-        enabled?: boolean;
-        message?: string | null;
-        since?: string | null;
-    } | null;
-    timezone?: string | null;
-    generatedAt?: string | null;
-    windows?: unknown[];
-};
+export type KioskStatusPayload = Partial<OfflineStatusPayload>;
 
 export type InventoryAvailabilityEntry = {
     productId: string;
@@ -111,17 +97,21 @@ const readOfflineState = (): OfflineState => {
 const persistSnapshot = ({ status, statusFingerprint, inventoryTrackingEnabled }: { status: KioskStatusPayload | null; statusFingerprint?: string | null; inventoryTrackingEnabled: boolean; }) => {
     try {
         const existing = readOfflineProductSnapshot();
+        const safeInventoryTracking =
+            typeof inventoryTrackingEnabled === 'boolean'
+                ? inventoryTrackingEnabled
+                : typeof existing?.inventoryTrackingEnabled === 'boolean'
+                    ? existing.inventoryTrackingEnabled
+                    : true;
+
         saveOfflineProductSnapshot({
             products: existing?.products || [],
             generatedAt: existing?.generatedAt || new Date().toISOString(),
             source: existing?.source || 'offline',
-            inventoryTrackingEnabled:
-                typeof inventoryTrackingEnabled === 'boolean'
-                    ? inventoryTrackingEnabled
-                    : existing?.inventoryTrackingEnabled,
-            status,
+            inventoryTrackingEnabled: safeInventoryTracking,
+            status: (status ?? null) as OfflineStatusPayload | null,
             statusFingerprint:
-                statusFingerprint !== undefined ? statusFingerprint : existing?.statusFingerprint
+                statusFingerprint ?? existing?.statusFingerprint ?? null
         });
     } catch (error) {
         console.warn('Unable to persist kiosk status snapshot', error);
@@ -321,16 +311,21 @@ export const useKioskStatus = (options: UseKioskStatusOptions = {}) => {
         return payload as KioskStatusPayload | null;
     };
 
-    const statusQuery = useQuery({
+    const statusQuery = useQuery<KioskStatusPayload | null>({
         queryKey: STATUS_QUERY_KEY,
         queryFn: ({ signal }) => fetchStatus({ signal }),
         enabled: options.enabled !== false,
         refetchInterval: options.refetchInterval ?? 45000,
         staleTime: options.staleTime ?? 30000,
         retry: options.retry ?? 1,
-        onSuccess: (payload) => applyStatusPayload(payload as StatusEventPayload | null, 'poll'),
-        initialData: offlineState.status || undefined
+        initialData: offlineState.status ?? null
     });
+
+    useEffect(() => {
+        if (statusQuery.data) {
+            applyStatusPayload(statusQuery.data as StatusEventPayload | null, 'poll');
+        }
+    }, [statusQuery.data]);
 
     const inventoryAvailability = useMemo(() => {
         const source = availabilityRef.current instanceof Map ? availabilityRef.current : null;

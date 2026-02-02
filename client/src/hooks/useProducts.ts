@@ -5,10 +5,10 @@ import { ensureMinimumProductShape, type ProductRecord } from '../utils/productP
 export const PRODUCTS_QUERY_KEY = 'products';
 
 export type ProductsQueryParams = {
-  includeArchived?: boolean;
-  search?: string;
-  limit?: number;
-  offset?: number;
+  includeArchived?: boolean | undefined;
+  search?: string | undefined;
+  limit?: number | undefined;
+  offset?: number | undefined;
 };
 
 export type ProductsResponse = {
@@ -23,7 +23,7 @@ export type ProductsResponse = {
 
 export type ProductWithOptimistic = ProductRecord & { __optimistic?: boolean };
 
-const listProductsRequest = async ({ token, includeArchived, search, limit, offset, signal }: { token?: string | undefined; includeArchived?: boolean; search?: string; limit?: number; offset?: number; signal?: AbortSignal; }): Promise<ProductsResponse> => {
+const listProductsRequest = async ({ token, includeArchived, search, limit, offset, signal }: { token?: string | undefined; includeArchived?: boolean | undefined; search?: string | undefined; limit?: number | undefined; offset?: number | undefined; signal?: AbortSignal; }): Promise<ProductsResponse> => {
   const response = await apiRequest<ProductsResponse>({
     path: '/products',
     token,

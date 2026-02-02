@@ -17,9 +17,13 @@ vi.mock('@tanstack/react-query', () => ({
     useQuery: mockUseQuery
 }));
 
-import { apiRequest } from '../../services/apiClient';
-import { readOfflineProductSnapshot, saveOfflineProductSnapshot } from '../../utils/offlineCache';
+import { apiRequest } from '../../services/apiClient.js';
+import { readOfflineProductSnapshot, saveOfflineProductSnapshot } from '../../utils/offlineCache.js';
 import useKioskStatus from '../useKioskStatus.js';
+
+const mockedApiRequest = vi.mocked(apiRequest);
+const mockedReadOfflineProductSnapshot = vi.mocked(readOfflineProductSnapshot);
+const mockedSaveOfflineProductSnapshot = vi.mocked(saveOfflineProductSnapshot);
 
 describe('useKioskStatus', () => {
     afterEach(() => {
@@ -28,7 +32,7 @@ describe('useKioskStatus', () => {
     });
 
     beforeEach(() => {
-        readOfflineProductSnapshot.mockReturnValue(null);
+        mockedReadOfflineProductSnapshot.mockReturnValue(null);
         mockUseQuery.mockImplementation((params: any) => {
             const { queryFn, onSuccess } = params;
             const execute = async () => {
@@ -73,7 +77,7 @@ describe('useKioskStatus', () => {
             generatedAt: '2025-05-05T10:00:00.000Z'
         };
 
-        apiRequest.mockResolvedValue(payload);
+        mockedApiRequest.mockResolvedValue(payload as any);
 
         const { result } = renderHook(() => useKioskStatus({ sse: false, refetchInterval: false }));
 
@@ -86,7 +90,7 @@ describe('useKioskStatus', () => {
         });
 
         await waitFor(() => {
-            expect(saveOfflineProductSnapshot).toHaveBeenCalled();
+            expect(mockedSaveOfflineProductSnapshot).toHaveBeenCalled();
         }, { timeout: 3000 });
 
         await waitFor(() => {
@@ -97,7 +101,7 @@ describe('useKioskStatus', () => {
 
         expect(result.current.statusFingerprint).not.toBeNull();
         expect(result.current.lastUpdatedAt).toBe(payload.generatedAt);
-        expect(saveOfflineProductSnapshot).toHaveBeenCalled();
+        expect(mockedSaveOfflineProductSnapshot).toHaveBeenCalled();
     });
 
     it('applies SSE status, tracking, and inventory updates', async () => {
@@ -142,6 +146,9 @@ describe('useKioskStatus', () => {
 
         expect(MockEventSource.instances).toHaveLength(1);
         const instance = MockEventSource.instances[0];
+        if (!instance) {
+            throw new Error('Expected MockEventSource instance');
+        }
 
         await act(async () => {
             if (typeof instance.onopen === 'function') {

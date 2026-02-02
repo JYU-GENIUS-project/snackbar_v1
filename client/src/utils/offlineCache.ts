@@ -1,5 +1,5 @@
 export type OfflineStatusPayload = {
-    status: string;
+    status: string | null;
     reason: string | null;
     message: string | null;
     nextOpen: string | null;
@@ -10,7 +10,7 @@ export type OfflineStatusPayload = {
         since: string | null;
     };
     timezone: string | null;
-    generatedAt: string;
+    generatedAt: string | null;
     windows: unknown[];
 };
 

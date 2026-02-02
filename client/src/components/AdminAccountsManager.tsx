@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
-import type * as React from 'react';
 
 const MAX_ACCOUNTS = 10;
 

@@ -1,19 +1,19 @@
 export type InventoryCacheItem = Record<string, unknown> & {
-    productId?: string;
-    product_id?: string;
-    id?: string;
-    name?: string;
-    currentStock?: number;
-    current_stock?: number;
-    lowStockThreshold?: number | null;
-    low_stock_threshold?: number | null;
-    lowStock?: boolean;
-    low_stock?: boolean;
-    discrepancyTotal?: number;
-    discrepancy_total?: number;
-    ledger_balance?: number;
-    negativeStock?: boolean;
-    negative_stock?: boolean;
+    productId?: string | undefined;
+    product_id?: string | undefined;
+    id?: string | undefined;
+    name?: string | undefined;
+    currentStock?: number | null | undefined;
+    current_stock?: number | null | undefined;
+    lowStockThreshold?: number | null | undefined;
+    low_stock_threshold?: number | null | undefined;
+    lowStock?: boolean | undefined;
+    low_stock?: boolean | undefined;
+    discrepancyTotal?: number | null | undefined;
+    discrepancy_total?: number | null | undefined;
+    ledger_balance?: number | null | undefined;
+    negativeStock?: boolean | undefined;
+    negative_stock?: boolean | undefined;
 };
 
 const INVENTORY_CACHE_KEY = 'snackbar-inventory-cache';

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useLogin } from '../hooks/useAuth';
+import { useLogin } from '../hooks/useAuth.js';
 
 type AuthUser = {
   username?: string;

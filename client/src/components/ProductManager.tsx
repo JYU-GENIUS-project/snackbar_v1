@@ -3,16 +3,21 @@ import type { ChangeEvent, FormEvent } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useArchiveProduct, useCreateProduct, useProducts, useUpdateProduct } from '../hooks/useProducts.js';
 import { useDebouncedValue } from '../hooks/useDebouncedValue.js';
-import ProductTable from './ProductTable';
-import ProductForm from './ProductForm';
-import ProductMediaManager from './ProductMediaManager';
-import InventoryPanel from './InventoryPanel';
-import KioskPreview from './KioskPreview';
-import CategoryManager from './CategoryManager';
-import AdminAccountsManager from './AdminAccountsManager';
-import AuditTrailViewer from './AuditTrailViewer';
-import { normalizeProductPayload, productToFormState, ensureMinimumProductShape } from '../utils/productPayload.js';
-import { updateInventoryCacheItem } from '../utils/inventoryCache.js';
+import ProductTable, { type Product as ProductTableProduct } from './ProductTable.js';
+import ProductForm from './ProductForm.js';
+import ProductMediaManager from './ProductMediaManager.js';
+import InventoryPanel from './InventoryPanel.js';
+import KioskPreview from './KioskPreview.js';
+import CategoryManager from './CategoryManager.js';
+import AdminAccountsManager from './AdminAccountsManager.js';
+import AuditTrailViewer from './AuditTrailViewer.js';
+import {
+    normalizeProductPayload,
+    productToFormState,
+    ensureMinimumProductShape,
+    type ProductFormState
+} from '../utils/productPayload.js';
+import { updateInventoryCacheItem, type InventoryCacheItem } from '../utils/inventoryCache.js';
 import { useUploadProductMedia } from '../hooks/useProductMedia.js';
 import {
     useCategories,
@@ -30,7 +35,8 @@ type AuthUser = {
 
 type AuthPayload = {
     token: string;
-    user?: AuthUser;
+    expiresAt?: string | undefined;
+    user?: AuthUser | undefined;
 };
 
 type BannerTone = 'info' | 'success' | 'error';
@@ -130,7 +136,7 @@ type ProductFormSubmitPayload = ProductFormValues & { imageFile: File | null };
 
 type CategoryOption = {
     id: string;
-    name?: string;
+    name: string;
 };
 
 type InventoryMetadataEntry = {
@@ -196,7 +202,7 @@ type MutationResult<TResult, TVariables> = {
     isError?: boolean;
     reset?: () => void;
     error?: { message?: string } | null;
-    variables?: unknown;
+    variables?: TVariables;
 };
 
 type UploadMediaPayload = {
@@ -207,22 +213,6 @@ type UploadMediaPayload = {
 type UpdateProductPayload = {
     productId: string;
     payload: ProductPayload;
-};
-
-type InventoryCacheItem = {
-    id?: string;
-    productId?: string;
-    product_id?: string;
-    name?: string;
-    currentStock?: number | null;
-    current_stock?: number | null;
-    lowStockThreshold?: number | null;
-    low_stock_threshold?: number | null;
-    lowStock?: boolean;
-    low_stock?: boolean;
-    lastActivityAt?: string;
-    last_activity_at?: string;
-    [key: string]: unknown;
 };
 
 type AuditBridge = {
@@ -237,6 +227,15 @@ type ProductManagerProps = {
 };
 
 const DEFAULT_LIMIT = 50;
+const toOptionalNumber = (value: unknown): number | undefined => {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : undefined;
+};
+
+const toNullableNumber = (value: unknown): number | null => {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : null;
+};
 const SECTION_HASHES = Object.freeze({
     dashboard: '#/dashboard',
     products: '#/products',
@@ -370,7 +369,8 @@ const defaultMockProducts: Product[] = [
 const buildInitialMockProducts = (): Product[] => {
     const snapshot = readOfflineProductSnapshot();
     if (snapshot?.products?.length) {
-        return snapshot.products.map((product: Product) => ensureMinimumProductShape(product) as Product);
+        const snapshotProducts = Array.isArray(snapshot.products) ? snapshot.products : [];
+        return snapshotProducts.map((product) => ensureMinimumProductShape(product as Product) as Product);
     }
 
     return defaultMockProducts.map((product) => ({ ...product, media: Array.isArray(product.media) ? product.media : [] }));
@@ -719,6 +719,36 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
     const isBackedByApi = hasApiProducts && !forceMockMode;
     const effectiveProducts = isBackedByApi ? products : mockProducts;
     const effectiveMeta: ProductMeta | null = isBackedByApi ? meta : { total: effectiveProducts.length };
+    const tableProducts = useMemo<ProductTableProduct[]>(() => {
+        return effectiveProducts.map((product) => {
+            const priceValue = toOptionalNumber(product.price);
+            const stockValue = toNullableNumber(product.stockQuantity);
+            const limitValue = toNullableNumber(product.purchaseLimit);
+            const updatedAt = product.updatedAt || product.createdAt || new Date().toISOString();
+            const media = Array.isArray(product.media)
+                ? product.media.map((item) => ({
+                    id: item.id,
+                    variant: item.variant,
+                    format: item.format,
+                    isPrimary: item.isPrimary,
+                    deletedAt: item.deletedAt ?? null
+                }))
+                : undefined;
+
+            return {
+                id: product.id,
+                name: product.name,
+                status: product.status,
+                description: product.description ?? null,
+                price: priceValue,
+                stockQuantity: stockValue,
+                purchaseLimit: limitValue,
+                updatedAt,
+                deletedAt: product.deletedAt ?? null,
+                media
+            };
+        });
+    }, [effectiveProducts]);
     const inventoryProductMetadata = useMemo<InventoryMetadataLookup>(() => {
         const metadata: InventoryMetadataLookup = {};
         effectiveProducts.forEach((product) => {
@@ -905,7 +935,7 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
         setSettingsMessage({ type: 'success', text: 'Settings updated successfully' });
     };
 
-    const handleCreate = async (values: ProductFormSubmitPayload): Promise<Product> => {
+    const handleCreate = async (values: ProductFormSubmitPayload): Promise<void> => {
         const { imageFile, ...productValues } = values;
 
         let createdProduct: Product;
@@ -913,7 +943,9 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
 
         if (isBackedByApi) {
             try {
-                const payload = normalizeProductPayload(productValues);
+                                const payload = normalizeProductPayload(
+                                    productValues as Partial<ProductFormState> & Record<string, unknown>
+                                );
                 createdProduct = await createMutation.mutateAsync(payload);
             } catch (mutationError) {
                 console.warn('Create product via API failed, using local store fallback.', mutationError);
@@ -961,7 +993,6 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
             window.__snackbarLastCreateUsedMock = usedMock;
         }
         queryClient.invalidateQueries({ queryKey: ['product-feed'] });
-        return createdProduct;
     };
 
     const handleUpdate = async (values: ProductFormSubmitPayload): Promise<void> => {
@@ -1001,7 +1032,9 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
 
         if (isBackedByApi) {
             try {
-                const payload = normalizeProductPayload(productValues);
+                                const payload = normalizeProductPayload(
+                                    productValues as Partial<ProductFormState> & Record<string, unknown>
+                                );
                 await updateMutation.mutateAsync({ productId: editingProduct.id, payload });
                 if (imageFile) {
                     try {
@@ -1088,8 +1121,15 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
         queryClient.invalidateQueries({ queryKey: ['product-feed'] });
     };
 
-    const requestArchive = (product: Product) => {
-        setPendingDeletion(product);
+    const resolveTableProduct = useCallback(
+        (product: ProductTableProduct): Product => {
+            return effectiveProducts.find((item) => item.id === product.id) || (product as Product);
+        },
+        [effectiveProducts]
+    );
+
+    const requestArchive = (product: ProductTableProduct) => {
+        setPendingDeletion(resolveTableProduct(product));
     };
 
     const cancelArchiveRequest = () => {
@@ -1140,10 +1180,10 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
         setPendingDeletion(null);
     };
 
-    const handleEditSelection = (product: Product) => {
+    const handleEditSelection = (product: ProductTableProduct) => {
         setOfflineNotice(null);
         updateOfflineStatusText('');
-        setEditingProduct(product);
+        setEditingProduct(resolveTableProduct(product));
         setFormMode('edit');
         changeSection('products');
         setShowForm(true);
@@ -1167,16 +1207,17 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
         setFocusMediaManager(false);
     };
 
-    const handleManageMedia = (product: Product) => {
-        setEditingProduct(product);
+    const handleManageMedia = (product: ProductTableProduct) => {
+        setEditingProduct(resolveTableProduct(product));
         setFormMode('edit');
         changeSection('products');
         setShowForm(false);
         setFocusMediaManager(true);
     };
 
-    const activeMutation =
-        isBackedByApi && (createMutation.isPending || updateMutation.isPending || uploadMediaMutation.isPending);
+    const activeMutation = Boolean(
+        isBackedByApi && (createMutation.isPending || updateMutation.isPending || uploadMediaMutation.isPending)
+    );
 
     return (
         <div className="stack">
@@ -1296,13 +1337,13 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
                         </button>
                     </div>
                     <ProductTable
-                        products={effectiveProducts}
+                        products={tableProducts}
                         meta={effectiveMeta}
                         isLoading={isLoading && isBackedByApi}
                         isFetching={isFetching}
                         onEdit={handleEditSelection}
                         onArchive={requestArchive}
-                        archivePendingId={archiveMutation.variables}
+                        archivePendingId={archiveMutation.variables ?? null}
                         archivePending={archiveMutation.isPending}
                         onManageMedia={handleManageMedia}
                     />

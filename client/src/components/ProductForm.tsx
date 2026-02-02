@@ -97,7 +97,9 @@ const ProductForm = ({
   const handleChange = (
     event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
-    const { name, type, value, checked } = event.target;
+    const target = event.target as HTMLInputElement;
+    const { name, type, value } = target;
+    const checked = target.checked;
     if (name === 'categoryIds' || name === 'primaryCategory') {
       return;
     }
@@ -355,7 +357,7 @@ const ProductForm = ({
               </option>
             ))}
           </select>
-          {categoriesError && <span className="helper error">Unable to load categories.</span>}
+          {Boolean(categoriesError) && <span className="helper error">Unable to load categories.</span>}
         </div>
         <div className="form-field">
           <label htmlFor="category-multiselect">Additional categories</label>

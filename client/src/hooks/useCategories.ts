@@ -34,7 +34,7 @@ const generateOptimisticId = (): string => {
   return `tmp-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 };
 
-const listCategoriesRequest = async ({ token, signal }: { token?: string; signal?: AbortSignal }) => {
+const listCategoriesRequest = async ({ token, signal }: { token?: string | undefined; signal?: AbortSignal }) => {
   const response = (await apiRequest({
     path: '/categories',
     token,
@@ -44,7 +44,7 @@ const listCategoriesRequest = async ({ token, signal }: { token?: string; signal
   return response?.data ?? [];
 };
 
-export const useCategories = (token?: string) => {
+export const useCategories = (token?: string | undefined) => {
   return useQuery<Category[]>({
     queryKey: [CATEGORIES_QUERY_KEY, token],
     queryFn: ({ signal }) => listCategoriesRequest({ token, signal }),
@@ -53,7 +53,7 @@ export const useCategories = (token?: string) => {
   });
 };
 
-const createCategoryRequest = async ({ token, payload }: { token?: string; payload: CategoryPayload }) => {
+const createCategoryRequest = async ({ token, payload }: { token?: string | undefined; payload: CategoryPayload }) => {
   const response = (await apiRequest({
     path: '/categories',
     method: 'POST',
@@ -69,7 +69,7 @@ const updateCategoryRequest = async ({
   categoryId,
   payload
 }: {
-  token?: string;
+  token?: string | undefined;
   categoryId: string;
   payload: CategoryPayload;
 }) => {
@@ -83,7 +83,7 @@ const updateCategoryRequest = async ({
   return response.data;
 };
 
-const deleteCategoryRequest = async ({ token, categoryId }: { token?: string; categoryId: string }) => {
+const deleteCategoryRequest = async ({ token, categoryId }: { token?: string | undefined; categoryId: string }) => {
   const response = (await apiRequest({
     path: `/categories/${categoryId}`,
     method: 'DELETE',
@@ -104,10 +104,10 @@ const updateCachedCategories = (
   });
 };
 
-export const useCreateCategory = (token?: string) => {
+export const useCreateCategory = (token?: string | undefined) => {
   const queryClient = useQueryClient();
 
-  return useMutation<Category, Error, CategoryPayload>({
+  return useMutation<Category, Error, CategoryPayload, { previous?: unknown }>({
     mutationFn: async (payload) => createCategoryRequest({ token, payload }),
     onMutate: async (payload) => {
       await queryClient.cancelQueries({ queryKey: [CATEGORIES_QUERY_KEY, token] });
@@ -147,10 +147,10 @@ export const useCreateCategory = (token?: string) => {
   });
 };
 
-export const useUpdateCategory = (token?: string) => {
+export const useUpdateCategory = (token?: string | undefined) => {
   const queryClient = useQueryClient();
 
-  return useMutation<Category, Error, CategoryMutationPayload>({
+  return useMutation<Category, Error, CategoryMutationPayload, { previous?: unknown }>({
     mutationFn: async ({ id, ...payload }) => updateCategoryRequest({ token, categoryId: id, payload }),
     onMutate: async ({ id, ...payload }) => {
       await queryClient.cancelQueries({ queryKey: [CATEGORIES_QUERY_KEY, token] });
@@ -187,10 +187,10 @@ export const useUpdateCategory = (token?: string) => {
   });
 };
 
-export const useDeleteCategory = (token?: string) => {
+export const useDeleteCategory = (token?: string | undefined) => {
   const queryClient = useQueryClient();
 
-  return useMutation<Category, Error, { id: string }>({
+  return useMutation<Category, Error, { id: string }, { previous?: unknown }>({
     mutationFn: async ({ id }) => deleteCategoryRequest({ token, categoryId: id }),
     onMutate: async ({ id }) => {
       await queryClient.cancelQueries({ queryKey: [CATEGORIES_QUERY_KEY, token] });

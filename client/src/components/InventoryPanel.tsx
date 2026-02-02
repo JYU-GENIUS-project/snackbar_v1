@@ -4,29 +4,14 @@ import {
   useRecordInventoryAdjustment,
   useRecordStockUpdate
 } from '../hooks/useInventory.js';
-import { cloneItemsCollection, readInventoryCache, writeInventoryCache } from '../utils/inventoryCache.js';
+import { cloneItemsCollection, readInventoryCache, writeInventoryCache, type InventoryCacheItem } from '../utils/inventoryCache.js';
 
-type InventoryItem = {
-  productId?: string;
-  product_id?: string;
-  id?: string;
-  name?: string;
-  currentStock?: number;
-  current_stock?: number;
-  stockQuantity?: number;
-  stock_quantity?: number;
-  lowStockThreshold?: number | null;
-  low_stock_threshold?: number | null;
-  lowStock?: boolean;
-  low_stock?: boolean;
-  discrepancyTotal?: number;
-  discrepancy_total?: number;
-  ledger_balance?: number;
-  negativeStock?: boolean;
-  negative_stock?: boolean;
-  lastActivityAt?: string | null;
-  isActive?: boolean;
-  deletedAt?: string | null;
+type InventoryItem = InventoryCacheItem & {
+  stockQuantity?: number | undefined;
+  stock_quantity?: number | undefined;
+  lastActivityAt?: string | null | undefined;
+  isActive?: boolean | undefined;
+  deletedAt?: string | null | undefined;
 };
 
 type InventoryMetadataMap = Record<
@@ -245,12 +230,14 @@ const InventoryPanel = ({
       }
 
       updateLocalItems((currentItems) => {
+        const pendingCurrentStock = pending.currentStock ?? null;
+        const pendingThreshold = pending.lowStockThreshold ?? null;
         const nextLowStock =
           typeof pending.lowStock === 'boolean'
             ? pending.lowStock
-            : pending.lowStockThreshold !== null &&
-              pending.currentStock !== null &&
-              pending.currentStock <= pending.lowStockThreshold;
+            : pendingThreshold !== null &&
+              pendingCurrentStock !== null &&
+              pendingCurrentStock <= pendingThreshold;
 
         let matchFound = false;
         const nextItems = currentItems.map((item) => {
@@ -453,8 +440,9 @@ const InventoryPanel = ({
 
     const productKey =
       stockDialog.productId || stockDialog.product_id || stockDialog.id || stockDialog.name;
+    const resolvedProductId = stockDialog.productId || stockDialog.product_id || stockDialog.id;
     const shouldUseOffline =
-      isOfflineMode || !isLikelyUuid(stockDialog.productId || stockDialog.product_id || stockDialog.id);
+      isOfflineMode || !resolvedProductId || !isLikelyUuid(resolvedProductId);
 
     if (shouldUseOffline) {
       applyLocalUpdate(productKey, (item) => {
@@ -466,9 +454,9 @@ const InventoryPanel = ({
           current_stock: parsedQuantity,
           lowStock: nextLowStock,
           low_stock: nextLowStock,
-          discrepancyTotal: item.discrepancyTotal,
-          discrepancy_total: item.discrepancy_total,
-          ledger_balance: item.ledger_balance
+          discrepancyTotal: item.discrepancyTotal ?? 0,
+          discrepancy_total: item.discrepancy_total ?? 0,
+          ledger_balance: item.ledger_balance ?? 0
         };
       });
       setFeedbackMessage({ type: 'success', text: 'Stock updated locally.' });
@@ -482,8 +470,11 @@ const InventoryPanel = ({
     }
 
     try {
+      if (!resolvedProductId) {
+        throw new Error('Missing product identifier for stock update.');
+      }
       await stockMutation.mutateAsync({
-        productId: stockDialog.productId,
+        productId: resolvedProductId,
         quantity: parsedQuantity,
         reason: 'Manual stock update'
       });
@@ -531,8 +522,8 @@ const InventoryPanel = ({
 
     const productKey =
       adjustDialog.productId || adjustDialog.product_id || adjustDialog.id || adjustDialog.name;
-    const shouldUseOffline =
-      isOfflineMode || !isLikelyUuid(adjustDialog.productId || adjustDialog.product_id || adjustDialog.id);
+    const resolvedProductId = adjustDialog.productId || adjustDialog.product_id || adjustDialog.id;
+    const shouldUseOffline = isOfflineMode || !resolvedProductId || !isLikelyUuid(resolvedProductId);
 
     if (shouldUseOffline) {
       applyLocalUpdate(productKey, (item) => {
@@ -562,8 +553,11 @@ const InventoryPanel = ({
     }
 
     try {
+      if (!resolvedProductId) {
+        throw new Error('Missing product identifier for inventory adjustment.');
+      }
       await adjustmentMutation.mutateAsync({
-        productId: adjustDialog.productId,
+        productId: resolvedProductId,
         newQuantity: parsedQuantity,
         reason: adjustReason || 'Inventory adjustment'
       });

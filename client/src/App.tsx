@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import LoginPanel from './components/LoginPanel';
-import ProductManager from './components/ProductManager';
-import KioskApp from './components/KioskApp';
-import { useLogout } from './hooks/useAuth';
+import LoginPanel from './components/LoginPanel.js';
+import ProductManager from './components/ProductManager.js';
+import KioskApp from './components/KioskApp.js';
+import { useLogout } from './hooks/useAuth.js';
 import { apiRequest } from './services/apiClient.js';
 
 type AuthUser = {
@@ -11,8 +11,12 @@ type AuthUser = {
 
 type AuthPayload = {
   token: string;
-  expiresAt?: string;
-  user?: AuthUser;
+  expiresAt?: string | undefined;
+  user?: AuthUser | undefined;
+};
+
+type AuthMeResponse = {
+  data?: AuthUser;
 };
 
 type AuthNoticeTone = 'warning' | 'info' | 'success' | 'error';
@@ -41,8 +45,8 @@ const readStoredAuth = (): AuthPayload | null => {
     }
     return {
       token: parsed.token,
-      expiresAt: typeof parsed.expiresAt === 'string' ? parsed.expiresAt : undefined,
-      user: parsed.user
+      ...(typeof parsed.expiresAt === 'string' ? { expiresAt: parsed.expiresAt } : {}),
+      ...(parsed.user ? { user: parsed.user } : {})
     };
   } catch (error) {
     console.warn('Failed to read stored auth payload', error);
@@ -128,7 +132,7 @@ const AdminApp = () => {
           controller.abort();
         }, 1000);
         try {
-          const response = await apiRequest({
+          const response = await apiRequest<AuthMeResponse>({
             path: '/auth/me',
             method: 'GET',
             token: nextAuth.token,
@@ -137,11 +141,13 @@ const AdminApp = () => {
 
           const nextUser = (response?.data ?? nextAuth.user) as AuthUser | undefined;
 
-          nextAuth = {
-            token: nextAuth.token,
-            expiresAt: nextAuth.expiresAt,
-            user: nextUser
-          };
+          if (nextAuth) {
+            nextAuth = {
+              token: nextAuth.token,
+              ...(nextAuth.expiresAt ? { expiresAt: nextAuth.expiresAt } : {}),
+              ...(nextUser ? { user: nextUser } : {})
+            };
+          }
         } catch (error) {
           if (isApiError(error) && (error.status === 401 || error.status === 403)) {
             console.warn('Stored session invalid, clearing local auth', error);
@@ -153,11 +159,13 @@ const AdminApp = () => {
             };
           } else {
             console.warn('Auth verification unavailable, continuing in offline mode', error);
-            nextAuth = {
-              token: nextAuth.token,
-              expiresAt: nextAuth.expiresAt,
-              user: nextAuth.user || { username: storedAuth?.user?.username || 'admin@example.com' }
-            };
+            if (nextAuth) {
+              nextAuth = {
+                token: nextAuth.token,
+                ...(nextAuth.expiresAt ? { expiresAt: nextAuth.expiresAt } : {}),
+                user: nextAuth.user || { username: storedAuth?.user?.username || 'admin@example.com' }
+              };
+            }
             if (!nextNotice) {
               nextNotice = {
                 tone: 'info',
@@ -218,8 +226,8 @@ const AdminApp = () => {
     writeSessionState('active');
     setAuth({
       token: payload.token,
-      expiresAt: payload.expiresAt,
-      user: payload.user
+      ...(payload.expiresAt ? { expiresAt: payload.expiresAt } : {}),
+      ...(payload.user ? { user: payload.user } : {})
     });
     setAuthNotice(null);
   };

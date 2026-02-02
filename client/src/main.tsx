@@ -2,7 +2,7 @@ import { StrictMode } from 'react';
 import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import App from './App';
+import App from './App.js';
 import './styles.css';
 
 const queryClient = new QueryClient({
@@ -25,7 +25,7 @@ ReactDOM.createRoot(rootElement).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <App />
-      <ReactQueryDevtools initialIsOpen={false} position="bottom-right" />
+      <ReactQueryDevtools initialIsOpen={false} />
     </QueryClientProvider>
   </StrictMode>
 );

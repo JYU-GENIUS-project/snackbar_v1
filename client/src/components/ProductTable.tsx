@@ -1,4 +1,4 @@
-type ProductMedia = {
+export type ProductMedia = {
   id?: string;
   variant?: string;
   format?: string;
@@ -6,7 +6,7 @@ type ProductMedia = {
   deletedAt?: string | null;
 };
 
-type Product = {
+export type Product = {
   id: string;
   name: string;
   status?: string;
@@ -19,7 +19,7 @@ type Product = {
   media?: ProductMedia[];
 };
 
-type ProductTableMeta = {
+export type ProductTableMeta = {
   total: number;
 };
 

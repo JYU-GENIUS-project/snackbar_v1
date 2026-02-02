@@ -7,12 +7,12 @@ export const INVENTORY_DISCREPANCY_QUERY_KEY = 'inventory-discrepancies';
 
 export type InventoryListParams = {
     token?: string | undefined;
-    search?: string;
-    includeInactive?: boolean;
-    sortBy?: string;
-    sortDirection?: string;
-    limit?: number;
-    offset?: number;
+    search?: string | undefined;
+    includeInactive?: boolean | undefined;
+    sortBy?: string | undefined;
+    sortDirection?: string | undefined;
+    limit?: number | undefined;
+    offset?: number | undefined;
     signal?: AbortSignal;
 };
 
@@ -70,7 +70,7 @@ const setTrackingRequest = async ({ token, enabled }: { token?: string | undefin
     return response.data;
 };
 
-const recordStockRequest = async ({ token, productId, quantity, reason }: { token?: string | undefined; productId: string; quantity: number; reason?: string; }): Promise<InventoryItem> => {
+const recordStockRequest = async ({ token, productId, quantity, reason }: { token?: string | undefined; productId: string; quantity: number; reason?: string | undefined; }): Promise<InventoryItem> => {
     const response = await apiRequest<{ data: InventoryItem }>({
         path: `/inventory/${productId}/stock`,
         method: 'PATCH',
@@ -81,7 +81,7 @@ const recordStockRequest = async ({ token, productId, quantity, reason }: { toke
     return response.data;
 };
 
-const recordAdjustmentRequest = async ({ token, productId, newQuantity, reason }: { token?: string | undefined; productId: string; newQuantity: number; reason?: string; }): Promise<InventoryItem> => {
+const recordAdjustmentRequest = async ({ token, productId, newQuantity, reason }: { token?: string | undefined; productId: string; newQuantity: number; reason?: string | undefined; }): Promise<InventoryItem> => {
     const response = await apiRequest<{ data: InventoryItem }>({
         path: `/inventory/${productId}/adjustments`,
         method: 'POST',
@@ -175,7 +175,7 @@ export const useRecordStockUpdate = (token?: string | undefined) => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ productId, quantity, reason }: { productId: string; quantity: number; reason?: string }) =>
+        mutationFn: ({ productId, quantity, reason }: { productId: string; quantity: number; reason?: string | undefined }) =>
             recordStockRequest({ token, productId, quantity, reason }),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: [INVENTORY_QUERY_KEY] });
@@ -187,7 +187,7 @@ export const useRecordInventoryAdjustment = (token?: string | undefined) => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ productId, newQuantity, reason }: { productId: string; newQuantity: number; reason?: string }) =>
+        mutationFn: ({ productId, newQuantity, reason }: { productId: string; newQuantity: number; reason?: string | undefined }) =>
             recordAdjustmentRequest({ token, productId, newQuantity, reason }),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: [INVENTORY_QUERY_KEY] });
