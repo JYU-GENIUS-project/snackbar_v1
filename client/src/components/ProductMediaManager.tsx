@@ -1,4 +1,4 @@
-import { forwardRef, useState } from 'react';
+import { forwardRef, useState, type FormEvent } from 'react';
 import {
   useDeleteProductMedia,
   useMarkPrimaryMedia,
@@ -55,7 +55,7 @@ const ProductMediaManager = forwardRef<HTMLDivElement, ProductMediaManagerProps>
 
     const resetStatus = () => setStatus({ type: '', message: '' });
 
-    const handleUpload = async (event: React.FormEvent<HTMLFormElement>) => {
+    const handleUpload = async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
       resetStatus();
 

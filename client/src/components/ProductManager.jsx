@@ -1,26 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { useArchiveProduct, useCreateProduct, useProducts, useUpdateProduct } from '../hooks/useProducts.js';
-import { useDebouncedValue } from '../hooks/useDebouncedValue.js';
-import ProductTable from './ProductTable';
-import ProductForm from './ProductForm';
-import ProductMediaManager from './ProductMediaManager';
-import InventoryPanel from './InventoryPanel.jsx';
-import KioskPreview from './KioskPreview.jsx';
-import CategoryManager from './CategoryManager.jsx';
-import AdminAccountsManager from './AdminAccountsManager.jsx';
-import AuditTrailViewer from './AuditTrailViewer.jsx';
-import { normalizeProductPayload, productToFormState, ensureMinimumProductShape } from '../utils/productPayload.js';
-import { updateInventoryCacheItem } from '../utils/inventoryCache.js';
-import { useUploadProductMedia } from '../hooks/useProductMedia.js';
-import {
-  useCategories,
-  useCreateCategory,
-  useDeleteCategory,
-  useUpdateCategory
-} from '../hooks/useCategories';
-import { useInventoryTracking, useSetInventoryTracking } from '../hooks/useInventory.js';
-import { saveOfflineProductSnapshot, readOfflineProductSnapshot } from '../utils/offlineCache.js';
+export { default } from './ProductManager.tsx';
 
 const DEFAULT_LIMIT = 50;
 const DEFAULT_SECTION = 'products';

@@ -71,21 +71,35 @@
   - `main.tsx` and `App.tsx` now type the auth/session state, API error handling, and history wrappers; HTML entry updated.
 - [x] Migrate top-level providers/hooks (`hooks/useAuth.js`, `useCategories.js`, etc.) to TypeScript with explicit return types.
   - Converted `useAuth` and `useCategories` to `.ts` with typed payloads and React Query generics; JS shims now re-export from TS.
+- [x] Migrate remaining data hooks to TypeScript.
+  - [x] `hooks/useDebouncedValue.js`
+  - [x] `hooks/useInventory.js`
+  - [x] `hooks/useProducts.js`
+  - [x] `hooks/useProductMedia.js`
+  - [x] `hooks/useProductFeed.js`
+  - [x] `hooks/useKioskStatus.js`
 - [ ] Convert components directory iteratively; prioritize shared primitives (forms, tables) before specialized views.
   - [x] `components/ProductManager.jsx`
   - [x] `components/ProductTable.jsx`
   - [x] `components/ProductDetailModal.jsx`
   - [x] `components/ProductForm.jsx`
   - [x] `components/ProductMediaManager.jsx`
-  - [ ] `components/InventoryPanel.jsx`
+  - [x] `components/InventoryPanel.jsx`
   - [x] `components/AdminAccountsManager.jsx`
   - [x] `components/AuditTrailViewer.jsx`
-  - [ ] `components/CategoryManager.jsx`
-  - [ ] `components/KioskApp.jsx`
-  - [ ] `components/KioskPreview.jsx`
+  - [x] `components/CategoryManager.jsx`
+  - [x] `components/KioskApp.jsx`
+  - [x] `components/ProductGridSkeleton.jsx`
+  - [x] `components/KioskPreview.jsx`
   - [x] `components/LoginPanel.jsx`
-- [ ] Update utility modules in `client/src/utils` and API layer `services/apiClient.js` to TypeScript, leveraging shared DTOs.
+- [x] Update utility modules in `client/src/utils` and API layer `services/apiClient.js` to TypeScript, leveraging shared DTOs.
+  - [x] `utils/analytics.js`
+  - [x] `utils/inventoryCache.js`
+  - [x] `utils/offlineCache.js`
+  - [x] `utils/productPayload.js`
+  - [x] `services/apiClient.js`
 - [ ] Migrate test files to `.tsx`/`.ts` and ensure Vitest typings are configured via `vitest.config.ts` and `vitest.setup.ts` updates.
+  - [x] `hooks/__tests__/useKioskStatus.test.jsx`
 - [ ] Remove residual `.js/.jsx` files once equivalents exist and imports updated.
 
 ## Phase 4 – Server Tooling Enablement

@@ -16,7 +16,7 @@
     "@tanstack/react-query-devtools": "^5.59.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "@snackbar/shared-types": "workspace:*"
+    "@snackbar/shared-types": "file:../packages/shared-types"
   },
   "devDependencies": {
     "@types/react": "^18.3.8",

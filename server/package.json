@@ -41,14 +41,14 @@
     "pg": "^8.11.3",
     "sharp": "^0.33.3",
     "uuid": "^9.0.1",
-    "@snackbar/shared-types": "workspace:*"
+    "@snackbar/shared-types": "file:../packages/shared-types"
   },
   "devDependencies": {
     "@types/compression": "^1.7.5",
     "@types/cors": "^2.8.17",
-    "@types/dotenv": "^16.0.7",
     "@types/express": "^4.17.21",
     "@types/express-serve-static-core": "^4.17.43",
+    "@types/jest": "^29.5.12",
     "@types/jsonwebtoken": "^9.0.6",
     "@types/morgan": "^1.9.7",
     "@types/multer": "^1.4.12",
@@ -61,8 +61,8 @@
     "@eslint/js": "^9.39.1",
     "eslint": "^9.39.1",
     "globals": "^16.5.0",
-    "jest": "^30.2.0",
-    "ts-jest": "^30.0.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.2",
     "ts-node": "^10.9.2",
     "typescript": "~5.4.0",
     "nodemon": "^3.0.2",
