@@ -1134,9 +1134,9 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
 
         if (isBackedByApi) {
             try {
-                                const payload = normalizeProductPayload(
-                                    productValues as Partial<ProductFormState> & Record<string, unknown>
-                                );
+                const payload = normalizeProductPayload(
+                    productValues as Partial<ProductFormState> & Record<string, unknown>
+                );
                 createdProduct = await createMutation.mutateAsync(payload);
             } catch (mutationError) {
                 console.warn('Create product via API failed, using local store fallback.', mutationError);
@@ -1223,9 +1223,9 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
 
         if (isBackedByApi) {
             try {
-                                const payload = normalizeProductPayload(
-                                    productValues as Partial<ProductFormState> & Record<string, unknown>
-                                );
+                const payload = normalizeProductPayload(
+                    productValues as Partial<ProductFormState> & Record<string, unknown>
+                );
                 await updateMutation.mutateAsync({ productId: editingProduct.id, payload });
                 if (imageFile) {
                     try {
