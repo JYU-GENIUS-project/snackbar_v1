@@ -124,12 +124,22 @@
   - [x] `middleware/requestLogger.js`
   - [x] `middleware/auth.js`
   - [x] `middleware/rateLimiter.js`
-- [ ] Update route handlers under `server/src/routes` to TypeScript, aligning response schemas with shared DTOs.
+- [x] Update route handlers under `server/src/routes` to TypeScript, aligning response schemas with shared DTOs.
   - [x] `routes/health.js`
   - [x] `routes/auth.js`
   - [x] `routes/admins.js`
   - [x] `routes/categories.js`
+  - [x] `routes/products.js`
+  - [x] `routes/feed.js`
+  - [x] `routes/inventory.js`
+  - [x] `routes/status.js`
+  - [x] `routes/notifications.js`
+  - [x] `routes/transactions.js`
+  - [x] `routes/notifications.js`
 - [ ] Convert service layer modules to TypeScript, especially those interacting with the database (ensure `pg` typings are used).
+  - [x] `services/statusService.js`
+  - [x] `services/statusEvents.js`
+  - [x] `services/inventoryEvents.js`
 - [ ] Introduce type-safe models/interfaces for entities (products, categories, inventory, users) in shared types package.
 - [ ] Refine utility modules to TypeScript, handling environment config via typed `process.env` wrappers.
 - [ ] Update Jest tests to `.ts` or keep `.js` with TypeScript-aware transpilation; ensure mocks provide types.

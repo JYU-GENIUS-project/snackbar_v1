@@ -1,6 +1,6 @@
 'use strict';
 
-const db = require('../utils/database');
+import db from '../utils/database';
 
 const OPERATING_HOURS_KEY = 'operating_hours';
 const MAINTENANCE_MODE_KEY = 'maintenance_mode';
@@ -13,7 +13,7 @@ const DEFAULT_OPERATING_WINDOW = {
 const DEFAULT_MAINTENANCE_MESSAGE = '🔧 System Under Maintenance - Check back soon';
 const MAX_LOOKAHEAD_DAYS = 14;
 
-const WEEKDAY_MAP = {
+const WEEKDAY_MAP: Record<string, number> = {
     Sun: 7,
     Mon: 1,
     Tue: 2,
@@ -23,7 +23,66 @@ const WEEKDAY_MAP = {
     Sat: 6
 };
 
-const parseConfigValue = (value) => {
+type OperatingHoursInput = {
+    start?: string;
+    end?: string;
+    days?: Array<number | string>;
+    timezone?: string;
+    windows?: Array<{
+        start?: string;
+        end?: string;
+        days?: Array<number | string>;
+    }>;
+};
+
+type OperatingWindow = {
+    start: string;
+    end: string;
+    startMinutes: number;
+    endMinutes: number;
+    days: number[];
+    daysSet: Set<number>;
+};
+
+type OperatingHoursConfig = {
+    timezone: string;
+    windows: OperatingWindow[];
+};
+
+type MaintenanceState = {
+    enabled: boolean;
+    message: string;
+    since: string | null;
+};
+
+type ZonedDateParts = {
+    year: number;
+    month: number;
+    day: number;
+    hour: number;
+    minute: number;
+    second: number;
+    weekday: number;
+};
+
+type KioskStatus = {
+    status: 'maintenance' | 'open' | 'closed';
+    reason: string;
+    message: string;
+    timezone: string;
+    maintenance: MaintenanceState;
+    operatingWindow: {
+        start: string;
+        end: string;
+        days: number[];
+    } | null;
+    nextOpen: string | null;
+    nextClose: string | null;
+    generatedAt: string;
+    windows: Array<{ start: string; end: string; days: number[] }>;
+};
+
+const parseConfigValue = (value: unknown) => {
     if (value === null || value === undefined) {
         return null;
     }
@@ -32,29 +91,40 @@ const parseConfigValue = (value) => {
         return value;
     }
 
-    try {
-        return JSON.parse(value);
-    } catch (error) {
-        const lowered = value.toLowerCase();
-        if (lowered === 'true') {
-            return true;
+    if (typeof value === 'string') {
+        try {
+            const parsed: unknown = JSON.parse(value);
+            return parsed;
+        } catch {
+            const lowered = value.toLowerCase();
+            if (lowered === 'true') {
+                return true;
+            }
+            if (lowered === 'false') {
+                return false;
+            }
+            return value;
         }
-        if (lowered === 'false') {
-            return false;
-        }
-        return value;
     }
+
+    return value;
 };
 
-const getConfigValue = async (key) => {
-    const result = await db.query('SELECT value FROM system_config WHERE key = $1 LIMIT 1', [key]);
+const getConfigValue = async (key: string) => {
+    const result = (await db.query('SELECT value FROM system_config WHERE key = $1 LIMIT 1', [key])) as {
+        rows: Array<{ value: unknown }>;
+    };
     if (!result.rows.length) {
         return null;
     }
-    return parseConfigValue(result.rows[0].value);
+    const row = result.rows[0];
+    if (!row) {
+        return null;
+    }
+    return parseConfigValue(row.value);
 };
 
-const sanitizeTimeString = (value, fallback) => {
+const sanitizeTimeString = (value: unknown, fallback: string | null) => {
     const source = typeof value === 'string' ? value.trim() : null;
     const candidate = source || fallback;
     if (!candidate) {
@@ -64,6 +134,9 @@ const sanitizeTimeString = (value, fallback) => {
     if (!match) {
         return null;
     }
+    if (!match[1] || !match[2]) {
+        return null;
+    }
     const hours = parseInt(match[1], 10);
     if (hours > 23) {
         return null;
@@ -71,11 +144,14 @@ const sanitizeTimeString = (value, fallback) => {
     return `${match[1].padStart(2, '0')}:${match[2]}`;
 };
 
-const parseTimeToMinutes = (value) => {
+const parseTimeToMinutes = (value: unknown) => {
     if (typeof value !== 'string') {
         return null;
     }
     const [hours, minutes] = value.split(':');
+    if (!hours || !minutes) {
+        return null;
+    }
     const parsedHours = parseInt(hours, 10);
     const parsedMinutes = parseInt(minutes, 10);
     if (Number.isNaN(parsedHours) || Number.isNaN(parsedMinutes)) {
@@ -84,10 +160,10 @@ const parseTimeToMinutes = (value) => {
     return parsedHours * 60 + parsedMinutes;
 };
 
-const sanitizeDays = (input, fallback) => {
+const sanitizeDays = (input: unknown, fallback: number[]) => {
     const base = Array.isArray(input) ? input : [];
     const sanitized = base
-        .map((value) => parseInt(value, 10))
+        .map((value) => parseInt(String(value), 10))
         .filter((value) => Number.isFinite(value) && value >= 1 && value <= 7);
     if (sanitized.length === 0) {
         return Array.isArray(fallback) && fallback.length ? [...new Set(fallback)] : [...DEFAULT_OPERATING_WINDOW.days];
@@ -95,18 +171,19 @@ const sanitizeDays = (input, fallback) => {
     return [...new Set(sanitized)];
 };
 
-const ensureValidTimeZone = (timeZoneCandidate) => {
-    const zone = typeof timeZoneCandidate === 'string' && timeZoneCandidate.trim() ? timeZoneCandidate.trim() : DEFAULT_TIMEZONE;
+const ensureValidTimeZone = (timeZoneCandidate: unknown) => {
+    const zone =
+        typeof timeZoneCandidate === 'string' && timeZoneCandidate.trim() ? timeZoneCandidate.trim() : DEFAULT_TIMEZONE;
     try {
         new Intl.DateTimeFormat('en-US', { timeZone: zone });
         return zone;
-    } catch (error) {
+    } catch {
         console.warn(`[StatusService] Invalid timezone '${zone}', falling back to ${DEFAULT_TIMEZONE}`);
         return DEFAULT_TIMEZONE;
     }
 };
 
-const buildOperatingWindows = (rawConfig) => {
+const buildOperatingWindows = (rawConfig: OperatingHoursInput) => {
     const defaultStart = sanitizeTimeString(rawConfig?.start, DEFAULT_OPERATING_WINDOW.start);
     const defaultEnd = sanitizeTimeString(rawConfig?.end, DEFAULT_OPERATING_WINDOW.end);
     const defaultDays = sanitizeDays(rawConfig?.days, DEFAULT_OPERATING_WINDOW.days);
@@ -137,9 +214,9 @@ const buildOperatingWindows = (rawConfig) => {
                 endMinutes,
                 days,
                 daysSet: new Set(days)
-            };
+            } satisfies OperatingWindow;
         })
-        .filter(Boolean);
+        .filter((window): window is OperatingWindow => Boolean(window));
 
     if (!windows.length) {
         const fallbackStart = defaultStart || DEFAULT_OPERATING_WINDOW.start;
@@ -152,8 +229,8 @@ const buildOperatingWindows = (rawConfig) => {
             {
                 start: fallbackStart,
                 end: fallbackEnd,
-                startMinutes: fallbackStartMinutes,
-                endMinutes: fallbackEndMinutes,
+                startMinutes: fallbackStartMinutes ?? 0,
+                endMinutes: fallbackEndMinutes ?? 0,
                 days: [...fallbackDays],
                 daysSet: new Set(fallbackDays)
             }
@@ -163,8 +240,8 @@ const buildOperatingWindows = (rawConfig) => {
     return windows;
 };
 
-const getOperatingHoursConfig = async () => {
-    const stored = await getConfigValue(OPERATING_HOURS_KEY);
+const getOperatingHoursConfig = async (): Promise<OperatingHoursConfig> => {
+    const stored = (await getConfigValue(OPERATING_HOURS_KEY)) as OperatingHoursInput | null;
     const timeZone = ensureValidTimeZone(stored?.timezone);
     const windows = buildOperatingWindows(stored || {});
 
@@ -174,7 +251,7 @@ const getOperatingHoursConfig = async () => {
     };
 };
 
-const getMaintenanceState = async () => {
+const getMaintenanceState = async (): Promise<MaintenanceState> => {
     const stored = await getConfigValue(MAINTENANCE_MODE_KEY);
 
     if (stored === null || stored === undefined) {
@@ -194,14 +271,23 @@ const getMaintenanceState = async () => {
     }
 
     if (typeof stored === 'object') {
+        const record = stored as { enabled?: boolean; message?: string; since?: string | null };
         return {
-            enabled: Boolean(stored.enabled),
-            message: typeof stored.message === 'string' && stored.message.trim() ? stored.message.trim() : DEFAULT_MAINTENANCE_MESSAGE,
-            since: stored.since || null
+            enabled: Boolean(record.enabled),
+            message: typeof record.message === 'string' && record.message.trim() ? record.message.trim() : DEFAULT_MAINTENANCE_MESSAGE,
+            since: record.since || null
         };
     }
 
-    const normalized = String(stored).toLowerCase();
+    let storedString: string;
+    if (typeof stored === 'string') {
+        storedString = stored;
+    } else if (typeof stored === 'number' || typeof stored === 'boolean') {
+        storedString = String(stored);
+    } else {
+        storedString = '';
+    }
+    const normalized = storedString.toLowerCase();
     const enabled = normalized === 'true';
     return {
         enabled,
@@ -210,7 +296,7 @@ const getMaintenanceState = async () => {
     };
 };
 
-const getZonedDateParts = (date, timeZone) => {
+const getZonedDateParts = (date: Date, timeZone: string): ZonedDateParts => {
     const formatter = new Intl.DateTimeFormat('en-US', {
         timeZone,
         hour12: false,
@@ -224,7 +310,7 @@ const getZonedDateParts = (date, timeZone) => {
     });
 
     const parts = formatter.formatToParts(date);
-    const map = {};
+    const map: Record<string, string> = {};
 
     for (const part of parts) {
         if (part.type !== 'literal') {
@@ -232,22 +318,22 @@ const getZonedDateParts = (date, timeZone) => {
         }
     }
 
-    const weekdayCode = WEEKDAY_MAP[map.weekday] || 1;
+    const weekdayCode = WEEKDAY_MAP[map.weekday ?? 'Mon'] || 1;
 
     return {
-        year: parseInt(map.year, 10),
-        month: parseInt(map.month, 10),
-        day: parseInt(map.day, 10),
-        hour: parseInt(map.hour, 10),
-        minute: parseInt(map.minute, 10),
-        second: parseInt(map.second, 10),
+        year: parseInt(map.year ?? '0', 10),
+        month: parseInt(map.month ?? '1', 10),
+        day: parseInt(map.day ?? '1', 10),
+        hour: parseInt(map.hour ?? '0', 10),
+        minute: parseInt(map.minute ?? '0', 10),
+        second: parseInt(map.second ?? '0', 10),
         weekday: weekdayCode
     };
 };
 
-const addDays = (date, days) => new Date(date.getTime() + days * 86400000);
+const addDays = (date: Date, days: number) => new Date(date.getTime() + days * 86400000);
 
-const getTimeZoneOffset = (timeZone, date) => {
+const getTimeZoneOffset = (timeZone: string, date: Date) => {
     const formatter = new Intl.DateTimeFormat('en-US', {
         timeZone,
         hour12: false,
@@ -260,7 +346,7 @@ const getTimeZoneOffset = (timeZone, date) => {
     });
 
     const parts = formatter.formatToParts(date);
-    const data = {};
+    const data: Record<string, string> = {};
     for (const part of parts) {
         if (part.type !== 'literal') {
             data[part.type] = part.value;
@@ -268,18 +354,21 @@ const getTimeZoneOffset = (timeZone, date) => {
     }
 
     const utcTime = Date.UTC(
-        parseInt(data.year, 10),
-        parseInt(data.month, 10) - 1,
-        parseInt(data.day, 10),
-        parseInt(data.hour, 10),
-        parseInt(data.minute, 10),
-        parseInt(data.second, 10)
+        parseInt(data.year ?? '0', 10),
+        parseInt(data.month ?? '1', 10) - 1,
+        parseInt(data.day ?? '1', 10),
+        parseInt(data.hour ?? '0', 10),
+        parseInt(data.minute ?? '0', 10),
+        parseInt(data.second ?? '0', 10)
     );
 
     return (utcTime - date.getTime()) / 60000;
 };
 
-const makeZonedDate = ({ year, month, day, hour, minute, second = 0 }, timeZone) => {
+const makeZonedDate = (
+    { year, month, day, hour, minute, second = 0 }: ZonedDateParts,
+    timeZone: string
+) => {
     const base = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
     const offset = getTimeZoneOffset(timeZone, base);
     const adjusted = new Date(base.getTime() - offset * 60000);
@@ -290,7 +379,7 @@ const makeZonedDate = ({ year, month, day, hour, minute, second = 0 }, timeZone)
     return adjusted;
 };
 
-const isWithinWindow = (parts, window) => {
+const isWithinWindow = (parts: ZonedDateParts, window: OperatingWindow) => {
     const { startMinutes, endMinutes, daysSet } = window;
     const minutes = parts.hour * 60 + parts.minute;
 
@@ -310,7 +399,7 @@ const isWithinWindow = (parts, window) => {
     return daysSet.has(previousWeekday) && minutes < endMinutes;
 };
 
-const computeWindowClose = (now, parts, timeZone, window) => {
+const computeWindowClose = (now: Date, parts: ZonedDateParts, timeZone: string, window: OperatingWindow) => {
     if (window.startMinutes === window.endMinutes) {
         return null;
     }
@@ -320,25 +409,33 @@ const computeWindowClose = (now, parts, timeZone, window) => {
     const minutes = parts.hour * 60 + parts.minute;
 
     if (window.startMinutes < window.endMinutes) {
-        const sameDayClose = makeZonedDate({
-            year: parts.year,
-            month: parts.month,
-            day: parts.day,
-            hour: endHour,
-            minute: endMinute,
-            second: 0
-        }, timeZone);
+        const sameDayClose = makeZonedDate(
+            {
+                year: parts.year,
+                month: parts.month,
+                day: parts.day,
+                hour: endHour,
+                minute: endMinute,
+                second: 0,
+                weekday: parts.weekday
+            },
+            timeZone
+        );
 
         if (sameDayClose.getTime() <= now.getTime()) {
             const nextDayParts = getZonedDateParts(addDays(now, 1), timeZone);
-            return makeZonedDate({
-                year: nextDayParts.year,
-                month: nextDayParts.month,
-                day: nextDayParts.day,
-                hour: endHour,
-                minute: endMinute,
-                second: 0
-            }, timeZone);
+            return makeZonedDate(
+                {
+                    year: nextDayParts.year,
+                    month: nextDayParts.month,
+                    day: nextDayParts.day,
+                    hour: endHour,
+                    minute: endMinute,
+                    second: 0,
+                    weekday: nextDayParts.weekday
+                },
+                timeZone
+            );
         }
 
         return sameDayClose;
@@ -346,27 +443,35 @@ const computeWindowClose = (now, parts, timeZone, window) => {
 
     if (minutes >= window.startMinutes) {
         const nextDayParts = getZonedDateParts(addDays(now, 1), timeZone);
-        return makeZonedDate({
-            year: nextDayParts.year,
-            month: nextDayParts.month,
-            day: nextDayParts.day,
-            hour: endHour,
-            minute: endMinute,
-            second: 0
-        }, timeZone);
+        return makeZonedDate(
+            {
+                year: nextDayParts.year,
+                month: nextDayParts.month,
+                day: nextDayParts.day,
+                hour: endHour,
+                minute: endMinute,
+                second: 0,
+                weekday: nextDayParts.weekday
+            },
+            timeZone
+        );
     }
 
-    return makeZonedDate({
-        year: parts.year,
-        month: parts.month,
-        day: parts.day,
-        hour: endHour,
-        minute: endMinute,
-        second: 0
-    }, timeZone);
+    return makeZonedDate(
+        {
+            year: parts.year,
+            month: parts.month,
+            day: parts.day,
+            hour: endHour,
+            minute: endMinute,
+            second: 0,
+            weekday: parts.weekday
+        },
+        timeZone
+    );
 };
 
-const findNextOpen = (now, timeZone, windows) => {
+const findNextOpen = (now: Date, timeZone: string, windows: OperatingWindow[]) => {
     for (let dayOffset = 0; dayOffset <= MAX_LOOKAHEAD_DAYS; dayOffset += 1) {
         const targetDate = addDays(now, dayOffset);
         const targetParts = getZonedDateParts(targetDate, timeZone);
@@ -378,14 +483,18 @@ const findNextOpen = (now, timeZone, windows) => {
 
             const startHour = Math.floor(window.startMinutes / 60);
             const startMinute = window.startMinutes % 60;
-            const candidate = makeZonedDate({
-                year: targetParts.year,
-                month: targetParts.month,
-                day: targetParts.day,
-                hour: startHour,
-                minute: startMinute,
-                second: 0
-            }, timeZone);
+            const candidate = makeZonedDate(
+                {
+                    year: targetParts.year,
+                    month: targetParts.month,
+                    day: targetParts.day,
+                    hour: startHour,
+                    minute: startMinute,
+                    second: 0,
+                    weekday: targetParts.weekday
+                },
+                timeZone
+            );
 
             if (candidate.getTime() <= now.getTime()) {
                 continue;
@@ -401,7 +510,7 @@ const findNextOpen = (now, timeZone, windows) => {
     return null;
 };
 
-const formatDisplayTime = (date, timeZone, options = {}) => {
+const formatDisplayTime = (date: Date, timeZone: string, options: { includeWeekday?: boolean; includeDate?: boolean } = {}) => {
     const formatter = new Intl.DateTimeFormat('en-GB', {
         timeZone,
         hour12: false,
@@ -413,7 +522,7 @@ const formatDisplayTime = (date, timeZone, options = {}) => {
     return formatter.format(date);
 };
 
-const buildClosedMessage = ({ nextOpen, window, timeZone }) => {
+const buildClosedMessage = ({ nextOpen, window, timeZone }: { nextOpen: Date | null; window: OperatingWindow | null; timeZone: string }) => {
     if (!nextOpen || !window) {
         return '🔒 Closed - Please check back during operating hours';
     }
@@ -422,7 +531,7 @@ const buildClosedMessage = ({ nextOpen, window, timeZone }) => {
     return `🔒 Closed - Opens ${nextOpenFormatted} (Hours: ${window.start}–${window.end})`;
 };
 
-const buildOpenMessage = ({ nextClose, window, timeZone }) => {
+const buildOpenMessage = ({ nextClose, window, timeZone }: { nextClose: Date | null; window: OperatingWindow | null; timeZone: string }) => {
     if (!window) {
         return '🟢 Open - Serving customers';
     }
@@ -435,7 +544,7 @@ const buildOpenMessage = ({ nextClose, window, timeZone }) => {
     return `🟢 Open - Closes at ${closingFormatted}`;
 };
 
-const buildStatusFingerprint = (status) => {
+const buildStatusFingerprint = (status: KioskStatus | null) => {
     if (!status) {
         return null;
     }
@@ -453,7 +562,7 @@ const buildStatusFingerprint = (status) => {
     return JSON.stringify(payload);
 };
 
-const getKioskStatus = async ({ now } = {}) => {
+const getKioskStatus = async ({ now }: { now?: Date } = {}): Promise<KioskStatus> => {
     const reference = now instanceof Date ? new Date(now.getTime()) : new Date();
     const operating = await getOperatingHoursConfig();
     const maintenance = await getMaintenanceState();
@@ -464,7 +573,7 @@ const getKioskStatus = async ({ now } = {}) => {
     const isMaintenance = Boolean(maintenance.enabled);
     const isOpen = !isMaintenance && Boolean(activeWindow);
 
-    const nextClose = isOpen ? computeWindowClose(reference, parts, timeZone, activeWindow) : null;
+    const nextClose = isOpen && activeWindow ? computeWindowClose(reference, parts, timeZone, activeWindow) : null;
     const nextOpenResult = isMaintenance
         ? null
         : isOpen
@@ -474,7 +583,7 @@ const getKioskStatus = async ({ now } = {}) => {
     const nextOpenDate = nextOpenResult?.date || null;
     const nextOpenWindow = nextOpenResult?.window || null;
 
-    const statusValue = isMaintenance ? 'maintenance' : isOpen ? 'open' : 'closed';
+    const statusValue: KioskStatus['status'] = isMaintenance ? 'maintenance' : isOpen ? 'open' : 'closed';
     const reason = isMaintenance ? 'maintenance' : isOpen ? 'operational' : 'outside-operating-hours';
 
     let message = DEFAULT_MAINTENANCE_MESSAGE;
@@ -516,16 +625,19 @@ const getKioskStatus = async ({ now } = {}) => {
     };
 };
 
-const statusHasChanged = (previous, next) => {
+const statusHasChanged = (previous: KioskStatus | null, next: KioskStatus | null) => {
     const previousSignature = buildStatusFingerprint(previous);
     const nextSignature = buildStatusFingerprint(next);
     return previousSignature !== nextSignature;
 };
 
-module.exports = {
+const statusService = {
     getOperatingHoursConfig,
     getMaintenanceState,
     getKioskStatus,
     statusHasChanged,
     buildStatusFingerprint
 };
+
+export { getOperatingHoursConfig, getMaintenanceState, getKioskStatus, statusHasChanged, buildStatusFingerprint };
+export default statusService;
