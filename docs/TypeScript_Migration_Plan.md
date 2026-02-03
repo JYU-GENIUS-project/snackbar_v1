@@ -100,6 +100,7 @@
   - [x] `services/apiClient.js`
 - [ ] Migrate test files to `.tsx`/`.ts` and ensure Vitest typings are configured via `vitest.config.ts` and `vitest.setup.ts` updates.
   - [x] `hooks/__tests__/useKioskStatus.test.jsx`
+  - [x] `components/__tests__/ProductDetailModal.test.jsx`
 - [ ] Remove residual `.js/.jsx` files once equivalents exist and imports updated.
 
 ## Phase 4 – Server Tooling Enablement
