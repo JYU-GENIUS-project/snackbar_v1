@@ -187,8 +187,11 @@
 ## Phase 8 – Validation & Clean-up
 
 - [ ] Run full automated test stack (unit, integration, Robot suites) against TypeScript builds.
+  - Robot suites executed; failures remain in admin/product flows, transactions/statistics, and customer checkout/cart selectors (see latest report/log).
+- Expected passing acceptance suites based on closed issues: `admin_authentication_products.robot` (US-019–US-028), `admin_category_management.robot` (US-029–US-031), `admin_inventory_management.robot` (US-032–US-038), `customer_product_browsing.robot` (US-001–US-005), `customer_system_status.robot` (US-016–US-018), `system_technical_security.robot` (US-060–US-063), `system_integration_communication.robot` (US-064, US-067).
 - [ ] Perform manual smoke testing on critical flows (admin product management, kiosk browsing, checkout).
-- [ ] Remove deprecated configs (old ESLint rules, Babel settings if any) and ensure no JS-specific tooling remains.
+- [x] Remove deprecated configs (old ESLint rules, Babel settings if any) and ensure no JS-specific tooling remains.
+  - Removed remaining legacy JS utilities in `server/src/utils`.
 - [ ] Monitor runtime logs for type-related regressions post-deployment and adjust typings as necessary.
 
 ## Risk & Mitigation Log
