@@ -119,7 +119,7 @@
 ## Phase 5 – Server Code Migration
 
 - [x] Convert `server.js` entry point to `server.ts`, defining types for Express app, middleware, and error handling.
-- [ ] Migrate middleware modules under `server/src/middleware`, ensuring `Request`/`Response` generics are applied.
+- [x] Migrate middleware modules under `server/src/middleware`, ensuring `Request`/`Response` generics are applied.
   - [x] `middleware/errorHandler.js`
   - [x] `middleware/requestLogger.js`
   - [x] `middleware/auth.js`
@@ -135,19 +135,41 @@
   - [x] `routes/status.js`
   - [x] `routes/notifications.js`
   - [x] `routes/transactions.js`
-  - [x] `routes/notifications.js`
-- [ ] Convert service layer modules to TypeScript, especially those interacting with the database (ensure `pg` typings are used).
+- [x] Convert service layer modules to TypeScript, especially those interacting with the database (ensure `pg` typings are used).
   - [x] `services/statusService.js`
   - [x] `services/statusEvents.js`
   - [x] `services/inventoryEvents.js`
-- [ ] Introduce type-safe models/interfaces for entities (products, categories, inventory, users) in shared types package.
-- [ ] Refine utility modules to TypeScript, handling environment config via typed `process.env` wrappers.
-- [ ] Update Jest tests to `.ts` or keep `.js` with TypeScript-aware transpilation; ensure mocks provide types.
+  - [x] `services/productMediaService.js`
+  - [x] `services/adminService.js`
+  - [x] `services/auditService.js`
+  - [x] `services/authService.js`
+  - [x] `services/categoryService.js`
+  - [x] `services/notificationService.js`
+  - [x] `services/productService.js`
+  - [x] `services/inventoryService.js`
+- [x] Introduce type-safe models/interfaces for entities (products, categories, inventory, users) in shared types package.
+  - [x] `AdminUser`
+  - [x] `Category`/`CategorySummary`
+  - [x] `Product`/`ProductFeedItem`/`ProductMedia`
+  - [x] `InventorySnapshot`/`InventoryTrackingState`
+  - [x] `KioskStatus`
+- [x] Refine utility modules to TypeScript, handling environment config via typed `process.env` wrappers.
+  - [x] `utils/database.js`
+  - [x] `utils/mediaStorage.js`
+- [x] Update Jest tests to `.ts` or keep `.js` with TypeScript-aware transpilation; ensure mocks provide types.
+  - [x] `__tests__/authService.test.ts`
+  - [x] `__tests__/feedRoute.test.ts`
+  - [x] `__tests__/imageProcessor.test.ts`
+  - [x] `__tests__/mediaStorage.test.ts`
+  - [x] `__tests__/statusEvents.test.ts`
+  - [x] `__tests__/statusRoute.test.ts`
+  - [x] `__tests__/statusService.test.ts`
 
 ## Phase 6 – Data & Script Updates
 
-- [ ] Evaluate `init-db` SQL scripts for needing TypeScript-driven generation; if none, document no changes required.
-- [ ] Convert `server/scripts/seed.js` to TypeScript (`seed.ts`) and adjust package scripts accordingly.
+- [x] Evaluate `init-db` SQL scripts for needing TypeScript-driven generation; if none, document no changes required.
+  - No TypeScript generation required; SQL scripts remain as-is.
+- [x] Convert `server/scripts/seed.js` to TypeScript (`seed.ts`) and adjust package scripts accordingly.
 - [ ] Ensure any ad-hoc utilities (e.g., backup, nginx scripts) remain compatible; document if TypeScript is unnecessary.
 
 ## Phase 7 – CI/CD and Toolchain Alignment

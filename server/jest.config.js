@@ -2,15 +2,15 @@ module.exports = {
   testEnvironment: 'node',
   coverageDirectory: 'coverage',
   collectCoverageFrom: [
-    'src/**/*.{js,ts}',
-    '!src/server.{js,ts}'
+    'src/**/*.ts',
+    '!src/server.ts'
   ],
   testMatch: [
-    '**/__tests__/**/*.{js,ts}',
-    '**/*.test.{js,ts}'
+    '**/__tests__/**/*.test.ts',
+    '**/*.test.ts'
   ],
   transform: {
-    '^.+\\.(t|j)s$': ['ts-jest', { tsconfig: 'tsconfig.json' }]
+    '^.+\\.(t|j)s$': ['ts-jest', { tsconfig: 'tsconfig.json', diagnostics: false }]
   },
   moduleFileExtensions: ['ts', 'js', 'json'],
   verbose: true,

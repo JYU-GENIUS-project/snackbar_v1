@@ -1,15 +1,37 @@
 'use strict';
 
+
 jest.mock('../utils/database', () => ({
-    query: jest.fn()
+    __esModule: true,
+    default: {
+        query: jest.fn()
+    }
 }));
 
-const db = require('../utils/database');
+let mockedDb: { query: jest.Mock };
+
+type StatusService = typeof import('../services/statusService').default;
+
+const loadStatusService = async (): Promise<StatusService> => {
+    const module = await import('../services/statusService');
+    return module.default;
+};
+
+const loadDbMock = async (): Promise<{ query: jest.Mock }> => {
+    const module = await import('../utils/database');
+    return (module.default ?? module) as unknown as { query: jest.Mock };
+};
+
+let statusService: StatusService;
 
 process.env.KIOSK_TIMEZONE = 'UTC';
-const statusService = require('../services/statusService');
 
-const mockOperatingHours = (value) => {
+type MockQueryInput = {
+    operatingHours?: unknown;
+    maintenance?: unknown;
+};
+
+const mockOperatingHours = (value: unknown) => {
     return {
         rows: [
             {
@@ -19,7 +41,7 @@ const mockOperatingHours = (value) => {
     };
 };
 
-const mockMaintenance = (value) => {
+const mockMaintenance = (value: unknown) => {
     return {
         rows: [
             {
@@ -29,16 +51,17 @@ const mockMaintenance = (value) => {
     };
 };
 
-const mockQueryImplementation = ({ operatingHours, maintenance }) => {
-    db.query.mockImplementation((text, params) => {
-        if (params[0] === 'operating_hours') {
+const mockQueryImplementation = ({ operatingHours, maintenance }: MockQueryInput) => {
+    mockedDb.query.mockImplementation((text: string, params: unknown[] = []) => {
+        const [paramKey] = params;
+        if (paramKey === 'operating_hours') {
             if (operatingHours) {
                 return Promise.resolve(mockOperatingHours(operatingHours));
             }
             return Promise.resolve({ rows: [] });
         }
 
-        if (params[0] === 'maintenance_mode') {
+        if (paramKey === 'maintenance_mode') {
             if (maintenance !== undefined) {
                 return Promise.resolve(mockMaintenance(maintenance));
             }
@@ -56,15 +79,18 @@ const DEFAULT_OPERATING = {
 };
 
 describe('statusService.getOperatingHoursConfig', () => {
-    beforeEach(() => {
-        db.query.mockReset();
+    beforeEach(async () => {
         process.env.KIOSK_TIMEZONE = 'UTC';
+        jest.resetModules();
+        statusService = await loadStatusService();
+        mockedDb = await loadDbMock();
+        mockedDb.query.mockReset();
     });
 
     it('falls back to default timezone when configuration provides an invalid zone', async () => {
         const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => { });
 
-        db.query.mockResolvedValueOnce(
+        mockedDb.query.mockResolvedValueOnce(
             mockOperatingHours({
                 timezone: 'Mars/OlympusMons',
                 start: '09:00',
@@ -81,7 +107,7 @@ describe('statusService.getOperatingHoursConfig', () => {
     });
 
     it('sanitizes malformed operating windows back to defaults', async () => {
-        db.query.mockResolvedValueOnce(
+        mockedDb.query.mockResolvedValueOnce(
             mockOperatingHours({
                 start: '27:90',
                 end: 'aa:bb',
@@ -99,19 +125,23 @@ describe('statusService.getOperatingHoursConfig', () => {
         const config = await statusService.getOperatingHoursConfig();
 
         expect(config.windows).toHaveLength(1);
-        expect(config.windows[0].start).toBe('08:00');
-        expect(config.windows[0].end).toBe('18:00');
-        expect(config.windows[0].days).toEqual([1, 2, 3, 4, 5]);
+        const [window] = config.windows;
+        expect(window?.start).toBe('08:00');
+        expect(window?.end).toBe('18:00');
+        expect(window?.days).toEqual([1, 2, 3, 4, 5]);
     });
 });
 
 describe('statusService.getMaintenanceState', () => {
-    beforeEach(() => {
-        db.query.mockReset();
+    beforeEach(async () => {
+        jest.resetModules();
+        statusService = await loadStatusService();
+        mockedDb = await loadDbMock();
+        mockedDb.query.mockReset();
     });
 
     it('returns defaults when no maintenance configuration is stored', async () => {
-        db.query.mockResolvedValueOnce({ rows: [] });
+        mockedDb.query.mockResolvedValueOnce({ rows: [] });
 
         const maintenance = await statusService.getMaintenanceState();
 
@@ -122,6 +152,12 @@ describe('statusService.getMaintenanceState', () => {
 });
 
 describe('statusService.statusHasChanged', () => {
+    beforeEach(async () => {
+        jest.resetModules();
+        statusService = await loadStatusService();
+        mockedDb = await loadDbMock();
+    });
+
     it('compares status fingerprints to detect meaningful changes', () => {
         const baseStatus = {
             status: 'open',
@@ -133,14 +169,14 @@ describe('statusService.statusHasChanged', () => {
                 enabled: false,
                 message: 'All good'
             }
-        };
+        } as unknown as Awaited<ReturnType<typeof statusService.getKioskStatus>>;
 
         expect(statusService.statusHasChanged(baseStatus, { ...baseStatus })).toBe(false);
 
         const updated = {
             ...baseStatus,
             message: 'Closing soon'
-        };
+        } as typeof baseStatus;
 
         expect(statusService.statusHasChanged(baseStatus, updated)).toBe(true);
     });
@@ -149,11 +185,14 @@ describe('statusService.statusHasChanged', () => {
 describe('statusService.getKioskStatus', () => {
     const originalEnv = process.env.KIOSK_TIMEZONE;
 
-    beforeEach(() => {
+    beforeEach(async () => {
         jest.useFakeTimers();
         jest.setSystemTime(new Date('2025-05-05T10:00:00Z'));
-        db.query.mockReset();
         process.env.KIOSK_TIMEZONE = 'UTC';
+        jest.resetModules();
+        statusService = await loadStatusService();
+        mockedDb = await loadDbMock();
+        mockedDb.query.mockReset();
     });
 
     afterEach(() => {

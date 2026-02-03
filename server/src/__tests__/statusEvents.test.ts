@@ -1,4 +1,6 @@
-'use strict';
+"use strict";
+
+import type { Response } from 'express';
 
 jest.mock('../services/statusService', () => ({
     getKioskStatus: jest.fn(),
@@ -9,12 +11,18 @@ jest.mock('crypto', () => ({
     randomUUID: jest.fn()
 }));
 
-const flushAsync = () => new Promise((resolve) => setImmediate(resolve));
+type ResponseMock = {
+    write: jest.Mock<void, [string]>;
+    end: jest.Mock<void, []>;
+    writableEnded: boolean;
+};
 
-const createResponseMock = () => {
-    const response = {
-        write: jest.fn(),
-        end: jest.fn(() => {
+const flushAsync = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
+
+const createResponseMock = (): ResponseMock => {
+    const response: ResponseMock = {
+        write: jest.fn<void, [string]>(),
+        end: jest.fn<void, []>(() => {
             response.writableEnded = true;
         }),
         writableEnded: false
@@ -23,7 +31,7 @@ const createResponseMock = () => {
     return response;
 };
 
-const parseEvents = (res) => {
+const parseEvents = (res: ResponseMock): Array<{ event: string; data: unknown }> => {
     return res.write.mock.calls
         .map(([chunk]) => {
             const trimmed = typeof chunk === 'string' ? chunk.trim() : '';
@@ -37,21 +45,22 @@ const parseEvents = (res) => {
                 return null;
             }
             const event = eventLine.replace('event: ', '').trim();
-            const data = JSON.parse(dataLine.replace('data: ', ''));
+            const data = JSON.parse(dataLine.replace('data: ', '')) as unknown;
             return { event, data };
         })
-        .filter(Boolean);
+        .filter((event): event is { event: string; data: unknown } => Boolean(event));
 };
 
 describe('statusEvents', () => {
-    let statusEvents;
-    let statusService;
-    let randomUUID;
+    let statusEvents: typeof import('../services/statusEvents');
+    let statusService: { getKioskStatus: jest.Mock; statusHasChanged: jest.Mock };
+    let randomUUID: jest.Mock<string, []>;
 
-    beforeEach(() => {
+    beforeEach(async () => {
         jest.resetModules();
 
-        statusService = require('../services/statusService');
+        const statusServiceModule = await import('../services/statusService');
+        statusService = statusServiceModule.default as unknown as { getKioskStatus: jest.Mock; statusHasChanged: jest.Mock };
         statusService.getKioskStatus.mockReset();
         statusService.statusHasChanged.mockReset();
         statusService.getKioskStatus.mockResolvedValue({
@@ -60,7 +69,8 @@ describe('statusEvents', () => {
         });
         statusService.statusHasChanged.mockReturnValue(false);
 
-        ({ randomUUID } = require('crypto'));
+        const cryptoModule = (await import('crypto')) as unknown as { randomUUID: jest.Mock<string, []> };
+        randomUUID = cryptoModule.randomUUID;
         randomUUID.mockReset();
         let counter = 0;
         randomUUID.mockImplementation(() => {
@@ -68,7 +78,8 @@ describe('statusEvents', () => {
             return `client-${counter}`;
         });
 
-        statusEvents = require('../services/statusEvents');
+        const statusEventsModule = await import('../services/statusEvents');
+        statusEvents = statusEventsModule as unknown as typeof import('../services/statusEvents');
     });
 
     afterEach(() => {
@@ -77,35 +88,37 @@ describe('statusEvents', () => {
 
     it('sends the latest kiosk status to newly registered clients', async () => {
         const response = createResponseMock();
-        const clientId = await statusEvents.registerClient({ res: response });
+        const clientId = await statusEvents.registerClient({ res: response as unknown as Response });
 
         expect(clientId).toBe('client-1');
         const events = parseEvents(response);
         expect(events).toHaveLength(1);
-        expect(events[0].event).toBe('status:init');
-        expect(events[0].data).toMatchObject({ status: 'open', message: 'Open for business' });
+        const [firstEvent] = events;
+        expect(firstEvent?.event).toBe('status:init');
+        expect(firstEvent?.data).toMatchObject({ status: 'open', message: 'Open for business' });
 
         statusEvents.removeClient(clientId);
     });
 
     it('replays cached tracking and inventory updates to new clients', async () => {
         const firstClient = createResponseMock();
-        const firstClientId = await statusEvents.registerClient({ res: firstClient });
+        const firstClientId = await statusEvents.registerClient({ res: firstClient as unknown as Response });
         statusEvents.broadcastTrackingState({ enabled: true, emittedAt: '2025-05-05T10:00:00.000Z' });
         statusEvents.broadcastInventoryAvailability({
             productId: 'sku-123'
-        });
+        } as Parameters<typeof statusEvents.broadcastInventoryAvailability>[0]);
 
         const secondClient = createResponseMock();
-        const secondClientId = await statusEvents.registerClient({ res: secondClient });
+        const secondClientId = await statusEvents.registerClient({ res: secondClient as unknown as Response });
 
         const events = parseEvents(secondClient);
         expect(events).toHaveLength(3);
-        expect(events[0].event).toBe('status:init');
-        expect(events[1].event).toBe('inventory:tracking');
-        expect(events[1].data).toEqual({ enabled: true, emittedAt: '2025-05-05T10:00:00.000Z' });
-        expect(events[2].event).toBe('inventory:update');
-        expect(events[2].data).toMatchObject({
+        const [initEvent, trackingEvent, inventoryEvent] = events;
+        expect(initEvent?.event).toBe('status:init');
+        expect(trackingEvent?.event).toBe('inventory:tracking');
+        expect(trackingEvent?.data).toEqual({ enabled: true, emittedAt: '2025-05-05T10:00:00.000Z' });
+        expect(inventoryEvent?.event).toBe('inventory:update');
+        expect(inventoryEvent?.data).toMatchObject({
             productId: 'sku-123',
             stockStatus: 'unavailable',
             available: false
@@ -117,7 +130,7 @@ describe('statusEvents', () => {
 
     it('normalizes inventory payloads before broadcasting to subscribers', async () => {
         const response = createResponseMock();
-        const clientId = await statusEvents.registerClient({ res: response });
+        const clientId = await statusEvents.registerClient({ res: response as unknown as Response });
         response.write.mockClear();
 
         statusEvents.broadcastInventoryAvailability({
@@ -128,13 +141,23 @@ describe('statusEvents', () => {
             isOutOfStock: 1,
             stockStatus: ' ',
             available: undefined
-        });
+        } as unknown as Parameters<typeof statusEvents.broadcastInventoryAvailability>[0]);
 
         const events = parseEvents(response);
         expect(events).toHaveLength(1);
-        expect(events[0].event).toBe('inventory:update');
+        const [inventoryEvent] = events;
+        expect(inventoryEvent?.event).toBe('inventory:update');
 
-        const payload = events[0].data;
+        const payload = inventoryEvent?.data as {
+            productId: string;
+            stockQuantity: number | null;
+            lowStockThreshold: number | null;
+            isLowStock: boolean;
+            isOutOfStock: boolean;
+            stockStatus: string;
+            available: boolean;
+            emittedAt: string;
+        };
         expect(payload.productId).toBe('sku-321');
         expect(payload.stockQuantity).toBeNull();
         expect(payload.lowStockThreshold).toBeNull();
@@ -154,7 +177,7 @@ describe('statusEvents', () => {
 
         statusService.getKioskStatus.mockResolvedValueOnce(initialStatus);
         const response = createResponseMock();
-        const clientId = await statusEvents.registerClient({ res: response });
+        const clientId = await statusEvents.registerClient({ res: response as unknown as Response });
         response.write.mockClear();
 
         statusService.getKioskStatus.mockResolvedValueOnce(updatedStatus);
@@ -163,15 +186,16 @@ describe('statusEvents', () => {
 
         const events = parseEvents(response);
         expect(events).toHaveLength(1);
-        expect(events[0].event).toBe('status:update');
-        expect(events[0].data).toEqual(updatedStatus);
+        const [updateEvent] = events;
+        expect(updateEvent?.event).toBe('status:update');
+        expect(updateEvent?.data).toEqual(updatedStatus);
 
         statusEvents.removeClient(clientId);
     });
 
     it('closes the underlying response when removing a client', async () => {
         const response = createResponseMock();
-        const clientId = await statusEvents.registerClient({ res: response });
+        const clientId = await statusEvents.registerClient({ res: response as unknown as Response });
 
         statusEvents.removeClient(clientId);
 

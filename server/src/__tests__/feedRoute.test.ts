@@ -1,37 +1,52 @@
 'use strict';
 
-const express = require('express');
-const request = require('supertest');
+import express from 'express';
+import request from 'supertest';
+
+import feedRouter from '../routes/feed';
+import inventoryService from '../services/inventoryService';
+import productService from '../services/productService';
+import statusService from '../services/statusService';
 
 jest.mock('../services/productService', () => ({
-    getProductFeed: jest.fn()
+    __esModule: true,
+    default: {
+        getProductFeed: jest.fn()
+    }
 }));
 
 jest.mock('../services/inventoryService', () => ({
-    getInventoryTrackingState: jest.fn()
+    __esModule: true,
+    default: {
+        getInventoryTrackingState: jest.fn()
+    }
 }));
 
 jest.mock('../services/statusService', () => ({
-    getKioskStatus: jest.fn(),
-    buildStatusFingerprint: jest.fn()
+    __esModule: true,
+    default: {
+        getKioskStatus: jest.fn(),
+        buildStatusFingerprint: jest.fn()
+    }
 }));
 
-const productService = require('../services/productService');
-const inventoryService = require('../services/inventoryService');
-const statusService = require('../services/statusService');
-const feedRouter = require('../routes/feed');
+const mockedProductService = productService as jest.Mocked<typeof productService>;
+const mockedInventoryService = inventoryService as jest.Mocked<typeof inventoryService>;
+const mockedStatusService = statusService as jest.Mocked<typeof statusService>;
+
+type KioskStatus = Awaited<ReturnType<typeof statusService.getKioskStatus>>;
 
 describe('GET /products feed route', () => {
-    let app;
+    let app: express.Express;
 
     beforeEach(() => {
         jest.useFakeTimers();
         jest.setSystemTime(new Date('2025-05-05T10:00:00Z'));
 
-        productService.getProductFeed.mockReset();
-        inventoryService.getInventoryTrackingState.mockReset();
-        statusService.getKioskStatus.mockReset();
-        statusService.buildStatusFingerprint.mockReset();
+        mockedProductService.getProductFeed.mockReset();
+        mockedInventoryService.getInventoryTrackingState.mockReset();
+        mockedStatusService.getKioskStatus.mockReset();
+        mockedStatusService.buildStatusFingerprint.mockReset();
 
         app = express();
         app.use('/api/feed', feedRouter);
@@ -75,29 +90,40 @@ describe('GET /products feed route', () => {
             message: 'Open for business',
             nextOpen: null,
             nextClose: '2025-05-05T18:00:00.000Z'
-        };
+        } as KioskStatus;
 
-        productService.getProductFeed.mockResolvedValue(products);
-        inventoryService.getInventoryTrackingState.mockResolvedValue(true);
-        statusService.getKioskStatus.mockResolvedValue(kioskStatus);
-        statusService.buildStatusFingerprint.mockReturnValue('fingerprint-open');
+        mockedProductService.getProductFeed.mockResolvedValue(products);
+        mockedInventoryService.getInventoryTrackingState.mockResolvedValue(true);
+        mockedStatusService.getKioskStatus.mockResolvedValue(kioskStatus);
+        mockedStatusService.buildStatusFingerprint.mockReturnValue('fingerprint-open');
 
         const response = await request(app).get('/api/feed/products');
+        const body = response.body as {
+            success: boolean;
+            data: {
+                inventoryTrackingEnabled: boolean;
+                status: KioskStatus;
+                statusFingerprint: string;
+                products: Array<{ id: string }>;
+            };
+        };
 
         expect(response.status).toBe(200);
         expect(response.headers['cache-control']).toBe('public, max-age=5');
         expect(response.headers).toHaveProperty('etag');
         expect(response.headers).toHaveProperty('last-modified');
 
-        expect(response.body.success).toBe(true);
-        const payload = response.body.data;
+        expect(body.success).toBe(true);
+        const payload = body.data;
         expect(payload.inventoryTrackingEnabled).toBe(true);
         expect(payload.status).toEqual(kioskStatus);
         expect(payload.statusFingerprint).toBe('fingerprint-open');
         expect(Array.isArray(payload.products)).toBe(true);
-        expect(payload.products[0].id).toBe('prod-1');
+        expect(payload.products).toHaveLength(1);
+        const [firstProduct] = payload.products;
+        expect(firstProduct?.id).toBe('prod-1');
 
-        expect(statusService.buildStatusFingerprint).toHaveBeenCalledWith(kioskStatus);
+        expect(mockedStatusService.buildStatusFingerprint).toHaveBeenCalledWith(kioskStatus);
     });
 
     it('responds with 304 when ETag matches', async () => {
@@ -134,19 +160,21 @@ describe('GET /products feed route', () => {
             message: 'Open for business',
             nextOpen: null,
             nextClose: '2025-05-05T18:00:00.000Z'
-        };
+        } as KioskStatus;
 
-        productService.getProductFeed.mockResolvedValue(products);
-        inventoryService.getInventoryTrackingState.mockResolvedValue(true);
-        statusService.getKioskStatus.mockResolvedValue(kioskStatus);
-        statusService.buildStatusFingerprint.mockReturnValue('fingerprint-open');
+        mockedProductService.getProductFeed.mockResolvedValue(products);
+        mockedInventoryService.getInventoryTrackingState.mockResolvedValue(true);
+        mockedStatusService.getKioskStatus.mockResolvedValue(kioskStatus);
+        mockedStatusService.buildStatusFingerprint.mockReturnValue('fingerprint-open');
 
         const firstResponse = await request(app).get('/api/feed/products');
-        const etag = firstResponse.headers.etag;
+        const etag = Array.isArray(firstResponse.headers.etag)
+            ? firstResponse.headers.etag[0]
+            : firstResponse.headers.etag;
 
         const secondResponse = await request(app)
             .get('/api/feed/products')
-            .set('If-None-Match', etag);
+            .set('If-None-Match', etag ?? '');
 
         expect(secondResponse.status).toBe(304);
         expect(secondResponse.body).toEqual({});
