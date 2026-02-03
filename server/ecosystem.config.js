@@ -14,14 +14,14 @@ module.exports = {
   apps: [{
     // Application name (used in PM2 commands)
     name: 'snackbar-api',
-    
+
     // Entry point script
-    script: './src/server.js',
-    
+    script: './dist/server.js',
+
     // Clustering configuration
     instances: process.env.NODE_ENV === 'production' ? 2 : 1,
     exec_mode: 'cluster',
-    
+
     // Environment variables
     env: {
       NODE_ENV: 'development',
@@ -31,23 +31,23 @@ module.exports = {
       NODE_ENV: 'production',
       PORT: 3000
     },
-    
+
     // Logging configuration
     error_file: './logs/err.log',
     out_file: './logs/out.log',
     log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
     merge_logs: true,
-    
+
     // Auto-restart configuration
     max_memory_restart: '1G',
     autorestart: true,
     max_restarts: 10,
     min_uptime: '10s',
-    
+
     // Watch configuration (development only)
     watch: process.env.NODE_ENV !== 'production',
     ignore_watch: ['node_modules', 'logs', 'uploads'],
-    
+
     // Graceful shutdown
     kill_timeout: 5000,
     wait_ready: true,

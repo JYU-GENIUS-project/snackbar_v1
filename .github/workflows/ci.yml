@@ -64,6 +64,10 @@ jobs:
         working-directory: ./server
         run: npm run lint || echo "Linting completed with warnings"
 
+      - name: Run TypeScript type-check
+        working-directory: ./server
+        run: npm run type-check
+
   # ---------------------------------------------------------------------------
   # Unit Test Job - Server
   # ---------------------------------------------------------------------------

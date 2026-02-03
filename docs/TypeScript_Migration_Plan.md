@@ -170,15 +170,19 @@
 - [x] Evaluate `init-db` SQL scripts for needing TypeScript-driven generation; if none, document no changes required.
   - No TypeScript generation required; SQL scripts remain as-is.
 - [x] Convert `server/scripts/seed.js` to TypeScript (`seed.ts`) and adjust package scripts accordingly.
-- [ ] Ensure any ad-hoc utilities (e.g., backup, nginx scripts) remain compatible; document if TypeScript is unnecessary.
+- [x] Ensure any ad-hoc utilities (e.g., backup, nginx scripts) remain compatible; document if TypeScript is unnecessary.
+  - Backup shell script and nginx config remain Bash/NGINX; no TypeScript changes required.
 
 ## Phase 7 – CI/CD and Toolchain Alignment
 
-- [ ] Update Dockerfiles (client/server) to install TypeScript dependencies and use compiled artifacts where needed.
-- [ ] Adjust docker-compose to reference compiled server build if applicable.
-- [ ] Ensure lint/test steps in CI run both TypeScript-aware tooling and existing suites.
-- [ ] Add type-check command to CI to catch compilation errors (`tsc --noEmit`).
-- [ ] Update documentation (`README.md`, deployment guides) with new commands and prerequisites.
+- [x] Update Dockerfiles (client/server) to install TypeScript dependencies and use compiled artifacts where needed.
+  - Server Dockerfile builds TS output and runs compiled `dist` entrypoint.
+- [x] Adjust docker-compose to reference compiled server build if applicable.
+  - Compose continues to build the server image; compiled output is produced in the Dockerfile.
+- [x] Ensure lint/test steps in CI run both TypeScript-aware tooling and existing suites.
+- [x] Add type-check command to CI to catch compilation errors (`tsc --noEmit`).
+- [x] Update documentation (`README.md`, deployment guides) with new commands and prerequisites.
+  - Added server/client TypeScript-aware scripts to README.
 
 ## Phase 8 – Validation & Clean-up
 
