@@ -51,31 +51,31 @@ mediaStorage.ensureStorageStructure();
 
 // Helmet for security headers
 app.use(
-  helmet({
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'"],
-        styleSrc: ["'self'", "'unsafe-inline'"],
-        imgSrc: ["'self'", 'data:', 'blob:'],
-        connectSrc: ["'self'"],
-        fontSrc: ["'self'"],
-        objectSrc: ["'none'"],
-        mediaSrc: ["'self'"],
-        frameSrc: ["'none'"],
-      },
-    },
-    crossOriginEmbedderPolicy: false,
-  })
+    helmet({
+        contentSecurityPolicy: {
+            directives: {
+                defaultSrc: ["'self'"],
+                scriptSrc: ["'self'", "'unsafe-inline'"],
+                styleSrc: ["'self'", "'unsafe-inline'"],
+                imgSrc: ["'self'", 'data:', 'blob:'],
+                connectSrc: ["'self'"],
+                fontSrc: ["'self'"],
+                objectSrc: ["'none'"],
+                mediaSrc: ["'self'"],
+                frameSrc: ["'none'"],
+            },
+        },
+        crossOriginEmbedderPolicy: false,
+    })
 );
 
 // CORS configuration
 const corsOptions: CorsOptions = {
-  origin: process.env.CORS_ORIGIN?.split(',') || ['http://localhost:3000', 'http://localhost:5173'],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true,
-  maxAge: 86400, // 24 hours
+    origin: process.env.CORS_ORIGIN?.split(',') || ['http://localhost:3000', 'http://localhost:5173'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
+    maxAge: 86400, // 24 hours
 };
 app.use(cors(corsOptions));
 
@@ -95,11 +95,11 @@ app.use('/admin', express.static(CLIENT_DIST_DIR, { index: false }));
 
 // SPA fallback for admin routes
 const serveAdminApp = (req: Request, res: Response, next: NextFunction) => {
-  try {
-    res.sendFile(path.join(CLIENT_DIST_DIR, 'index.html'));
-  } catch (error) {
-    next(error);
-  }
+    try {
+        res.sendFile(path.join(CLIENT_DIST_DIR, 'index.html'));
+    } catch (error) {
+        next(error);
+    }
 };
 
 app.get('/admin', serveAdminApp);
@@ -109,11 +109,11 @@ app.get(/\/admin\/.*/, serveAdminApp);
 app.use(express.static(CLIENT_DIST_DIR, { index: false }));
 
 const serveKioskApp = (req: Request, res: Response, next: NextFunction) => {
-  try {
-    res.sendFile(path.join(CLIENT_DIST_DIR, 'index.html'));
-  } catch (error) {
-    next(error);
-  }
+    try {
+        res.sendFile(path.join(CLIENT_DIST_DIR, 'index.html'));
+    } catch (error) {
+        next(error);
+    }
 };
 
 app.get('/', serveKioskApp);
@@ -121,19 +121,19 @@ app.get(/^(?!\/(?:api|admin|uploads)\/).*/, serveKioskApp);
 
 // Serve media assets
 app.use(
-  '/uploads',
-  express.static(mediaStorage.getBaseDirectory(), {
-    index: false,
-    maxAge: '1h',
-    setHeaders: (res) => {
-      res.setHeader('Cache-Control', 'public, max-age=3600');
-    },
-  })
+    '/uploads',
+    express.static(mediaStorage.getBaseDirectory(), {
+        index: false,
+        maxAge: '1h',
+        setHeaders: (res) => {
+            res.setHeader('Cache-Control', 'public, max-age=3600');
+        },
+    })
 );
 
 // Request logging (Morgan)
 if (process.env.NODE_ENV !== 'test') {
-  app.use(morgan(process.env.LOG_FORMAT === 'json' ? 'combined' : 'dev'));
+    app.use(morgan(process.env.LOG_FORMAT === 'json' ? 'combined' : 'dev'));
 }
 
 // Custom request logger (for audit purposes)
@@ -147,14 +147,14 @@ app.set('trust proxy', 1);
 // =============================================================================
 
 type NotificationWorkerHandle = {
-  stop: () => Promise<void> | void;
+    stop: () => Promise<void> | void;
 };
 
 let notificationWorkerHandle: NotificationWorkerHandle | null = null;
 if (process.env.NODE_ENV !== 'test') {
-  notificationWorkerHandle = notificationService.startNotificationWorker({
-    workerId: 'api-process',
-  }) as NotificationWorkerHandle | null;
+    notificationWorkerHandle = notificationService.startNotificationWorker({
+        workerId: 'api-process',
+    }) as NotificationWorkerHandle | null;
 }
 
 // =============================================================================
@@ -209,7 +209,7 @@ app.use(errorHandler);
 // =============================================================================
 
 const server = app.listen(PORT, () => {
-  console.log(`
+    console.log(`
 ╔═══════════════════════════════════════════════════════════════╗
 ║         Snackbar Kiosk API Server                             ║
 ╠═══════════════════════════════════════════════════════════════╣
@@ -220,10 +220,10 @@ const server = app.listen(PORT, () => {
 ╚═══════════════════════════════════════════════════════════════╝
   `);
 
-  // Signal PM2 that the app is ready
-  if (process.send) {
-    process.send('ready');
-  }
+    // Signal PM2 that the app is ready
+    if (process.send) {
+        process.send('ready');
+    }
 });
 
 // =============================================================================
@@ -233,27 +233,27 @@ const server = app.listen(PORT, () => {
 type ShutdownSignal = 'SIGTERM' | 'SIGINT' | 'UNCAUGHT_EXCEPTION';
 
 const gracefulShutdown = (signal: ShutdownSignal) => {
-  console.log(`\n${signal} received. Shutting down gracefully...`);
+    console.log(`\n${signal} received. Shutting down gracefully...`);
 
-  if (notificationWorkerHandle) {
-    void notificationWorkerHandle.stop();
-  }
+    if (notificationWorkerHandle) {
+        void notificationWorkerHandle.stop();
+    }
 
-  server.close(() => {
-    console.log('HTTP server closed.');
+    server.close(() => {
+        console.log('HTTP server closed.');
 
-    // Close database connections
-    db.pool.end(() => {
-      console.log('Database connections closed.');
-      process.exit(0);
+        // Close database connections
+        db.pool.end(() => {
+            console.log('Database connections closed.');
+            process.exit(0);
+        });
     });
-  });
 
-  // Force shutdown after 10 seconds
-  setTimeout(() => {
-    console.error('Forced shutdown after timeout.');
-    process.exit(1);
-  }, 10000);
+    // Force shutdown after 10 seconds
+    setTimeout(() => {
+        console.error('Forced shutdown after timeout.');
+        process.exit(1);
+    }, 10000);
 };
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
@@ -261,10 +261,10 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (error) => {
-  console.error('Uncaught Exception:', error);
-  gracefulShutdown('UNCAUGHT_EXCEPTION');
+    console.error('Uncaught Exception:', error);
+    gracefulShutdown('UNCAUGHT_EXCEPTION');
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });

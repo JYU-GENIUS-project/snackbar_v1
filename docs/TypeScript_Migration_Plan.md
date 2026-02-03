@@ -78,7 +78,7 @@
   - [x] `hooks/useProductMedia.js`
   - [x] `hooks/useProductFeed.js`
   - [x] `hooks/useKioskStatus.js`
-- [ ] Convert components directory iteratively; prioritize shared primitives (forms, tables) before specialized views.
+- [x] Convert components directory iteratively; prioritize shared primitives (forms, tables) before specialized views.
   - [x] `components/ProductManager.jsx`
   - [x] `components/ProductTable.jsx`
   - [x] `components/ProductDetailModal.jsx`
@@ -98,7 +98,7 @@
   - [x] `utils/offlineCache.js`
   - [x] `utils/productPayload.js`
   - [x] `services/apiClient.js`
-- [ ] Migrate test files to `.tsx`/`.ts` and ensure Vitest typings are configured via `vitest.config.ts` and `vitest.setup.ts` updates.
+- [x] Migrate test files to `.tsx`/`.ts` and ensure Vitest typings are configured via `vitest.config.ts` and `vitest.setup.ts` updates.
   - [x] `hooks/__tests__/useKioskStatus.test.jsx`
   - [x] `components/__tests__/ProductDetailModal.test.jsx`
 - [x] Remove residual `.js/.jsx` files once equivalents exist and imports updated.
@@ -126,6 +126,9 @@
   - [x] `middleware/rateLimiter.js`
 - [ ] Update route handlers under `server/src/routes` to TypeScript, aligning response schemas with shared DTOs.
   - [x] `routes/health.js`
+  - [x] `routes/auth.js`
+  - [x] `routes/admins.js`
+  - [x] `routes/categories.js`
 - [ ] Convert service layer modules to TypeScript, especially those interacting with the database (ensure `pg` typings are used).
 - [ ] Introduce type-safe models/interfaces for entities (products, categories, inventory, users) in shared types package.
 - [ ] Refine utility modules to TypeScript, handling environment config via typed `process.env` wrappers.
