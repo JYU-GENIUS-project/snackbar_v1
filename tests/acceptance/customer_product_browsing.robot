@@ -118,6 +118,8 @@ US-005-Edge: Cancel Out-of-Stock Purchase
 *** Keywords ***
 Navigate To Kiosk Home
     [Documentation]    Navigates to the kiosk home page
+    Reset Kiosk Test Controls
+    Seed Default Kiosk Products
     Go To    ${KIOSK_URL}
     Wait For Page Load Complete
 

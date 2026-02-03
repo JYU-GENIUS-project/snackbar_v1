@@ -165,6 +165,16 @@ const normalizeFeedPayload = (payload: unknown): ProductFeedPayload => {
 
 const fetchProductFeed = async ({ signal }: { signal?: AbortSignal }): Promise<ProductFeedPayload> => {
   try {
+    if (typeof window !== 'undefined') {
+      const forceOffline = window.localStorage.getItem('snackbar-force-offline-feed') === '1';
+      if (forceOffline) {
+        const fallbackSnapshot = readOfflineProductSnapshot();
+        if (fallbackSnapshot?.products?.length) {
+          return buildFeedFromOfflineSnapshot(fallbackSnapshot);
+        }
+      }
+    }
+
     const response = await apiRequest<unknown>({
       path: '/feed/products',
       method: 'GET',

@@ -1309,12 +1309,12 @@ const KioskApp = () => {
                         )}
                         {isLoading ? (
                             <ProductGridSkeleton />
-                        ) : (sortedProducts?.length ?? 0) === 0 ? (
-                            <div className="loading-placeholder">No products available.</div>
-                        ) : filteredProducts.length === 0 ? (
+                        ) : selectedCategory !== 'All Products' && filteredProducts.length === 0 ? (
                             <div className="loading-placeholder" role="status" aria-live="polite">
                                 No products in this category
                             </div>
+                        ) : (sortedProducts?.length ?? 0) === 0 ? (
+                            <div className="loading-placeholder">No products available.</div>
                         ) : (
                             <div
                                 id="product-grid"

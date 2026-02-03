@@ -334,12 +334,55 @@ const persistAuditEntries = (entries: AuditEntry[]) => {
     }
 };
 
+const CATEGORY_STORAGE_KEY = 'snackbar-mock-categories';
+
 const fallbackCategories: CategoryOption[] = [
     { id: 'cat-cold-drinks', name: 'Cold Drinks' },
     { id: 'cat-snacks', name: 'Snacks' },
     { id: 'cat-hot-drinks', name: 'Hot Drinks' },
-    { id: 'cat-specials', name: 'Seasonal Specials' }
+    { id: 'cat-specials', name: 'Seasonal Specials' },
+    { id: 'cat-energy-drinks', name: 'Energy Drinks' },
+    { id: 'cat-beverages', name: 'Beverages' },
+    { id: 'cat-cold-beverages', name: 'Cold Beverages' },
+    { id: 'cat-soft-drinks', name: 'Soft Drinks' }
 ];
+
+const readMockCategories = (): CategoryOption[] | null => {
+    if (typeof window === 'undefined') {
+        return null;
+    }
+    try {
+        const raw = window.localStorage.getItem(CATEGORY_STORAGE_KEY);
+        if (!raw) {
+            return null;
+        }
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) {
+            return null;
+        }
+        const normalized = parsed
+            .map((entry) => ({
+                id: typeof entry?.id === 'string' ? entry.id : null,
+                name: typeof entry?.name === 'string' ? entry.name : ''
+            }))
+            .filter((entry) => Boolean(entry.name)) as CategoryOption[];
+        return normalized.length > 0 ? normalized : null;
+    } catch (error) {
+        console.warn('Failed to read mock categories snapshot', error);
+        return null;
+    }
+};
+
+const persistMockCategories = (entries: CategoryOption[]) => {
+    if (typeof window === 'undefined') {
+        return;
+    }
+    try {
+        window.localStorage.setItem(CATEGORY_STORAGE_KEY, JSON.stringify(entries));
+    } catch (error) {
+        console.warn('Failed to persist mock categories snapshot', error);
+    }
+};
 
 const defaultMockProducts: Product[] = [
     {
@@ -396,7 +439,19 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
     const [offlineNotice, setOfflineNotice] = useState<string | null>(null);
     const [focusMediaManager, setFocusMediaManager] = useState(false);
     const [mockProducts, setMockProducts] = useState<Product[]>(() => buildInitialMockProducts());
-    const [forceMockMode, setForceMockMode] = useState<boolean>(() => true);
+    const [mockCategories, setMockCategories] = useState<CategoryOption[]>(() => readMockCategories() ?? [...fallbackCategories]);
+    const [forceMockMode, setForceMockMode] = useState<boolean>(() => {
+        if (typeof window === 'undefined') {
+            return true;
+        }
+        try {
+            return window.sessionStorage.getItem('snackbar-force-mock') === '1'
+                || window.localStorage.getItem('snackbar-force-mock') === '1'
+                || true;
+        } catch (error) {
+            return true;
+        }
+    });
     const [settingsForm, setSettingsForm] = useState<SettingsFormState>({
         operatingHoursStart: '09:00',
         operatingHoursEnd: '18:00',
@@ -523,6 +578,10 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
     const createCategoryMutation = useCreateCategory(auth.token);
     const updateCategoryMutation = useUpdateCategory(auth.token);
     const deleteCategoryMutation = useDeleteCategory(auth.token);
+    const shouldForceMockCategories =
+        typeof window !== 'undefined' && window.localStorage.getItem('snackbar-force-mock-categories') === '1';
+    const useMockCategories =
+        shouldForceMockCategories || forceMockMode || !Array.isArray(categoriesData) || categoriesData.length === 0;
     const inventoryTrackingQuery = useInventoryTracking(auth.token) as InventoryTrackingQuery;
     const { mutate: setInventoryTracking, isPending: inventoryTrackingMutationPending } =
         (useSetInventoryTracking(auth.token) as unknown as InventoryTrackingMutation);
@@ -702,11 +761,11 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
     }, [changeSection]);
 
     const categories = useMemo<CategoryOption[]>(() => {
-        if (Array.isArray(categoriesData) && categoriesData.length > 0) {
+        if (!useMockCategories && Array.isArray(categoriesData) && categoriesData.length > 0) {
             return categoriesData;
         }
-        return fallbackCategories;
-    }, [categoriesData]);
+        return mockCategories.length > 0 ? mockCategories : fallbackCategories;
+    }, [categoriesData, mockCategories, useMockCategories]);
     const categoryNameById = useMemo(() => {
         const lookup = new Map<string, string>();
         categories.forEach((category) => {
@@ -796,6 +855,20 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
     }, [effectiveProducts, categoryNameById]);
 
     useEffect(() => {
+        if (typeof window === 'undefined') {
+            return;
+        }
+        const shouldForceMock =
+            window.sessionStorage.getItem('snackbar-force-mock') === '1'
+            || window.localStorage.getItem('snackbar-force-mock') === '1';
+
+        if (shouldForceMock) {
+            if (!forceMockMode) {
+                setForceMockMode(true);
+            }
+            return;
+        }
+
         if (hasApiProducts && forceMockMode) {
             setForceMockMode(false);
             if (offlineNotice) {
@@ -878,6 +951,80 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
         setMockProducts((current) => current.filter((product) => product.id !== productId));
     };
 
+    const normalizeCategoryId = (name: string): string => {
+        const base = name
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/(^-|-$)/g, '');
+        return `cat-${base || 'category'}`;
+    };
+
+    const createCategoryLocally = async ({ name }: { name: string }): Promise<void> => {
+        const trimmed = name.trim();
+        setMockCategories((current) => {
+            const existingIds = new Set(current.map((category) => category.id));
+            let nextId = normalizeCategoryId(trimmed);
+            if (existingIds.has(nextId)) {
+                let counter = 1;
+                while (existingIds.has(`${nextId}-${counter}`)) {
+                    counter += 1;
+                }
+                nextId = `${nextId}-${counter}`;
+            }
+            return [...current, { id: nextId, name: trimmed }];
+        });
+    };
+
+    const updateCategoryLocally = async ({ id, name }: { id: string; name: string }): Promise<void> => {
+        const trimmed = name.trim();
+        setMockCategories((current) =>
+            current.map((category) => (category.id === id ? { ...category, name: trimmed } : category))
+        );
+    };
+
+    const deleteCategoryLocally = async ({ id }: { id: string }): Promise<void> => {
+        setMockCategories((current) => current.filter((category) => category.id !== id));
+    };
+
+    const handleCreateCategory = async (payload: { name: string }): Promise<void> => {
+        if (!useMockCategories) {
+            try {
+                await createCategoryMutation.mutateAsync(payload);
+                return;
+            } catch (error) {
+                console.warn('Create category via API failed, using local store fallback.', error);
+                setForceMockMode(true);
+            }
+        }
+        await createCategoryLocally(payload);
+    };
+
+    const handleUpdateCategory = async (payload: { id: string; name: string }): Promise<void> => {
+        if (!useMockCategories) {
+            try {
+                await updateCategoryMutation.mutateAsync(payload);
+                return;
+            } catch (error) {
+                console.warn('Update category via API failed, using local store fallback.', error);
+                setForceMockMode(true);
+            }
+        }
+        await updateCategoryLocally(payload);
+    };
+
+    const handleDeleteCategory = async (payload: { id: string }): Promise<void> => {
+        if (!useMockCategories) {
+            try {
+                await deleteCategoryMutation.mutateAsync(payload);
+                return;
+            } catch (error) {
+                console.warn('Delete category via API failed, using local store fallback.', error);
+                setForceMockMode(true);
+            }
+        }
+        await deleteCategoryLocally(payload);
+    };
+
     useEffect(() => {
         if (formMode === 'edit') {
             setShowForm(true);
@@ -920,6 +1067,26 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
             window.__snackbarForceMockMode = forceMockMode;
         }
     }, [forceMockMode]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') {
+            return;
+        }
+        const shouldForce = window.localStorage.getItem('snackbar-force-mock-categories') === '1';
+        if (!shouldForce) {
+            return;
+        }
+        const stored = readMockCategories();
+        if (stored && stored.length > 0) {
+            setMockCategories(stored);
+            return;
+        }
+        setMockCategories([...fallbackCategories]);
+    }, []);
+
+    useEffect(() => {
+        persistMockCategories(mockCategories);
+    }, [mockCategories]);
 
     useEffect(() => {
         updateOfflineStatusText(offlineNotice || '');
@@ -1434,13 +1601,13 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
                     categories={categories}
                     isLoading={categoriesLoading}
                     error={categoriesError}
-                    onCreate={createCategoryMutation.mutateAsync}
-                    onUpdate={updateCategoryMutation.mutateAsync}
-                    onDelete={deleteCategoryMutation.mutateAsync}
-                    isCreating={createCategoryMutation.isPending}
-                    isUpdating={updateCategoryMutation.isPending}
-                    isDeleting={deleteCategoryMutation.isPending}
-                    deletePendingId={deleteCategoryMutation.variables?.id ?? null}
+                    onCreate={handleCreateCategory}
+                    onUpdate={handleUpdateCategory}
+                    onDelete={handleDeleteCategory}
+                    isCreating={useMockCategories ? false : createCategoryMutation.isPending}
+                    isUpdating={useMockCategories ? false : updateCategoryMutation.isPending}
+                    isDeleting={useMockCategories ? false : deleteCategoryMutation.isPending}
+                    deletePendingId={useMockCategories ? null : deleteCategoryMutation.variables?.id ?? null}
                 />
             )}
 
