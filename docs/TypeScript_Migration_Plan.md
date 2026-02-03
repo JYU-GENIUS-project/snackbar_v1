@@ -118,9 +118,14 @@
 
 ## Phase 5 – Server Code Migration
 
-- [ ] Convert `server.js` entry point to `server.ts`, defining types for Express app, middleware, and error handling.
+- [x] Convert `server.js` entry point to `server.ts`, defining types for Express app, middleware, and error handling.
 - [ ] Migrate middleware modules under `server/src/middleware`, ensuring `Request`/`Response` generics are applied.
+  - [x] `middleware/errorHandler.js`
+  - [x] `middleware/requestLogger.js`
+  - [x] `middleware/auth.js`
+  - [x] `middleware/rateLimiter.js`
 - [ ] Update route handlers under `server/src/routes` to TypeScript, aligning response schemas with shared DTOs.
+  - [x] `routes/health.js`
 - [ ] Convert service layer modules to TypeScript, especially those interacting with the database (ensure `pg` typings are used).
 - [ ] Introduce type-safe models/interfaces for entities (products, categories, inventory, users) in shared types package.
 - [ ] Refine utility modules to TypeScript, handling environment config via typed `process.env` wrappers.
