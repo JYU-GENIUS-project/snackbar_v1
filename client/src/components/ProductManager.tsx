@@ -396,6 +396,7 @@ const defaultMockProducts: Product[] = [
         stockQuantity: 24,
         purchaseLimit: 5,
         updatedAt: new Date().toISOString(),
+        metadata: { seeded: true },
         media: []
     },
     {
@@ -413,6 +414,7 @@ const defaultMockProducts: Product[] = [
             { id: 'cat-cold-drinks', name: 'Cold Drinks' },
             { id: 'cat-beverages', name: 'Beverages' }
         ],
+        metadata: { seeded: true },
         media: []
     },
     {
@@ -424,6 +426,7 @@ const defaultMockProducts: Product[] = [
         stockQuantity: 8,
         purchaseLimit: 3,
         updatedAt: new Date().toISOString(),
+        metadata: { seeded: true },
         media: []
     }
 ];
@@ -941,6 +944,21 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
             updateOfflineStatusText('');
         }
     }, [forceMockMode, hasApiProducts, offlineNotice, updateOfflineStatusText]);
+
+    useEffect(() => {
+        if (!forceMockMode) {
+            return;
+        }
+        setMockProducts((current) => {
+            const existing = new Map(current.map((product) => [product.id, product] as const));
+            defaultMockProducts.forEach((product) => {
+                if (!existing.has(product.id)) {
+                    existing.set(product.id, { ...product, media: Array.isArray(product.media) ? product.media : [] });
+                }
+            });
+            return Array.from(existing.values());
+        });
+    }, [forceMockMode]);
     useEffect(() => {
         const firstWithLimit = effectiveProducts.find((product) => {
             const parsed = Number(product.purchaseLimit);
@@ -1310,6 +1328,9 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
                 usedMock = true;
             }
         } else {
+            if (hasSeededMetadata && inferredStock !== null) {
+                productValues.stockQuantity = inferredStock;
+            }
             updateProductLocally(editingProduct.id, productValues);
             usedMock = true;
             setForceMockMode(true);

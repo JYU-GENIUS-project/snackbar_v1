@@ -1269,6 +1269,9 @@ const KioskApp = () => {
             {!overlayInfo.active ? (
                 <>
                     <main className="kiosk-main">
+                        <p className="kiosk-helper" role="note">
+                            Browse items and tap a product card to add it to your cart.
+                        </p>
                         {error && (
                             <div className="kiosk-error" role="alert">
                                 {error.message || 'Unable to load products.'}
