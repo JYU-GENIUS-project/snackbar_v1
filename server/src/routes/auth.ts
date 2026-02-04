@@ -160,7 +160,15 @@ router.post(
         await authService.resetFailedLogins(adminId);
 
         // Create session
-        const session = (await authService.createSession(adminId, ipAddress, userAgent)) as SessionRecord;
+        const sessionResult = await authService.createSession(adminId, ipAddress, userAgent);
+        const session: SessionRecord = {
+            sessionId: sessionResult.sessionId,
+            token: sessionResult.token,
+            expiresAt:
+                sessionResult.expiresAt instanceof Date
+                    ? sessionResult.expiresAt.toISOString()
+                    : String(sessionResult.expiresAt)
+        };
 
         // Create audit log
         await createAuditLog({
@@ -169,8 +177,8 @@ router.post(
             action: AuditActions.LOGIN,
             entityType: EntityTypes.SESSION,
             entityId: session.sessionId,
-            ipAddress,
-            userAgent
+            ipAddress: ipAddress ?? null,
+            userAgent: userAgent ?? null
         });
 
         if (typeof rateLimiters.reset === 'function') {
@@ -210,8 +218,8 @@ router.post(
         }
 
         const { sessionId, username, id } = req.user;
-        const ipAddress = req.ip;
-        const userAgent = req.get('User-Agent');
+        const ipAddress = req.ip ?? null;
+        const userAgent = req.get('User-Agent') ?? null;
 
         // Invalidate session
         await authService.invalidateSession(sessionId);
@@ -256,8 +264,8 @@ router.post(
             action: AuditActions.LOGOUT,
             entityType: EntityTypes.SESSION,
             newValues: { scope: 'all_sessions' },
-            ipAddress: req.ip,
-            userAgent: req.get('User-Agent')
+            ipAddress: req.ip ?? null,
+            userAgent: req.get('User-Agent') ?? null
         });
 
         res.status(200).json({

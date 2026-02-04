@@ -137,6 +137,7 @@ type ProductFormSubmitPayload = ProductFormValues & { imageFile: File | null };
 type CategoryOption = {
     id: string;
     name: string;
+    productCount?: number;
 };
 
 type InventoryMetadataEntry = {
@@ -338,7 +339,7 @@ const CATEGORY_STORAGE_KEY = 'snackbar-mock-categories';
 
 const fallbackCategories: CategoryOption[] = [
     { id: 'cat-cold-drinks', name: 'Cold Drinks' },
-    { id: 'cat-snacks', name: 'Snacks' },
+    { id: 'cat-snacks', name: 'Snacks', productCount: 4 },
     { id: 'cat-hot-drinks', name: 'Hot Drinks' },
     { id: 'cat-specials', name: 'Seasonal Specials' },
     { id: 'cat-energy-drinks', name: 'Energy Drinks' },
@@ -363,7 +364,8 @@ const readMockCategories = (): CategoryOption[] | null => {
         const normalized = parsed
             .map((entry) => ({
                 id: typeof entry?.id === 'string' ? entry.id : null,
-                name: typeof entry?.name === 'string' ? entry.name : ''
+                name: typeof entry?.name === 'string' ? entry.name : '',
+                productCount: typeof entry?.productCount === 'number' ? entry.productCount : undefined
             }))
             .filter((entry) => Boolean(entry.name)) as CategoryOption[];
         return normalized.length > 0 ? normalized : null;
@@ -394,6 +396,23 @@ const defaultMockProducts: Product[] = [
         stockQuantity: 24,
         purchaseLimit: 5,
         updatedAt: new Date().toISOString(),
+        media: []
+    },
+    {
+        id: 'product-red-bull',
+        name: 'Red Bull',
+        description: 'Energy drink 250ml can.',
+        status: 'active',
+        price: 3.0,
+        stockQuantity: 18,
+        purchaseLimit: 5,
+        updatedAt: new Date().toISOString(),
+        categoryIds: ['cat-energy-drinks', 'cat-cold-drinks', 'cat-beverages'],
+        categories: [
+            { id: 'cat-energy-drinks', name: 'Energy Drinks' },
+            { id: 'cat-cold-drinks', name: 'Cold Drinks' },
+            { id: 'cat-beverages', name: 'Beverages' }
+        ],
         media: []
     },
     {
@@ -440,6 +459,16 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
     const [focusMediaManager, setFocusMediaManager] = useState(false);
     const [mockProducts, setMockProducts] = useState<Product[]>(() => buildInitialMockProducts());
     const [mockCategories, setMockCategories] = useState<CategoryOption[]>(() => readMockCategories() ?? [...fallbackCategories]);
+    const [forceMockCategories, setForceMockCategories] = useState<boolean>(() => {
+        if (typeof window === 'undefined') {
+            return false;
+        }
+        try {
+            return window.localStorage.getItem('snackbar-force-mock-categories') === '1';
+        } catch (error) {
+            return false;
+        }
+    });
     const [forceMockMode, setForceMockMode] = useState<boolean>(() => {
         if (typeof window === 'undefined') {
             return true;
@@ -528,6 +557,43 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
 
     useEffect(() => {
         if (typeof window === 'undefined') {
+            return;
+        }
+        try {
+            const stored = window.localStorage.getItem('snackbar-force-mock-categories') === '1';
+            if (stored !== forceMockCategories) {
+                setForceMockCategories(stored);
+            }
+        } catch (error) {
+            // Ignore localStorage read issues.
+        }
+    }, [forceMockCategories]);
+
+    useEffect(() => {
+        if (!forceMockCategories) {
+            return;
+        }
+        setMockCategories((current) => {
+            const normalized = new Set(
+                current
+                    .map((category) => (category?.name || '').trim().toLowerCase())
+                    .filter(Boolean)
+            );
+            const merged = [...current];
+            fallbackCategories.forEach((category) => {
+                const label = (category.name || '').trim().toLowerCase();
+                if (!label || normalized.has(label)) {
+                    return;
+                }
+                normalized.add(label);
+                merged.push({ ...category });
+            });
+            return merged;
+        });
+    }, [forceMockCategories]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') {
             return undefined;
         }
         window.__snackbarAuditBridge = {
@@ -578,10 +644,8 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
     const createCategoryMutation = useCreateCategory(auth.token);
     const updateCategoryMutation = useUpdateCategory(auth.token);
     const deleteCategoryMutation = useDeleteCategory(auth.token);
-    const shouldForceMockCategories =
-        typeof window !== 'undefined' && window.localStorage.getItem('snackbar-force-mock-categories') === '1';
     const useMockCategories =
-        shouldForceMockCategories || forceMockMode || !Array.isArray(categoriesData) || categoriesData.length === 0;
+        forceMockCategories || forceMockMode || !Array.isArray(categoriesData) || categoriesData.length === 0;
     const inventoryTrackingQuery = useInventoryTracking(auth.token) as InventoryTrackingQuery;
     const { mutate: setInventoryTracking, isPending: inventoryTrackingMutationPending } =
         (useSetInventoryTracking(auth.token) as unknown as InventoryTrackingMutation);

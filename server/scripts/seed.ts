@@ -9,9 +9,9 @@
 import dotenv from 'dotenv';
 
 import db from '../src/utils/database';
-import adminService from '../src/services/adminService';
 import categoryService from '../src/services/categoryService';
 import productService from '../src/services/productService';
+import authService from '../src/services/authService';
 
 dotenv.config();
 
@@ -175,9 +175,16 @@ const CUSTOMER_BROWSING_ORDER = [
 ];
 
 type AdminActor = {
-    id?: string | null;
-    username?: string;
+    id: string;
+    username: string;
     email?: string | null;
+};
+
+type AdminRow = {
+    id: string;
+    username: string;
+    email: string | null;
+    is_primary: boolean;
 };
 
 type CategoryRecord = {
@@ -194,32 +201,66 @@ type ProductPayload = {
     stockQuantity: number;
     purchaseLimit: number;
     lowStockThreshold: number;
-    allergens: string | null;
-    imageAlt: string | null;
-    metadata: Record<string, unknown>;
+    allergens?: string;
+    imageAlt?: string;
+    metadata?: Record<string, unknown>;
     displayOrder: number;
     isActive: boolean;
     categoryIds: string[];
     categoryId: string;
 };
 
-const buildProductPayload = (fixture: ProductFixture, categoryIds: string[]): ProductPayload => ({
-    name: fixture.name,
-    description: fixture.description,
-    price: fixture.price,
-    currency: 'EUR',
-    status: fixture.status,
-    stockQuantity: fixture.stockQuantity,
-    purchaseLimit: fixture.purchaseLimit,
-    lowStockThreshold: fixture.lowStockThreshold,
-    allergens: fixture.allergens ?? null,
-    imageAlt: null,
-    metadata: { seeded: true },
-    displayOrder: fixture.displayOrder ?? 0,
-    isActive: true,
-    categoryIds,
-    categoryId: categoryIds[0]
-});
+const buildProductPayload = (fixture: ProductFixture, categoryIds: string[]): ProductPayload => {
+    const primaryCategoryId = categoryIds[0];
+    if (!primaryCategoryId) {
+        throw new Error(`Missing primary category for ${fixture.name}`);
+    }
+
+    return {
+        name: fixture.name,
+        description: fixture.description,
+        price: fixture.price,
+        currency: 'EUR',
+        status: fixture.status,
+        stockQuantity: fixture.stockQuantity,
+        purchaseLimit: fixture.purchaseLimit,
+        lowStockThreshold: fixture.lowStockThreshold,
+        ...(fixture.allergens ? { allergens: fixture.allergens } : {}),
+        metadata: { seeded: true },
+        displayOrder: fixture.displayOrder ?? 0,
+        isActive: true,
+        categoryIds,
+        categoryId: primaryCategoryId
+    };
+};
+
+const ensurePrimaryAdmin = async (): Promise<AdminRow> => {
+    const { rows } = await db.query<AdminRow>(
+        'SELECT id, username, email, is_primary FROM admins WHERE LOWER(username) = LOWER($1) LIMIT 1',
+        [DEFAULT_ADMIN_USERNAME]
+    );
+
+    if (rows.length > 0 && rows[0]) {
+        return rows[0];
+    }
+
+    const passwordHash = await authService.hashPassword(DEFAULT_ADMIN_PASSWORD);
+    const created = await db.query<AdminRow>(
+        `INSERT INTO admins (username, email, password_hash, is_primary, is_active)
+     VALUES ($1, $2, $3, $4, $5)
+     RETURNING id, username, email, is_primary`,
+        [DEFAULT_ADMIN_USERNAME, DEFAULT_ADMIN_EMAIL, passwordHash, true, true]
+    );
+
+    const admin = created.rows[0];
+    if (!admin) {
+        throw new Error('Failed to create primary admin account');
+    }
+
+    await authService.addToPasswordHistory(admin.id, passwordHash);
+
+    return admin;
+};
 
 const removeBlockingCategories = async (): Promise<void> => {
     for (const name of BLOCKING_CATEGORY_NAMES) {
@@ -235,7 +276,7 @@ const removeBlockingCategories = async (): Promise<void> => {
     }
 };
 
-const ensureReferenceCategories = async (actor?: AdminActor | null): Promise<Map<string, CategoryRecord>> => {
+const ensureReferenceCategories = async (actor: AdminActor): Promise<Map<string, CategoryRecord>> => {
     await removeBlockingCategories();
     console.log('\nSeeding reference categories...');
 
@@ -258,7 +299,7 @@ const ensureReferenceCategories = async (actor?: AdminActor | null): Promise<Map
     return categoryMap;
 };
 
-const ensureReferenceProducts = async (actor: AdminActor | null, categoryMap: Map<string, CategoryRecord>): Promise<void> => {
+const ensureReferenceProducts = async (actor: AdminActor, categoryMap: Map<string, CategoryRecord>): Promise<void> => {
     console.log('\nSeeding reference products...');
 
     for (const fixture of PRODUCT_FIXTURES) {
@@ -280,12 +321,17 @@ const ensureReferenceProducts = async (actor: AdminActor | null, categoryMap: Ma
         const payload = buildProductPayload(fixture, categoryIds);
 
         if (rows.length === 0) {
-            await productService.createProduct(payload, actor ?? undefined);
+            await productService.createProduct(payload, actor);
             console.log(`  Created product: ${fixture.name}`);
             continue;
         }
 
-        await productService.updateProduct(rows[0].id, payload, actor ?? undefined);
+        const existingId = rows[0]?.id;
+        if (!existingId) {
+            console.warn(`  Skipping update for ${fixture.name}; missing product id.`);
+            continue;
+        }
+        await productService.updateProduct(existingId, payload, actor);
         console.log(`  Updated product: ${fixture.name}`);
     }
 };
@@ -317,7 +363,7 @@ const applyCustomerBrowsingFixtures = async (): Promise<void> => {
     );
 };
 
-const ensureInventoryFixtures = async (actor: AdminActor | null): Promise<void> => {
+const ensureInventoryFixtures = async (actor: AdminActor): Promise<void> => {
     console.log('\nEnsuring inventory ledger fixtures...');
 
     await db.query(
@@ -389,7 +435,7 @@ const ensureInventoryFixtures = async (actor: AdminActor | null): Promise<void> 
         ['Red Bull']
     );
 
-    if (redBullResult.rows.length > 0) {
+    if (redBullResult.rows.length > 0 && redBullResult.rows[0]) {
         const productId = redBullResult.rows[0].id;
         console.log('  Seeding Red Bull zero stock ledger entry...');
         await db.query(
@@ -439,32 +485,24 @@ const seed = async (): Promise<void> => {
 
         // Seed primary admin
         console.log('\nSeeding primary admin account...');
-        const admin = await adminService.seedPrimaryAdmin(
-            DEFAULT_ADMIN_USERNAME,
-            DEFAULT_ADMIN_PASSWORD,
-            DEFAULT_ADMIN_EMAIL
-        );
+        const admin = await ensurePrimaryAdmin();
 
-        const adminActor = admin || (await adminService.getAdminByUsername(DEFAULT_ADMIN_USERNAME));
+        const adminActor: AdminActor = { id: admin.id, username: admin.username, email: admin.email };
 
-        if (adminActor) {
-            if (admin) {
-                console.log('\n✓ Primary admin created:');
-                console.log(`  Username: ${admin.username}`);
-                console.log(`  Email:    ${admin.email}`);
-                console.log(`  ID:       ${admin.id}`);
-                console.log('\n⚠️  IMPORTANT: Change the default password after first login!');
-            } else {
-                console.log('Admin accounts already exist. Using existing primary admin.');
-            }
+        if (admin.is_primary) {
+            console.log('\n✓ Primary admin ready:');
+            console.log(`  Username: ${admin.username}`);
+            console.log(`  Email:    ${admin.email ?? '—'}`);
+            console.log(`  ID:       ${admin.id}`);
+            console.log('\n⚠️  IMPORTANT: Change the default password after first login!');
         } else {
-            throw new Error('Primary admin account is missing.');
+            console.log('Admin accounts already exist. Using existing admin.');
         }
 
-        const categoryMap = await ensureReferenceCategories(adminActor as AdminActor);
-        await ensureReferenceProducts(adminActor as AdminActor, categoryMap);
+        const categoryMap = await ensureReferenceCategories(adminActor);
+        await ensureReferenceProducts(adminActor, categoryMap);
         await applyCustomerBrowsingFixtures();
-        await ensureInventoryFixtures(adminActor as AdminActor);
+        await ensureInventoryFixtures(adminActor);
 
         console.log(`\n${'='.repeat(60)}`);
         console.log('Seed completed successfully');

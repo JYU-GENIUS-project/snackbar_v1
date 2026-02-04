@@ -204,7 +204,17 @@ router.put(
         }
 
         const actor = req.user as AdminActor;
-        const admin = await adminService.updateAdmin(adminId, { username, email, is_active }, actor);
+        const updates: { username?: string; email?: string | null; is_active?: boolean } = {};
+        if (typeof username === 'string') {
+            updates.username = username;
+        }
+        if (typeof email === 'string' || email === null) {
+            updates.email = email ?? null;
+        }
+        if (typeof is_active === 'boolean') {
+            updates.is_active = is_active;
+        }
+        const admin = await adminService.updateAdmin(adminId, updates, actor);
 
         res.status(200).json({
             success: true,

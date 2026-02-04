@@ -33,7 +33,7 @@ type CategoryUpdatePayload = {
     name?: string;
     description?: string | null;
     displayOrder?: number | null;
-    isActive?: boolean | null;
+    isActive?: boolean;
 };
 
 const asyncHandler = (
@@ -127,11 +127,20 @@ router.put(
 
         const payload = req.body as CategoryUpdatePayload;
         const actor = req.user as AdminActor;
-        const category = await categoryService.updateCategory(
-            categoryId,
-            payload as { name: string; description: string | null; displayOrder: number | null; isActive: boolean | null },
-            actor
-        );
+        const updates: CategoryUpdatePayload = {};
+        if (payload.name !== undefined) {
+            updates.name = payload.name;
+        }
+        if (payload.description !== undefined) {
+            updates.description = payload.description;
+        }
+        if (payload.displayOrder !== undefined) {
+            updates.displayOrder = payload.displayOrder;
+        }
+        if (typeof payload.isActive === 'boolean') {
+            updates.isActive = payload.isActive;
+        }
+        const category = await categoryService.updateCategory(categoryId, updates, actor);
 
         res.status(200).json({
             success: true,

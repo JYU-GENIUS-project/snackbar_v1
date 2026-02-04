@@ -223,6 +223,15 @@ const AdminApp = () => {
   }, [auth?.token, isBootstrapping]);
 
   const handleLogin = (payload: AuthPayload) => {
+    if (typeof window !== 'undefined') {
+      try {
+        if (window.localStorage.getItem('snackbar-force-mock-categories') === '1') {
+          window.localStorage.removeItem('snackbar-mock-categories');
+        }
+      } catch (error) {
+        console.warn('Unable to reset mock categories on login', error);
+      }
+    }
     writeSessionState('active');
     setAuth({
       token: payload.token,

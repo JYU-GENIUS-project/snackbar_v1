@@ -218,12 +218,15 @@ router.patch(
 
         const actor = req.user as AdminActor;
         const { quantity, reason } = req.body as { quantity: unknown; reason?: string };
-        const result = (await inventoryService.recordManualStockUpdate({
+        const payload: { productId: string; quantity: unknown; reason?: string; actor: AdminActor } = {
             productId,
             quantity,
-            reason,
             actor
-        })) as Record<string, unknown>;
+        };
+        if (typeof reason === 'string') {
+            payload.reason = reason;
+        }
+        const result = (await inventoryService.recordManualStockUpdate(payload)) as Record<string, unknown>;
 
         res.status(200).json({
             success: true,
@@ -253,12 +256,15 @@ router.post(
 
         const actor = req.user as AdminActor;
         const { newQuantity, reason } = req.body as { newQuantity: unknown; reason?: string };
-        const result = (await inventoryService.recordInventoryAdjustment({
+        const payload: { productId: string; newQuantity: unknown; reason?: string; actor: AdminActor } = {
             productId,
             newQuantity,
-            reason,
             actor
-        })) as Record<string, unknown>;
+        };
+        if (typeof reason === 'string') {
+            payload.reason = reason;
+        }
+        const result = (await inventoryService.recordInventoryAdjustment(payload)) as Record<string, unknown>;
 
         res.status(200).json({
             success: true,

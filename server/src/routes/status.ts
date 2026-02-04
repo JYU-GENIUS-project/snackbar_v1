@@ -30,8 +30,9 @@ router.get(
     })
 );
 
-router.get('/events', (req, res, next) => {
-    try {
+router.get(
+    '/events',
+    asyncHandler(async (req, res) => {
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Cache-Control', 'no-cache');
         res.setHeader('Connection', 'keep-alive');
@@ -42,14 +43,12 @@ router.get('/events', (req, res, next) => {
 
         res.write(': connected\n\n');
 
-        const clientId = statusEvents.registerClient({ res } as StatusEventClient) as string;
+        const clientId = await statusEvents.registerClient({ res } as StatusEventClient);
 
         const cleanup = () => statusEvents.removeClient(clientId);
         req.on('close', cleanup);
         req.on('end', cleanup);
-    } catch (error) {
-        next(error);
-    }
-});
+    })
+);
 
 export default router;

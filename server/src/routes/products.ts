@@ -32,6 +32,15 @@ type ProductPayload = {
     metadata?: Record<string, unknown> | string | null;
 };
 
+type ProductInputPayload = {
+    name?: string;
+    price?: unknown;
+    status?: string;
+    categoryId?: string;
+    categoryIds?: string[];
+    metadata?: Record<string, unknown> | string;
+};
+
 type ProductMediaUpload = {
     productId: string;
     buffer: Buffer;
@@ -139,7 +148,26 @@ router.post(
 
         const payload = req.body as ProductPayload;
         const actor = req.user as AdminActor;
-        const product = (await productService.createProduct(payload, actor)) as ProductRecord;
+        const normalizedPayload: ProductInputPayload = {};
+        if (payload.name !== undefined) {
+            normalizedPayload.name = payload.name;
+        }
+        if (payload.price !== undefined) {
+            normalizedPayload.price = payload.price;
+        }
+        if (payload.status !== undefined) {
+            normalizedPayload.status = payload.status;
+        }
+        if (payload.categoryIds !== undefined && payload.categoryIds !== null) {
+            normalizedPayload.categoryIds = payload.categoryIds;
+        }
+        if (payload.categoryId !== undefined && payload.categoryId !== null) {
+            normalizedPayload.categoryId = payload.categoryId;
+        }
+        if (payload.metadata !== undefined && payload.metadata !== null) {
+            normalizedPayload.metadata = payload.metadata;
+        }
+        const product = (await productService.createProduct(normalizedPayload, actor)) as ProductRecord;
 
         res.status(201).json({
             success: true,
@@ -165,7 +193,26 @@ router.put(
 
         const payload = req.body as ProductPayload;
         const actor = req.user as AdminActor;
-        const product = (await productService.updateProduct(productId, payload, actor)) as ProductRecord;
+        const normalizedPayload: ProductInputPayload = {};
+        if (payload.name !== undefined) {
+            normalizedPayload.name = payload.name;
+        }
+        if (payload.price !== undefined) {
+            normalizedPayload.price = payload.price;
+        }
+        if (payload.status !== undefined) {
+            normalizedPayload.status = payload.status;
+        }
+        if (payload.categoryIds !== undefined && payload.categoryIds !== null) {
+            normalizedPayload.categoryIds = payload.categoryIds;
+        }
+        if (payload.categoryId !== undefined && payload.categoryId !== null) {
+            normalizedPayload.categoryId = payload.categoryId;
+        }
+        if (payload.metadata !== undefined && payload.metadata !== null) {
+            normalizedPayload.metadata = payload.metadata;
+        }
+        const product = (await productService.updateProduct(productId, normalizedPayload, actor)) as ProductRecord;
 
         res.status(200).json({
             success: true,
@@ -251,7 +298,7 @@ router.post(
             actor
         };
 
-        const media = (await productMediaService.uploadProductMedia(uploadRequest)) as ProductMediaRecord;
+        const media = (await productMediaService.uploadProductMedia(uploadRequest)) as ProductMediaRecord[];
 
         res.status(201).json({
             success: true,
@@ -284,7 +331,7 @@ router.patch(
             productId,
             mediaId,
             actor
-        })) as ProductMediaRecord;
+        })) as ProductMediaRecord[];
 
         res.status(200).json({
             success: true,
@@ -317,7 +364,7 @@ router.delete(
             productId,
             mediaId,
             actor
-        })) as ProductMediaRecord;
+        })) as ProductMediaRecord[];
 
         res.status(200).json({
             success: true,

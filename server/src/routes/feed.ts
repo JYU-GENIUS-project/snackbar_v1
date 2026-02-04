@@ -11,13 +11,13 @@ type ProductFeedItem = {
     updatedAt?: string;
 } & Record<string, unknown>;
 
-type KioskStatus = Record<string, unknown>;
+type KioskStatusPayload = Awaited<ReturnType<typeof statusService.getKioskStatus>>;
 
 type FeedPayload = {
     generatedAt: string;
     products: ProductFeedItem[];
     inventoryTrackingEnabled: boolean;
-    status: KioskStatus;
+    status: KioskStatusPayload;
     statusFingerprint: string;
 };
 
@@ -49,7 +49,7 @@ router.get(
             productService.getProductFeed(),
             inventoryService.getInventoryTrackingState(),
             statusService.getKioskStatus()
-        ])) as [ProductFeedItem[], boolean, KioskStatus];
+        ])) as [ProductFeedItem[], boolean, KioskStatusPayload];
 
         const statusFingerprint = statusService.buildStatusFingerprint(kioskStatus) as string;
         const serializedPayload = JSON.stringify({
