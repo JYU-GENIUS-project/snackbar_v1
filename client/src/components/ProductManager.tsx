@@ -468,7 +468,7 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
         }
         try {
             return window.localStorage.getItem('snackbar-force-mock-categories') === '1';
-        } catch (error) {
+        } catch {
             return false;
         }
     });
@@ -480,7 +480,7 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
             return window.sessionStorage.getItem('snackbar-force-mock') === '1'
                 || window.localStorage.getItem('snackbar-force-mock') === '1'
                 || true;
-        } catch (error) {
+        } catch {
             return true;
         }
     });
@@ -567,7 +567,7 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
             if (stored !== forceMockCategories) {
                 setForceMockCategories(stored);
             }
-        } catch (error) {
+        } catch {
             // Ignore localStorage read issues.
         }
     }, [forceMockCategories]);

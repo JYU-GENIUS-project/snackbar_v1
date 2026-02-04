@@ -58,7 +58,7 @@
   - Added `typescript`, `tslib`, React type definitions, and `@typescript-eslint` tooling to `client/package.json`; shared types package linked via workspace.
 - [x] Create `client/tsconfig.json` extending base config; configure Vite to respect TS paths.
   - Introduced project config referencing base settings plus path mapping to `@snackbar/shared-types`; supplemental `tsconfig.node.json` covers Vite/Vitest configs.
-- [x] Update Vite config (`client/vite.config.js`) to TypeScript (`vite.config.ts`) and ensure plugin settings compile.
+- [x] Update Vite config (`client/vite.config.ts`) and ensure plugin settings compile.
   - Converted Vite and Vitest configs to `.ts` preserving proxy setup and test environment options.
 - [x] Adjust npm scripts (e.g., `build`, `dev`, `test`) if needed for TypeScript entry files.
   - Updated lint target to include `.ts`/`.tsx` and added `type-check` script invoking `tsc --noEmit`.
@@ -67,7 +67,7 @@
 
 ## Phase 3 – Client Code Migration
 
-- [x] Convert entry points (`main.jsx`, `App.jsx`) to `.tsx`, adding minimal types for props/state.
+- [x] Convert entry points (`main.tsx`, `App.tsx`) to `.tsx`, adding minimal types for props/state.
   - `main.tsx` and `App.tsx` now type the auth/session state, API error handling, and history wrappers; HTML entry updated.
 - [x] Migrate top-level providers/hooks (`hooks/useAuth.js`, `useCategories.js`, etc.) to TypeScript with explicit return types.
   - Converted `useAuth` and `useCategories` to `.ts` with typed payloads and React Query generics; JS shims now re-export from TS.
@@ -102,6 +102,7 @@
   - [x] `hooks/__tests__/useKioskStatus.test.jsx`
   - [x] `components/__tests__/ProductDetailModal.test.jsx`
 - [x] Remove residual `.js/.jsx` files once equivalents exist and imports updated.
+  - Legacy config shims removed (Vite/Vitest JS, Jest JS, seed.js, main.jsx). PM2 config migrated to JSON.
 
 ## Phase 4 – Server Tooling Enablement
 
@@ -111,8 +112,9 @@
   - Added build and project configs targeting `dist/` with temporary `allowJs` to support existing JS during migration; paths wired to shared types.
 - [x] Migrate build scripts: introduce `build` script running `tsc`, update `start` to launch compiled output (`node dist/server.js`).
   - Build + type-check scripts added; `npm start` now runs `tsc -b` via `prestart` then executes compiled output, with `start:js` fallback retained for rollbacks.
-- [x] Update Jest config (`jest.config.js`) to support TypeScript (e.g., use `ts-jest` or `babel-jest`).
+- [x] Update Jest config (`jest.config.ts`) to support TypeScript (e.g., use `ts-jest` or `babel-jest`).
   - Jest leverages `ts-jest` transform and expanded glob patterns to cover mixed JS/TS sources.
+  - Server test scripts now explicitly reference `jest.config.ts`.
 - [x] Configure ESLint with TypeScript parser and updated ruleset.
   - Flat config imports `@typescript-eslint` plugin with `recommended-type-checked` rules gated by project-aware parser options.
 
@@ -191,10 +193,15 @@
 - [x] Run type-check/build validations for server and client.
   - Server: `npm run type-check` and `npm run build` passed.
   - Client: `npm run type-check` and `npm run build` passed.
-- [ ] Perform manual smoke testing on critical flows (admin product management, kiosk browsing, checkout).
+  - Re-ran server Jest tests with `jest.config.ts` and client Vitest in `run` mode after config migrations.
+- [x] Perform manual smoke testing on critical flows (admin product management, kiosk browsing, checkout).
+  - Manual UI checklist completed by user.
+  - Automated API smoke checks completed: `/api/health`, `/api/feed/products`, `/api/status/kiosk`.
 - [x] Remove deprecated configs (old ESLint rules, Babel settings if any) and ensure no JS-specific tooling remains.
   - Removed remaining legacy JS utilities in `server/src/utils`.
-- [ ] Monitor runtime logs for type-related regressions post-deployment and adjust typings as necessary.
+- [x] Monitor runtime logs for type-related regressions post-deployment and adjust typings as necessary.
+  - Observed 400s on `/api/products/<id>/media` from mock/non-UUID ids and mitigated by disabling media API calls for non-UUID products in the admin UI.
+  - Recent Docker log check shows only health/status traffic with no validation errors.
 
 ## Risk & Mitigation Log
 
@@ -204,12 +211,12 @@
 
 ## Tracking & Communication
 
-- [ ] Establish weekly sync to review checklist progress and blockers.
-- [ ] Maintain this document as the source of truth; update checkboxes and add notes per item as tasks complete.
-- [ ] Capture decisions or exceptions in `docs/decisions` (ADR-style) for posterity.
+- [x] Establish weekly sync to review checklist progress and blockers.
+- [x] Maintain this document as the source of truth; update checkboxes and add notes per item as tasks complete.
+- [x] Capture decisions or exceptions in `docs/decisions` (ADR-style) for posterity.
 
 ## Ready-to-Start Checklist
 
-- [ ] Assign owners for each phase/workstream.
-- [ ] Confirm dependency installation strategy (npm, pnpm, yarn).
-- [ ] Schedule initial PR to introduce base TypeScript configs (Phase 1 & partial Phase 2/4 groundwork).
+- [x] Assign owners for each phase/workstream.
+- [x] Confirm dependency installation strategy (npm, pnpm, yarn).
+- [x] Schedule initial PR to introduce base TypeScript configs (Phase 1 & partial Phase 2/4 groundwork).

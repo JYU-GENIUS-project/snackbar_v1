@@ -73,12 +73,14 @@ We will adopt the **PERN stack** as the primary technology stack:
 #### UI Component Library (Choose One)
 
 **Option A: Material-UI (MUI)** - Recommended
+
 - `@mui/material` 5.14.x
 - `@mui/icons-material` 5.14.x
 - Google Material Design implementation
 - Comprehensive accessible components
 
 **Option B: Chakra UI** - Alternative
+
 - `@chakra-ui/react` 2.8.x
 - Modular and accessible components
 - Simple prop-based styling
@@ -86,10 +88,12 @@ We will adopt the **PERN stack** as the primary technology stack:
 #### Date/Time Handling (Choose One)
 
 **Option A: date-fns** - Recommended
+
 - Tree-shakable, immutable functions
 - Modern JavaScript date utility
 
 **Option B: Day.js** - Alternative
+
 - Lightweight (2KB)
 - Moment.js-compatible API
 
@@ -115,12 +119,14 @@ We will adopt the **PERN stack** as the primary technology stack:
 ### Optional but Recommended: TypeScript
 
 **TypeScript 5.3.x** is recommended for:
+
 - Static type checking
 - Better IDE support and autocomplete
 - Catch errors at compile time
 - Self-documenting code
 
 Type definitions needed:
+
 - `@types/node`
 - `@types/express`
 - `@types/react`
@@ -220,30 +226,35 @@ Type definitions needed:
 ## Alternatives Considered
 
 ### 1. MEAN Stack (MongoDB, Express, Angular, Node) - Rejected
+
 - **Description:** Similar stack with MongoDB and Angular instead
 - **Pros:** Angular's opinionated structure, MongoDB flexibility
 - **Cons:** MongoDB lacks ACID transactions, Angular steeper learning curve
 - **Rejection Reason:** PostgreSQL required by SRS; React preferred for its flexibility and smaller bundle
 
 ### 2. Django + React (Python Backend) - Rejected
+
 - **Description:** Python Django backend with React frontend
 - **Pros:** Django ORM, admin panel out of box, Python ecosystem
 - **Cons:** Two languages (Python + JavaScript), Django overhead
 - **Rejection Reason:** SRS specifies Node.js; single-language stack preferred
 
 ### 3. Spring Boot + React (Java Backend) - Rejected
+
 - **Description:** Java Spring Boot backend with React frontend
 - **Pros:** Enterprise-grade, strong typing, mature ecosystem
 - **Cons:** Java complexity, longer development time, higher memory usage
 - **Rejection Reason:** Overkill for single-kiosk application; SRS specifies Node.js
 
 ### 4. Ruby on Rails + React - Rejected
+
 - **Description:** Ruby on Rails backend with React frontend
 - **Pros:** Convention over configuration, rapid development
 - **Cons:** Ruby performance, two languages, smaller community than Node.js
 - **Rejection Reason:** SRS specifies Node.js; team more familiar with JavaScript
 
 ### 5. Next.js Full Stack - Considered but Deferred
+
 - **Description:** React framework with built-in API routes
 - **Pros:** SSR, file-based routing, excellent DX
 - **Cons:** Opinionated structure, SSR overhead for kiosk SPA
@@ -266,8 +277,8 @@ snackbar/
 │   │   ├── services/          # Business logic
 │   │   └── utils/             # Helpers
 │   ├── package.json
-│   ├── server.js
-│   └── ecosystem.config.js    # PM2 configuration
+│   ├── server.ts
+│   └── ecosystem.config.json  # PM2 configuration
 ├── client/                    # Frontend
 │   ├── src/
 │   │   ├── components/        # Reusable UI components
@@ -276,7 +287,7 @@ snackbar/
 │   │   ├── services/          # API client
 │   │   └── utils/             # Helpers
 │   ├── package.json
-│   └── vite.config.js
+│   └── vite.config.ts
 ├── docker-compose.yml
 ├── nginx/
 │   └── nginx.conf
@@ -288,11 +299,11 @@ snackbar/
 ```json
 {
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js",
-    "test": "jest --coverage",
-    "lint": "eslint .",
-    "format": "prettier --write \"**/*.{js,json,md}\""
+      "start": "node dist/server.js",
+      "dev": "nodemon --watch src --ext ts,tsx --exec \"ts-node --project tsconfig.json src/server.ts\"",
+      "test": "jest --config jest.config.ts --coverage",
+      "lint": "eslint src --ext .js,.ts",
+      "format": "prettier --write \"src/**/*.{ts,tsx}\""
   }
 }
 ```
@@ -305,8 +316,8 @@ snackbar/
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "jest",
-    "lint": "eslint src --ext .js,.jsx"
+      "test": "vitest run",
+      "lint": "eslint \"src/**/*.{js,jsx,ts,tsx}\""
   }
 }
 ```

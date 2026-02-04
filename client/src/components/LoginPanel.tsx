@@ -35,7 +35,7 @@ const LoginPanel = ({ onSuccess, notice }: LoginPanelProps) => {
     try {
       const result = await loginMutation.mutateAsync({ username, password });
       onSuccess(result);
-    } catch (error) {
+    } catch {
       // error handled via mutation state
     }
   };

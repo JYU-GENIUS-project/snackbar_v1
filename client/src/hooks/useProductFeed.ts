@@ -48,12 +48,19 @@ export type ProductFeedOptions = {
   enabled?: boolean;
 };
 
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  return typeof value === 'object' && value !== null;
+};
+
+const readRecord = (value: unknown): Record<string, unknown> => (isRecord(value) ? value : {});
+
 const normalizeStatusPayload = (input: unknown): ProductFeedStatus => {
   if (!input || typeof input !== 'object') {
     return null;
   }
 
-  const candidate = input as Record<string, any>;
+  const candidate = readRecord(input);
+  const maintenanceCandidate = readRecord(candidate.maintenance);
 
   return {
     status: typeof candidate.status === 'string' ? candidate.status : null,
@@ -62,9 +69,9 @@ const normalizeStatusPayload = (input: unknown): ProductFeedStatus => {
     nextOpen: typeof candidate.nextOpen === 'string' ? candidate.nextOpen : null,
     nextClose: typeof candidate.nextClose === 'string' ? candidate.nextClose : null,
     maintenance: {
-      enabled: Boolean(candidate?.maintenance?.enabled),
-      message: typeof candidate?.maintenance?.message === 'string' ? candidate.maintenance.message : null,
-      since: typeof candidate?.maintenance?.since === 'string' ? candidate.maintenance.since : null
+      enabled: Boolean(maintenanceCandidate.enabled),
+      message: typeof maintenanceCandidate.message === 'string' ? maintenanceCandidate.message : null,
+      since: typeof maintenanceCandidate.since === 'string' ? maintenanceCandidate.since : null
     },
     timezone: typeof candidate.timezone === 'string' ? candidate.timezone : null,
     generatedAt: typeof candidate.generatedAt === 'string' ? candidate.generatedAt : null,
@@ -109,7 +116,7 @@ const buildFeedFromOfflineSnapshot = (snapshot: OfflineProductSnapshot | null): 
           : {},
       primaryMedia: primaryCandidate
         ? {
-          url: primaryCandidate.url || (primaryCandidate as any).previewUrl || (primaryCandidate as any).localPath || '',
+          url: primaryCandidate.url || primaryCandidate.previewUrl || primaryCandidate.localPath || '',
           alt:
             primaryCandidate.alt ||
             primaryCandidate.description ||
@@ -147,20 +154,43 @@ const normalizeFeedPayload = (payload: unknown): ProductFeedPayload => {
     };
   }
 
-  const candidate = payload as Record<string, any>;
-  const products = Array.isArray(candidate.products) ? candidate.products : [];
+  const candidate = readRecord(payload);
+  const products = Array.isArray(candidate.products) ? (candidate.products as ProductFeedProduct[]) : [];
 
   return {
-    ...candidate,
     products,
-    generatedAt: candidate.generatedAt || new Date().toISOString(),
-    lastUpdatedAt: candidate.lastUpdatedAt || candidate.generatedAt || new Date().toISOString(),
-    source: candidate.source || 'api',
+    generatedAt: typeof candidate.generatedAt === 'string' ? candidate.generatedAt : new Date().toISOString(),
+    lastUpdatedAt:
+      typeof candidate.lastUpdatedAt === 'string'
+        ? candidate.lastUpdatedAt
+        : typeof candidate.generatedAt === 'string'
+          ? candidate.generatedAt
+          : new Date().toISOString(),
+    source: typeof candidate.source === 'string' ? candidate.source : 'api',
     inventoryTrackingEnabled:
       typeof candidate.inventoryTrackingEnabled === 'boolean' ? candidate.inventoryTrackingEnabled : true,
     statusFingerprint: typeof candidate.statusFingerprint === 'string' ? candidate.statusFingerprint : null,
     status: normalizeStatusPayload(candidate.status)
-  } as ProductFeedPayload;
+  };
+};
+
+const extractApiPayload = (response: unknown): unknown => {
+  if (!isRecord(response)) {
+    return response;
+  }
+
+  const success = response.success === true;
+  const data = response.data;
+  if (success && data !== undefined) {
+    return data;
+  }
+  if (Array.isArray(response.products)) {
+    return response;
+  }
+  if (data !== undefined && isRecord(data)) {
+    return data;
+  }
+  return response;
 };
 
 const fetchProductFeed = async ({ signal }: { signal?: AbortSignal }): Promise<ProductFeedPayload> => {
@@ -181,15 +211,7 @@ const fetchProductFeed = async ({ signal }: { signal?: AbortSignal }): Promise<P
       signal
     });
 
-    const selected = normalizeFeedPayload(
-      (response as any)?.success && (response as any).data
-        ? (response as any).data
-        : Array.isArray((response as any)?.products)
-          ? response
-          : (response as any)?.data && typeof (response as any).data === 'object'
-            ? (response as any).data
-            : response
-    );
+    const selected = normalizeFeedPayload(extractApiPayload(response));
 
     if (Array.isArray(selected.products) && selected.products.length > 0) {
       saveOfflineProductSnapshot({
@@ -226,7 +248,7 @@ const fetchProductFeed = async ({ signal }: { signal?: AbortSignal }): Promise<P
 };
 
 export const useProductFeed = (options: ProductFeedOptions = {}) => {
-  return useQuery({
+  return useQuery<ProductFeedPayload>({
     queryKey: FEED_QUERY_KEY,
     queryFn: ({ signal }) => fetchProductFeed({ signal }),
     refetchInterval: options.refetchInterval ?? 15000,

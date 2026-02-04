@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiRequest, API_BASE_URL } from '../services/apiClient.js';
 import { readOfflineProductSnapshot, saveOfflineProductSnapshot, type OfflineStatusPayload } from '../utils/offlineCache.js';
@@ -48,6 +48,10 @@ type InventoryEventPayload = {
     stockStatus?: string;
     available?: boolean;
     emittedAt?: string;
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+    return typeof value === 'object' && value !== null;
 };
 
 const computeFingerprint = (payload?: KioskStatusPayload | null): string | null => {
@@ -144,6 +148,25 @@ const parseEventPayload = (event: MessageEvent<string>): unknown => {
     }
 };
 
+const extractApiPayload = (response: unknown): KioskStatusPayload | null => {
+    if (!isRecord(response)) {
+        return response as KioskStatusPayload | null;
+    }
+
+    if (response.success === true && 'data' in response) {
+        return response.data as KioskStatusPayload | null;
+    }
+
+    if ('data' in response) {
+        const data = response.data;
+        if (isRecord(data) || data === null) {
+            return data as KioskStatusPayload | null;
+        }
+    }
+
+    return response as KioskStatusPayload | null;
+};
+
 export const useKioskStatus = (options: UseKioskStatusOptions = {}) => {
     const offlineState = useMemo(() => readOfflineState(), []);
     const [status, setStatus] = useState<KioskStatusPayload | null>(offlineState.status);
@@ -157,7 +180,7 @@ export const useKioskStatus = (options: UseKioskStatusOptions = {}) => {
     const retryAttemptRef = useRef(0);
     const eventSourceRef = useRef<EventSource | null>(null);
 
-    const applyStatusPayload = (payload: StatusEventPayload | null, source = 'poll') => {
+    const applyStatusPayload = useCallback((payload: StatusEventPayload | null, source = 'poll') => {
         if (!payload || typeof payload !== 'object') {
             return;
         }
@@ -175,9 +198,9 @@ export const useKioskStatus = (options: UseKioskStatusOptions = {}) => {
         if (source === 'sse') {
             retryAttemptRef.current = 0;
         }
-    };
+    }, [inventoryTrackingEnabled, statusFingerprint]);
 
-    const applyTrackingPayload = (payload: TrackingEventPayload | null) => {
+    const applyTrackingPayload = useCallback((payload: TrackingEventPayload | null) => {
         if (!payload || typeof payload !== 'object') {
             return;
         }
@@ -188,9 +211,9 @@ export const useKioskStatus = (options: UseKioskStatusOptions = {}) => {
             statusFingerprint,
             inventoryTrackingEnabled: enabled
         });
-    };
+    }, [status, statusFingerprint]);
 
-    const applyInventoryAvailability = (payload: InventoryEventPayload | null) => {
+    const applyInventoryAvailability = useCallback((payload: InventoryEventPayload | null) => {
         if (!payload || !payload.productId) {
             return;
         }
@@ -217,9 +240,11 @@ export const useKioskStatus = (options: UseKioskStatusOptions = {}) => {
         current.set(payload.productId, nextEntry);
         availabilityRef.current = current;
         setAvailabilityVersion((version) => version + 1);
-    };
+    }, []);
 
-    const startEventStream = () => {
+    const reconnectDelayBase = options.reconnectDelayBase ?? 2000;
+
+    const startEventStream = useCallback(() => {
         if (typeof window === 'undefined' || typeof window.EventSource === 'undefined') {
             setConnectionState('unsupported');
             return;
@@ -279,13 +304,13 @@ export const useKioskStatus = (options: UseKioskStatusOptions = {}) => {
             if (reconnectTimerRef.current) {
                 window.clearTimeout(reconnectTimerRef.current);
             }
-            const delay = Math.min(30000, (options.reconnectDelayBase || 2000) * attempt);
+            const delay = Math.min(30000, reconnectDelayBase * attempt);
             reconnectTimerRef.current = window.setTimeout(() => {
                 reconnectTimerRef.current = null;
                 startEventStream();
             }, delay);
         };
-    };
+    }, [applyInventoryAvailability, applyStatusPayload, applyTrackingPayload, reconnectDelayBase]);
 
     useEffect(() => {
         if (options.sse !== false) {
@@ -301,14 +326,11 @@ export const useKioskStatus = (options: UseKioskStatusOptions = {}) => {
                 reconnectTimerRef.current = null;
             }
         };
-        // intentionally omit dependencies to avoid re-creating stream unnecessarily
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [options.sse, startEventStream]);
 
     const fetchStatus = async ({ signal }: { signal?: AbortSignal }) => {
         const response = await apiRequest<unknown>({ path: '/status/kiosk', method: 'GET', signal });
-        const payload = (response as any)?.success ? (response as any).data : response;
-        return payload as KioskStatusPayload | null;
+        return extractApiPayload(response);
     };
 
     const statusQuery = useQuery<KioskStatusPayload | null>({
@@ -325,7 +347,7 @@ export const useKioskStatus = (options: UseKioskStatusOptions = {}) => {
         if (statusQuery.data) {
             applyStatusPayload(statusQuery.data as StatusEventPayload | null, 'poll');
         }
-    }, [statusQuery.data]);
+    }, [applyStatusPayload, statusQuery.data]);
 
     const inventoryAvailability = useMemo(() => {
         const source = availabilityRef.current instanceof Map ? availabilityRef.current : null;

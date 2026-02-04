@@ -1,7 +1,7 @@
-// @ts-nocheck
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useProductFeed } from '../hooks/useProductFeed.js';
-import useKioskStatus from '../hooks/useKioskStatus.js';
+import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent } from 'react';
+import { useProductFeed, type ProductFeedProduct } from '../hooks/useProductFeed.js';
+import useKioskStatus, { type KioskStatusPayload, type InventoryAvailabilityEntry } from '../hooks/useKioskStatus.js';
 import ProductGridSkeleton from './ProductGridSkeleton.js';
 import ProductDetailModal from './ProductDetailModal';
 import { OFFLINE_FEED_STORAGE_KEY } from '../utils/offlineCache.js';
@@ -14,50 +14,120 @@ const TRUST_MODE_STORAGE_KEY = 'snackbar-trust-mode-disabled';
 const OUT_OF_STOCK_DIALOG_TITLE_ID = 'kiosk-out-of-stock-title';
 const OUT_OF_STOCK_DIALOG_MESSAGE_ID = 'kiosk-out-of-stock-message';
 
-const normalizeTestControls = (input) => {
+type KioskTestControls = {
+    statusOverride?: 'open' | 'closed' | 'maintenance';
+    statusMessage?: string | null;
+    statusNextOpen?: string | null;
+    inventoryTrackingEnabled?: boolean;
+};
+
+type NormalizedTestControls = {
+    __reset?: true;
+    statusOverride?: 'open' | 'closed' | 'maintenance' | null;
+    statusMessage?: string | null;
+    statusNextOpen?: string | null;
+    inventoryTrackingEnabled?: boolean | null;
+};
+
+type NormalizedCategory = {
+    id: string | null;
+    name: string | null;
+    isActive: boolean;
+};
+
+type NormalizedProduct = {
+    id: string;
+    name: string;
+    price: number;
+    purchaseLimit: number | null;
+    stockQuantity: number | null;
+    lowStockThreshold: number | null;
+    isOutOfStock: boolean;
+    isLowStock: boolean;
+    status: string;
+    imageAlt: string;
+    description: string;
+    allergens: string;
+    categoryId: string | null;
+    categoryIds: string[];
+    categories: NormalizedCategory[];
+    available: boolean;
+};
+
+type CartItem = {
+    id: string;
+    name: string;
+    price: number;
+    purchaseLimit: number | null;
+    quantity: number;
+};
+
+type StatusOverlay = {
+    active: boolean;
+    variant?: 'maintenance' | 'closed';
+    icon?: string;
+    title?: string;
+    message?: string;
+    detail?: string | null;
+    next?: string | null;
+    eta?: string | null;
+    lastUpdated?: string | null;
+};
+
+declare global {
+    interface Window {
+        snackbarApplyTestControls?: (update: unknown) => void;
+        snackbarDebugReadTestControls?: () => KioskTestControls;
+        snackbarCurrentTestControls?: KioskTestControls;
+    }
+}
+
+const normalizeTestControls = (input: unknown): NormalizedTestControls | null => {
     if (!input || typeof input !== 'object') {
         return null;
     }
 
-    if (input.reset === true) {
+    const candidate = input as Record<string, unknown>;
+
+    if (candidate.reset === true) {
         return { __reset: true };
     }
 
-    const normalized = {};
+    const normalized: NormalizedTestControls = {};
 
-    if (Object.prototype.hasOwnProperty.call(input, 'statusOverride')) {
-        const candidate = input.statusOverride;
-        if (candidate === null || candidate === undefined) {
+    if (Object.prototype.hasOwnProperty.call(candidate, 'statusOverride')) {
+        const statusOverride = candidate.statusOverride;
+        if (statusOverride === null || statusOverride === undefined) {
             normalized.statusOverride = null;
-        } else if (typeof candidate === 'string' && TEST_CONTROL_ALLOWED_STATUSES.has(candidate)) {
-            normalized.statusOverride = candidate;
+        } else if (typeof statusOverride === 'string' && TEST_CONTROL_ALLOWED_STATUSES.has(statusOverride)) {
+            normalized.statusOverride = statusOverride;
         } else {
             normalized.statusOverride = null;
         }
     }
 
-    if (Object.prototype.hasOwnProperty.call(input, 'statusMessage')) {
-        normalized.statusMessage = typeof input.statusMessage === 'string' ? input.statusMessage : null;
+    if (Object.prototype.hasOwnProperty.call(candidate, 'statusMessage')) {
+        normalized.statusMessage = typeof candidate.statusMessage === 'string' ? candidate.statusMessage : null;
     }
 
-    if (Object.prototype.hasOwnProperty.call(input, 'statusNextOpen')) {
-        normalized.statusNextOpen = typeof input.statusNextOpen === 'string' ? input.statusNextOpen : null;
+    if (Object.prototype.hasOwnProperty.call(candidate, 'statusNextOpen')) {
+        normalized.statusNextOpen = typeof candidate.statusNextOpen === 'string' ? candidate.statusNextOpen : null;
     }
 
-    if (Object.prototype.hasOwnProperty.call(input, 'inventoryTrackingEnabled')) {
-        const candidate = input.inventoryTrackingEnabled;
-        if (candidate === null || candidate === undefined) {
+    if (Object.prototype.hasOwnProperty.call(candidate, 'inventoryTrackingEnabled')) {
+        const trackingEnabled = candidate.inventoryTrackingEnabled;
+        if (trackingEnabled === null || trackingEnabled === undefined) {
             normalized.inventoryTrackingEnabled = null;
         } else {
-            normalized.inventoryTrackingEnabled = Boolean(candidate);
+            normalized.inventoryTrackingEnabled = Boolean(trackingEnabled);
         }
     }
 
     return normalized;
 };
 
-const mergeTestControls = (current, update) => {
-    const base = current && typeof current === 'object' ? { ...current } : {};
+const mergeTestControls = (current: KioskTestControls | null | undefined, update: unknown): KioskTestControls => {
+    const base: KioskTestControls = current && typeof current === 'object' ? { ...current } : {};
     if (!update || typeof update !== 'object') {
         return base;
     }
@@ -72,12 +142,16 @@ const mergeTestControls = (current, update) => {
     }
 
     let changed = false;
-    const next = { ...base };
+    const next: KioskTestControls = { ...base };
 
-    Object.keys(normalized).forEach((key) => {
-        if (key === '__reset') {
-            return;
-        }
+    const fields: Array<keyof KioskTestControls> = [
+        'statusOverride',
+        'statusMessage',
+        'statusNextOpen',
+        'inventoryTrackingEnabled'
+    ];
+
+    fields.forEach((key) => {
         const value = normalized[key];
         if (value === null || value === undefined) {
             if (Object.prototype.hasOwnProperty.call(next, key)) {
@@ -87,7 +161,7 @@ const mergeTestControls = (current, update) => {
             return;
         }
         if (next[key] !== value) {
-            next[key] = value;
+            next[key] = value as KioskTestControls[typeof key];
             changed = true;
         }
     });
@@ -95,7 +169,7 @@ const mergeTestControls = (current, update) => {
     return changed ? next : base;
 };
 
-const persistTestControls = (controls) => {
+const persistTestControls = (controls: KioskTestControls) => {
     if (typeof window === 'undefined') {
         return;
     }
@@ -113,7 +187,7 @@ const persistTestControls = (controls) => {
     }
 };
 
-const readTestControls = () => {
+const readTestControls = (): KioskTestControls => {
     if (typeof window === 'undefined') {
         return {};
     }
@@ -130,7 +204,7 @@ const readTestControls = () => {
         if (!normalized || normalized.__reset) {
             return {};
         }
-        const sanitized = {};
+        const sanitized: KioskTestControls = {};
         if (Object.prototype.hasOwnProperty.call(normalized, 'statusOverride')) {
             sanitized.statusOverride = normalized.statusOverride;
         }
@@ -154,7 +228,7 @@ const readTestControls = () => {
     }
 };
 
-const formatLocalizedDateTime = (isoValue, timeZone) => {
+const formatLocalizedDateTime = (isoValue?: string | null, timeZone?: string | null): string | null => {
     if (!isoValue) {
         return null;
     }
@@ -178,7 +252,7 @@ const formatLocalizedDateTime = (isoValue, timeZone) => {
     }
 };
 
-const formatDurationUntil = (isoValue) => {
+const formatDurationUntil = (isoValue?: string | null): string | null => {
     if (!isoValue) {
         return null;
     }
@@ -204,7 +278,7 @@ const formatDurationUntil = (isoValue) => {
     return `${Math.max(totalMinutes, 1)}m`;
 };
 
-const formatRelativeTimestamp = (isoValue) => {
+const formatRelativeTimestamp = (isoValue?: string | null): string | null => {
     if (!isoValue) {
         return null;
     }
@@ -237,26 +311,31 @@ const formatRelativeTimestamp = (isoValue) => {
     }
 };
 
-const formatPrice = (value) => `${Number(value ?? 0).toFixed(2)}€`;
+const formatPrice = (value: number | string | null | undefined) => `${Number(value ?? 0).toFixed(2)}€`;
 const DEFAULT_PRODUCT_IMAGE = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300"><rect width="400" height="300" fill="%23e5e7eb"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="%236b7280" font-size="28">No Image</text></svg>';
 const REQUIRED_CUSTOMER_FILTERS = [
     { name: 'Hot Drinks', id: 'virtual-hot-drinks' }
 ];
 
-const toNumberOrNull = (value) => {
+const toNumberOrNull = (value: unknown): number | null => {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : null;
 };
 
-const normalizeProduct = (product) => {
+const normalizeProduct = (product: ProductFeedProduct): NormalizedProduct => {
     const limit = toNumberOrNull(product.purchaseLimit);
     const stockQuantity = toNumberOrNull(product.stockQuantity);
     const lowStockThreshold = toNumberOrNull(product.lowStockThreshold);
+    const metadata = typeof product.metadata === 'object' && product.metadata !== null
+        ? (product.metadata as Record<string, unknown>)
+        : {};
+    const metadataDescription = typeof metadata.description === 'string' ? metadata.description : '';
+    const metadataAllergens = typeof metadata.allergens === 'string' ? metadata.allergens : '';
     const isOutOfStock = stockQuantity !== null && stockQuantity <= 0;
     const isLowStock =
         !isOutOfStock && stockQuantity !== null && lowStockThreshold !== null && stockQuantity <= lowStockThreshold;
     const categories = Array.isArray(product.categories)
-        ? product.categories
+        ? (product.categories as Array<{ id?: string | null; name?: string | null; isActive?: boolean | null }>)
             .filter(Boolean)
             .map((category) => ({
                 id: category.id ?? (category.name ? `name:${category.name}` : null),
@@ -266,11 +345,13 @@ const normalizeProduct = (product) => {
             .filter((category) => Boolean(category.name))
         : [];
     const categoryIds = Array.isArray(product.categoryIds)
-        ? product.categoryIds.filter(Boolean)
-        : categories.map((category) => category.id).filter(Boolean);
+        ? product.categoryIds.filter((id): id is string => Boolean(id))
+        : categories.map((category) => category.id).filter((id): id is string => Boolean(id));
+
+    const resolvedId = typeof product.id === 'string' && product.id.trim() ? product.id : product.name || 'product';
 
     return {
-        id: product.id,
+        id: resolvedId,
         name: product.name || 'Product',
         price: Number(product.price ?? 0),
         purchaseLimit: Number.isFinite(limit) && limit > 0 ? limit : null,
@@ -280,17 +361,17 @@ const normalizeProduct = (product) => {
         isLowStock,
         status: product.status || 'active',
         imageAlt: product.primaryMedia?.alt || product.name || 'Product image',
-        description: product.description || product.metadata?.description || '',
+        description: product.description || metadataDescription || '',
         allergens: typeof product.allergens === 'string' && product.allergens.trim()
             ? product.allergens.trim()
-            : product.metadata?.allergens || '',
+            : metadataAllergens || '',
         categoryId: categoryIds[0] || null,
         categoryIds,
         categories,
         available: product.available !== false
     };
 };
-const buildStatusOverlay = (statusPayload, lastUpdatedAt) => {
+const buildStatusOverlay = (statusPayload: KioskStatusPayload | null, lastUpdatedAt?: string | null): StatusOverlay => {
     if (!statusPayload || typeof statusPayload !== 'object') {
         return { active: false };
     }
@@ -337,7 +418,11 @@ const buildStatusOverlay = (statusPayload, lastUpdatedAt) => {
     };
 };
 
-const applyTestStatusOverride = (overlay, controls, statusPayload) => {
+const applyTestStatusOverride = (
+    overlay: StatusOverlay | null | undefined,
+    controls: KioskTestControls | null | undefined,
+    statusPayload: KioskStatusPayload | null
+): StatusOverlay => {
     const baseOverlay = overlay || { active: false };
     if (!controls || typeof controls !== 'object' || !controls.statusOverride) {
         return baseOverlay;
@@ -372,7 +457,11 @@ const applyTestStatusOverride = (overlay, controls, statusPayload) => {
     };
 };
 
-const updateQuantityInCart = (cart, productId, updater) => {
+const updateQuantityInCart = (
+    cart: CartItem[],
+    productId: string,
+    updater: (quantity: number, purchaseLimit: number | null) => number
+): CartItem[] => {
     return cart
         .map((item) => {
             if (item.id !== productId) {
@@ -387,15 +476,15 @@ const updateQuantityInCart = (cart, productId, updater) => {
                 quantity: nextQuantity
             };
         })
-        .filter(Boolean);
+        .filter((item): item is CartItem => Boolean(item));
 };
 
 const KioskApp = () => {
     const { data, isLoading, isFetching, error, refetch } = useProductFeed({ refetchInterval: 15000, staleTime: 10000 });
     const kioskStatus = useKioskStatus({ refetchInterval: 45000 });
 
-    const [testControls, setTestControls] = useState(() => readTestControls());
-    const applyTestControls = useCallback((update) => {
+    const [testControls, setTestControls] = useState<KioskTestControls>(() => readTestControls());
+    const applyTestControls = useCallback((update: unknown) => {
         setTestControls((current) => {
             const next = mergeTestControls(current, update);
             persistTestControls(next);
@@ -408,7 +497,7 @@ const KioskApp = () => {
             return;
         }
 
-        const storageHandler = (event) => {
+        const storageHandler = (event: StorageEvent) => {
             if (event.key === TEST_CONTROL_STORAGE_KEY) {
                 setTestControls(readTestControls());
             }
@@ -514,8 +603,11 @@ const KioskApp = () => {
         if (overlayVariant !== 'closed') {
             return null;
         }
-        if (statusPayload?.operatingWindow?.start && statusPayload?.operatingWindow?.end) {
-            return `${statusPayload.operatingWindow.start}–${statusPayload.operatingWindow.end}`;
+        const operatingWindow = statusPayload && typeof statusPayload === 'object' && 'operatingWindow' in statusPayload
+            ? (statusPayload as { operatingWindow?: { start?: string; end?: string } }).operatingWindow
+            : undefined;
+        if (operatingWindow?.start && operatingWindow?.end) {
+            return `${operatingWindow.start}–${operatingWindow.end}`;
         }
         const windows = Array.isArray(statusPayload?.windows) ? statusPayload.windows : [];
         if (windows.length > 0) {
@@ -525,7 +617,7 @@ const KioskApp = () => {
             }
         }
         return null;
-    }, [overlayVariant, statusPayload?.operatingWindow, statusPayload?.windows]);
+    }, [overlayVariant, statusPayload, statusPayload?.windows]);
 
     const closedBannerMessage = useMemo(() => {
         if (overlayVariant !== 'closed') {
@@ -563,12 +655,12 @@ const KioskApp = () => {
             .filter((product) => product.status !== 'archived');
     }, [data]);
 
-    const products = useMemo(() => {
+    const products = useMemo<NormalizedProduct[]>(() => {
         if (!Array.isArray(baseProducts) || baseProducts.length === 0) {
             return baseProducts;
         }
 
-        const availability = kioskStatus.inventoryAvailability || {};
+        const availability: Record<string, InventoryAvailabilityEntry> = kioskStatus.inventoryAvailability || {};
 
         return baseProducts.map((product) => {
             const override = availability[product.id];
@@ -626,8 +718,8 @@ const KioskApp = () => {
     }, [products]);
 
     const categoryFilters = useMemo(() => {
-        const seen = new Set();
-        const derived = [];
+        const seen = new Set<string>();
+        const derived: Array<{ id?: string | null; name: string }> = [];
 
         (sortedProducts || []).forEach((product) => {
             (product.categories || []).forEach((category) => {
@@ -650,27 +742,27 @@ const KioskApp = () => {
         return derived.sort((a, b) => a.name.localeCompare(b.name));
     }, [sortedProducts]);
 
-    const [selectedCategory, setSelectedCategory] = useState('All Products');
-    const [cart, setCart] = useState([]);
+    const [selectedCategory, setSelectedCategory] = useState<string>('All Products');
+    const [cart, setCart] = useState<CartItem[]>([]);
     const [cartOpen, setCartOpen] = useState(false);
     const [checkoutVisible, setCheckoutVisible] = useState(false);
     const [toastMessage, setToastMessage] = useState('');
     const [limitMessage, setLimitMessage] = useState('');
-    const [outOfStockPrompt, setOutOfStockPrompt] = useState(null);
-    const [selectedProduct, setSelectedProduct] = useState(null);
-    const outOfStockDialogRef = useRef(null);
-    const outOfStockConfirmRef = useRef(null);
-    const outOfStockCancelRef = useRef(null);
-    const previousFocusRef = useRef(null);
-    const statusOverlayRef = useRef(null);
-    const previousOverlayFocusRef = useRef(null);
-    const checkoutDialogRef = useRef(null);
-    const checkoutPrimaryActionRef = useRef(null);
-    const previousCheckoutFocusRef = useRef(null);
+    const [outOfStockPrompt, setOutOfStockPrompt] = useState<NormalizedProduct | null>(null);
+    const [selectedProduct, setSelectedProduct] = useState<NormalizedProduct | null>(null);
+    const outOfStockDialogRef = useRef<HTMLDivElement | null>(null);
+    const outOfStockConfirmRef = useRef<HTMLButtonElement | null>(null);
+    const outOfStockCancelRef = useRef<HTMLButtonElement | null>(null);
+    const previousFocusRef = useRef<HTMLElement | null>(null);
+    const statusOverlayRef = useRef<HTMLDivElement | null>(null);
+    const previousOverlayFocusRef = useRef<HTMLElement | null>(null);
+    const checkoutDialogRef = useRef<HTMLDivElement | null>(null);
+    const checkoutPrimaryActionRef = useRef<HTMLButtonElement | null>(null);
+    const previousCheckoutFocusRef = useRef<HTMLElement | null>(null);
     const inventoryWarningLoggedRef = useRef(false);
-    const categoryFilterTimingRef = useRef(null);
+    const categoryFilterTimingRef = useRef<{ category: string; startedAt: number } | null>(null);
 
-    const markCategoryFilterSelection = (category) => {
+    const markCategoryFilterSelection = (category: string) => {
         if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
             categoryFilterTimingRef.current = {
                 category,
@@ -684,7 +776,7 @@ const KioskApp = () => {
         };
     };
 
-    const handleCategorySelection = (category) => {
+    const handleCategorySelection = (category: string) => {
         if (category === selectedCategory) {
             return;
         }
@@ -827,7 +919,7 @@ const KioskApp = () => {
             dialogNode.focus({ preventScroll: true });
         }
 
-        const handleKeyDown = (event) => {
+        const handleKeyDown = (event: KeyboardEvent) => {
             if (event.key === 'Escape') {
                 event.preventDefault();
                 logKioskEvent('kiosk.out_of_stock_cancelled', {
@@ -895,7 +987,7 @@ const KioskApp = () => {
                         purchaseLimit: source.purchaseLimit
                     };
                 })
-                .filter(Boolean)
+                .filter((item): item is CartItem => Boolean(item))
         );
     }, [products]);
 
@@ -904,7 +996,7 @@ const KioskApp = () => {
             return undefined;
         }
 
-        const handleStorage = (event) => {
+        const handleStorage = (event: StorageEvent) => {
             if (event?.key === OFFLINE_FEED_STORAGE_KEY) {
                 refetch();
             }
@@ -925,7 +1017,7 @@ const KioskApp = () => {
     const cartCount = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart]);
     const cartTotal = useMemo(() => cart.reduce((sum, item) => sum + item.price * item.quantity, 0), [cart]);
 
-    const addProductToCart = (product) => {
+    const addProductToCart = (product: NormalizedProduct) => {
         setCart((current) => {
             const existing = current.find((item) => item.id === product.id);
             const limit = product.purchaseLimit ?? null;
@@ -963,7 +1055,11 @@ const KioskApp = () => {
         });
     };
 
-    const showOutOfStockPrompt = (product, trigger, options = {}) => {
+    const showOutOfStockPrompt = (
+        product: NormalizedProduct,
+        trigger: string,
+        options: { closeDetails?: boolean } = {}
+    ) => {
         const { closeDetails = true } = options;
         if (closeDetails) {
             setSelectedProduct(null);
@@ -979,7 +1075,7 @@ const KioskApp = () => {
         });
     };
 
-    const handleAddToCart = (product) => {
+    const handleAddToCart = (product: NormalizedProduct) => {
         if (kioskUnavailable) {
             setToastMessage(kioskUnavailableMessage);
             logKioskEvent('kiosk.order_blocked_unavailable', {
@@ -1008,7 +1104,7 @@ const KioskApp = () => {
         addProductToCart(product);
     };
 
-    const handleProductCardClick = (event, product) => {
+    const handleProductCardClick = (event: ReactMouseEvent<HTMLElement>, product: NormalizedProduct) => {
         if (!(event.target instanceof HTMLElement)) {
             return;
         }
@@ -1028,7 +1124,7 @@ const KioskApp = () => {
         setSelectedProduct(product);
     };
 
-    const handleProductCardKeyDown = (event, product) => {
+    const handleProductCardKeyDown = (event: ReactKeyboardEvent<HTMLElement>, product: NormalizedProduct) => {
         if (event.key !== 'Enter' && event.key !== ' ') {
             return;
         }
@@ -1051,7 +1147,7 @@ const KioskApp = () => {
         setSelectedProduct(product);
     };
 
-    const confirmOutOfStockSelection = (accept) => {
+    const confirmOutOfStockSelection = (accept: boolean) => {
         const promptProduct = outOfStockPrompt;
         if (!promptProduct) {
             setOutOfStockPrompt(null);
@@ -1089,7 +1185,7 @@ const KioskApp = () => {
         setOutOfStockPrompt(null);
     };
 
-    const incrementQuantity = (productId) => {
+    const incrementQuantity = (productId: string) => {
         setCart((current) => {
             const target = current.find((item) => item.id === productId);
             if (!target) {
@@ -1104,11 +1200,11 @@ const KioskApp = () => {
         });
     };
 
-    const decrementQuantity = (productId) => {
+    const decrementQuantity = (productId: string) => {
         setCart((current) => updateQuantityInCart(current, productId, (quantity) => quantity - 1));
     };
 
-    const removeItem = (productId) => {
+    const removeItem = (productId: string) => {
         setCart((current) => current.filter((item) => item.id !== productId));
     };
 

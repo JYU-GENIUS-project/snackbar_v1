@@ -1455,40 +1455,40 @@ The system will be considered complete and ready for production when:
 
 ### Performance Acceptance
 
-21. ✅ Filter changes update display within 300ms (90th percentile)
-22. ✅ Cart operations reflect within 200ms (90th percentile)
-23. ✅ Product grid loads within 2 seconds (95th percentile)
-24. ✅ QR code generation completes within 1 second
-25. ✅ Statistics queries return within 2 seconds for up to 10,000 transactions
+1. ✅ Filter changes update display within 300ms (90th percentile)
+2. ✅ Cart operations reflect within 200ms (90th percentile)
+3. ✅ Product grid loads within 2 seconds (95th percentile)
+4. ✅ QR code generation completes within 1 second
+5. ✅ Statistics queries return within 2 seconds for up to 10,000 transactions
 
 ### Security Acceptance
 
-26. ✅ Admin passwords are hashed with bcrypt/Argon2 (minimum 12 rounds)
-27. ✅ All communication uses HTTPS/TLS 1.2+
-28. ✅ Image uploads are validated and sanitized
-29. ✅ Admin sessions timeout after 30 minutes inactivity
+1. ✅ Admin passwords are hashed with bcrypt/Argon2 (minimum 12 rounds)
+2. ✅ All communication uses HTTPS/TLS 1.2+
+3. ✅ Image uploads are validated and sanitized
+4. ✅ Admin sessions timeout after 30 minutes inactivity
 
 ### Data & Reliability Acceptance
 
-30. ✅ Transactions are logged immediately (within 1 second)
-31. ✅ Transaction history retained for minimum 3 years
-32. ✅ Daily automated backups at 02:00 with email confirmation
-33. ✅ Backup integrity verification successful
-34. ✅ Database alerts at 80% capacity
+1. ✅ Transactions are logged immediately (within 1 second)
+2. ✅ Transaction history retained for minimum 3 years
+3. ✅ Daily automated backups at 02:00 with email confirmation
+4. ✅ Backup integrity verification successful
+5. ✅ Database alerts at 80% capacity
 
 ### Usability Acceptance
 
-35. ✅ 90% of test users (n=10) complete purchase within 60 seconds without assistance
-36. ✅ All interactive elements are minimum 44x44px touch targets
-37. ✅ Error messages meet WCAG AA contrast ratios (4.5:1)
-38. ✅ Admin portal works in Chrome 90+, Firefox 88+, Safari 14+, Edge 90+
+1. ✅ 90% of test users (n=10) complete purchase within 60 seconds without assistance
+2. ✅ All interactive elements are minimum 44x44px touch targets
+3. ✅ Error messages meet WCAG AA contrast ratios (4.5:1)
+4. ✅ Admin portal works in Chrome 90+, Firefox 88+, Safari 14+, Edge 90+
 
 ### Edge Case Acceptance
 
-39. ✅ Payment uncertainty is handled (PAYMENT_UNCERTAIN status, admin reconciliation)
-40. ✅ MobilePay API unavailability displays appropriate error message
-41. ✅ Multiple admin accounts supported (up to 10) with audit trail
-42. ✅ Maintenance mode overrides operating hours
+1. ✅ Payment uncertainty is handled (PAYMENT_UNCERTAIN status, admin reconciliation)
+2. ✅ MobilePay API unavailability displays appropriate error message
+3. ✅ Multiple admin accounts supported (up to 10) with audit trail
+4. ✅ Maintenance mode overrides operating hours
 
 ---
 
@@ -1966,23 +1966,24 @@ This section provides comprehensive details on all technologies, frameworks, lib
   - Monitoring dashboard
   - Startup script generation
 
-**PM2 Configuration (ecosystem.config.js):**
+**PM2 Configuration (ecosystem.config.json):**
 
-```javascript
-module.exports = {
-  apps: [{
-    name: 'snackbar-api',
-    script: './server.js',
-    instances: 2,
-    exec_mode: 'cluster',
-    env: {
-      NODE_ENV: 'production',
-      PORT: 3000
-    },
-    error_file: './logs/err.log',
-    out_file: './logs/out.log',
-    log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-    merge_logs: true,
+```json
+{
+  "apps": [
+    {
+      "name": "snackbar-api",
+      "script": "./dist/server.js",
+      "instances": 2,
+      "exec_mode": "cluster",
+      "env": {
+        "NODE_ENV": "production",
+        "PORT": 3000
+      },
+      "error_file": "./logs/err.log",
+      "out_file": "./logs/out.log",
+      "log_date_format": "YYYY-MM-DD HH:mm:ss Z",
+      "merge_logs": true,
     max_memory_restart: '1G'
   }]
 };
@@ -2127,13 +2128,13 @@ cd client && npm run dev
 ```json
 {
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js",
-    "test": "jest --coverage",
-    "test:watch": "jest --watch",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
-    "format": "prettier --write \"**/*.{js,json,md}\""
+    "start": "node dist/server.js",
+    "dev": "nodemon --watch src --ext ts,tsx --exec \"ts-node --project tsconfig.json src/server.ts\"",
+    "test": "jest --config jest.config.ts --coverage",
+    "test:watch": "jest --config jest.config.ts --watch",
+    "lint": "eslint src --ext .js,.ts",
+    "lint:fix": "eslint src --ext .js,.ts --fix",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\""
   }
 }
 ```
@@ -2146,11 +2147,11 @@ cd client && npm run dev
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "lint": "eslint src --ext .js,.jsx",
-    "lint:fix": "eslint src --ext .js,.jsx --fix",
-    "format": "prettier --write \"src/**/*.{js,jsx,css}\""
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint \"src/**/*.{js,jsx,ts,tsx}\"",
+    "lint:fix": "eslint \"src/**/*.{js,jsx,ts,tsx}\" --fix",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css}\""
   }
 }
 ```

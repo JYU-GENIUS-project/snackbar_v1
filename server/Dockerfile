@@ -41,7 +41,7 @@ RUN npm ci --omit=dev
 
 # Copy compiled output and runtime config
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/ecosystem.config.js ./ecosystem.config.js
+COPY --from=builder /app/ecosystem.config.json ./ecosystem.config.json
 
 # Create directories for uploads and logs
 RUN mkdir -p uploads logs
@@ -62,4 +62,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:3000/api/health || exit 1
 
 # Start with PM2 runtime
-CMD ["pm2-runtime", "ecosystem.config.js"]
+CMD ["pm2-runtime", "ecosystem.config.json"]

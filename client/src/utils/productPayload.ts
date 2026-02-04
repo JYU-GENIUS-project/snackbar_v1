@@ -99,7 +99,7 @@ const parseMetadata = (value: unknown): Record<string, unknown> => {
   }
   try {
     return JSON.parse(String(value)) as Record<string, unknown>;
-  } catch (error) {
+  } catch {
     throw new Error('Metadata must be valid JSON');
   }
 };

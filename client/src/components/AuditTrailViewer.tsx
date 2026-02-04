@@ -1,5 +1,4 @@
-/// <reference types="react" />
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { ChangeEvent } from 'react';
 
 const parseDate = (value: string): Date | null => {

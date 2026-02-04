@@ -49,7 +49,7 @@ const sanitizeStatusPayload = (input: unknown): OfflineStatusPayload | null => {
         return null;
     }
 
-    const candidate = input as Record<string, any>;
+    const candidate = input as Record<string, unknown>;
     const statusValue = typeof candidate.status === 'string' && candidate.status.trim() ? candidate.status.trim() : 'unknown';
     return {
         status: statusValue,

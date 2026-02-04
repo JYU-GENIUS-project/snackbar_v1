@@ -36,14 +36,18 @@ const formatBytes = (bytes?: number | null) => {
   return `${value.toFixed(value >= 10 || exponent === 0 ? 0 : 1)} ${units[exponent]}`;
 };
 
+const isUuid = (value?: string | null) =>
+  Boolean(typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value));
+
 const ProductMediaManager = forwardRef<HTMLDivElement, ProductMediaManagerProps>(
   ({ productId, token, productName }, ref) => {
     const [status, setStatus] = useState<MediaStatus>({ type: '', message: '' });
+    const mediaEnabled = Boolean(productId && isUuid(productId));
 
     const { data: media = [], isLoading, isFetching } = useProductMedia({
       token,
       productId,
-      enabled: Boolean(productId)
+      enabled: mediaEnabled
     });
     const uploadMutation = useUploadProductMedia(token);
     const markPrimaryMutation = useMarkPrimaryMedia(token);
@@ -102,6 +106,7 @@ const ProductMediaManager = forwardRef<HTMLDivElement, ProductMediaManagerProps>
     };
 
     const pendingAction = uploadMutation.isPending || markPrimaryMutation.isPending || deleteMutation.isPending;
+    const disableMediaActions = pendingAction || !mediaEnabled;
 
     return (
       <section
@@ -117,6 +122,11 @@ const ProductMediaManager = forwardRef<HTMLDivElement, ProductMediaManagerProps>
               Manage product imagery for <strong>{productName}</strong>. The first display variant is used in kiosk
               listings.
             </p>
+            {!mediaEnabled && (
+              <p className="helper" role="status">
+                Media management is available when the product is synced to the API.
+              </p>
+            )}
           </div>
         </div>
 
@@ -132,10 +142,10 @@ const ProductMediaManager = forwardRef<HTMLDivElement, ProductMediaManagerProps>
         <form className="inline" style={{ gap: '0.75rem', alignItems: 'flex-end' }} onSubmit={handleUpload}>
           <div className="form-field" style={{ flexGrow: 1 }}>
             <label htmlFor="product-media-file">Upload new image</label>
-            <input id="product-media-file" name="mediaFile" type="file" accept="image/*" disabled={pendingAction} />
+            <input id="product-media-file" name="mediaFile" type="file" accept="image/*" disabled={disableMediaActions} />
             <span className="helper">JPEG, PNG, or WebP up to 5 MB. Variants generate automatically.</span>
           </div>
-          <button className="button" type="submit" disabled={pendingAction}>
+          <button className="button" type="submit" disabled={disableMediaActions}>
             {uploadMutation.isPending ? 'Uploading…' : 'Upload'}
           </button>
         </form>

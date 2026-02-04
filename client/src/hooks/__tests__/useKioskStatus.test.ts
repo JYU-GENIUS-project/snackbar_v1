@@ -15,6 +15,13 @@ const mockUseQuery = vi.hoisted(() => vi.fn());
 
 let queryData: unknown = null;
 
+type UseQueryParams = {
+    queryFn: ({ signal }: { signal?: AbortSignal }) => Promise<unknown> | unknown;
+    onSuccess?: (data: unknown) => void;
+    enabled?: boolean;
+    [key: string]: unknown;
+};
+
 vi.mock('@tanstack/react-query', () => ({
     useQuery: mockUseQuery
 }));
@@ -36,7 +43,7 @@ describe('useKioskStatus', () => {
     beforeEach(() => {
         mockedReadOfflineProductSnapshot.mockReturnValue(null);
         queryData = null;
-        mockUseQuery.mockImplementation((params: any) => {
+        mockUseQuery.mockImplementation((params: UseQueryParams) => {
             const { queryFn, onSuccess } = params;
             const execute = async () => {
                 const data = await queryFn({ signal: undefined });
@@ -81,7 +88,7 @@ describe('useKioskStatus', () => {
             generatedAt: '2025-05-05T10:00:00.000Z'
         };
 
-        mockedApiRequest.mockResolvedValue(payload as any);
+        mockedApiRequest.mockResolvedValue(payload);
         queryData = payload;
 
         const { result } = renderHook(() => useKioskStatus({ sse: false, refetchInterval: false }));
