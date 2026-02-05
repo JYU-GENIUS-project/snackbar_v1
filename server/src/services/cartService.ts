@@ -140,7 +140,11 @@ const createSession = async (client: DbClient, sessionKey: string): Promise<Cart
         [sessionKey, expiresAt]
     )) as DbQueryResult<CartSessionRow>;
 
-    return result.rows[0];
+    const session = result.rows[0];
+    if (!session) {
+        throw new ApiError(500, 'Failed to create cart session');
+    }
+    return session;
 };
 
 const touchSession = async (client: DbClient, session: CartSessionRow): Promise<CartSessionRow> => {

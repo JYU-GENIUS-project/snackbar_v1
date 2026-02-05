@@ -71,7 +71,7 @@ router.post(
     asyncHandler(async (req, res) => {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
-            throw new ApiError(400, 'Invalid cart payload', errors.array());
+            throw new ApiError(400, 'Invalid cart payload', { errors: errors.array() });
         }
 
         const sessionKey = getSessionKey(req);
@@ -98,7 +98,7 @@ router.delete(
     asyncHandler(async (req, res) => {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
-            throw new ApiError(400, 'Invalid cart payload', errors.array());
+            throw new ApiError(400, 'Invalid cart payload', { errors: errors.array() });
         }
 
         const sessionKey = getSessionKey(req);
@@ -107,6 +107,9 @@ router.delete(
         }
 
         const { productId } = req.params;
+        if (!productId) {
+            throw new ApiError(400, 'productId is required');
+        }
         const cart = (await cartService.removeCartItem(sessionKey, productId)) as CartResponse;
         res.status(200).json({
             success: true,
@@ -121,7 +124,7 @@ router.post(
     asyncHandler(async (req, res) => {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
-            throw new ApiError(400, 'Invalid cart payload', errors.array());
+            throw new ApiError(400, 'Invalid cart payload', { errors: errors.array() });
         }
 
         const sessionKey = getSessionKey(req);
