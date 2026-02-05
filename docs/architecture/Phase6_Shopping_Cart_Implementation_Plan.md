@@ -35,7 +35,7 @@
 - [x] Step 1 – Domain and data model alignment
 - [x] Step 2 – API layer and session persistence
 - [x] Step 3 – Client cart state service
-- [ ] Step 4 – Quantity controls and purchase limits
+- [x] Step 4 – Quantity controls and purchase limits
 - [ ] Step 5 – Totals, subtotals, and currency safety
 - [ ] Step 6 – Remove and clear cart operations
 - [ ] Step 7 – Inactivity timer and auto-clear

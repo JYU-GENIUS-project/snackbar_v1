@@ -473,6 +473,20 @@ const updateQuantityInCart = (
         .filter((item): item is CartItem => Boolean(item));
 };
 
+const parsePurchaseLimitDetails = (details: unknown): { limit?: number } | null => {
+    if (!details || typeof details !== 'object') {
+        return null;
+    }
+
+    const candidate = details as Record<string, unknown>;
+    if (candidate.code !== 'PURCHASE_LIMIT') {
+        return null;
+    }
+
+    const limit = typeof candidate.limit === 'number' ? candidate.limit : Number.parseInt(String(candidate.limit), 10);
+    return Number.isFinite(limit) ? { limit } : { limit: undefined };
+};
+
 const KioskApp = () => {
     const { data, isLoading, isFetching, error, refetch } = useProductFeed({ refetchInterval: 15000, staleTime: 10000 });
     const kioskStatus = useKioskStatus({ refetchInterval: 45000 });
@@ -973,6 +987,10 @@ const KioskApp = () => {
         if (!cartError) {
             return;
         }
+        const limitInfo = parsePurchaseLimitDetails(cartError.details);
+        if (limitInfo?.limit) {
+            setLimitMessage(`Maximum ${limitInfo.limit} of this item per purchase`);
+        }
         setToastMessage(cartError.message || 'Unable to update cart.');
     }, [cartError]);
 
@@ -1214,6 +1232,7 @@ const KioskApp = () => {
                 },
                 target.quantity - 1
             );
+            setLimitMessage('');
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Unable to update cart.';
             setToastMessage(message);
@@ -1223,6 +1242,7 @@ const KioskApp = () => {
     const removeItem = async (productId: string) => {
         try {
             await removeCartItem(productId);
+            setLimitMessage('');
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Unable to remove item.';
             setToastMessage(message);
