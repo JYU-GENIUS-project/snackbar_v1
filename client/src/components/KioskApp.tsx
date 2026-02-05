@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent } from 'react';
 import { useProductFeed, type ProductFeedProduct } from '../hooks/useProductFeed.js';
+import useCart, { type CartItem, type CartProductSnapshot } from '../hooks/useCart.js';
 import useKioskStatus, { type KioskStatusPayload, type InventoryAvailabilityEntry } from '../hooks/useKioskStatus.js';
 import ProductGridSkeleton from './ProductGridSkeleton.js';
 import ProductDetailModal from './ProductDetailModal';
@@ -54,13 +55,6 @@ type NormalizedProduct = {
     available: boolean;
 };
 
-type CartItem = {
-    id: string;
-    name: string;
-    price: number;
-    purchaseLimit: number | null;
-    quantity: number;
-};
 
 type StatusOverlay = {
     active: boolean;
@@ -743,11 +737,18 @@ const KioskApp = () => {
     }, [sortedProducts]);
 
     const [selectedCategory, setSelectedCategory] = useState<string>('All Products');
-    const [cart, setCart] = useState<CartItem[]>([]);
     const [cartOpen, setCartOpen] = useState(false);
     const [checkoutVisible, setCheckoutVisible] = useState(false);
     const [toastMessage, setToastMessage] = useState('');
     const [limitMessage, setLimitMessage] = useState('');
+    const {
+        cart,
+        error: cartError,
+        setItemQuantity,
+        removeItem: removeCartItem,
+        clearCart: clearCartItems,
+        hydrateFromProducts
+    } = useCart();
     const [outOfStockPrompt, setOutOfStockPrompt] = useState<NormalizedProduct | null>(null);
     const [selectedProduct, setSelectedProduct] = useState<NormalizedProduct | null>(null);
     const outOfStockDialogRef = useRef<HTMLDivElement | null>(null);
@@ -969,27 +970,24 @@ const KioskApp = () => {
     }, [toastMessage]);
 
     useEffect(() => {
-        if (products.length === 0) {
-            setCart([]);
+        if (!cartError) {
             return;
         }
-        setCart((current) =>
-            current
-                .map((item) => {
-                    const source = products.find((product) => product.id === item.id);
-                    if (!source) {
-                        return null;
-                    }
-                    return {
-                        ...item,
-                        name: source.name,
-                        price: source.price,
-                        purchaseLimit: source.purchaseLimit
-                    };
-                })
-                .filter((item): item is CartItem => Boolean(item))
-        );
-    }, [products]);
+        setToastMessage(cartError.message || 'Unable to update cart.');
+    }, [cartError]);
+
+    useEffect(() => {
+        if (products.length === 0) {
+            return;
+        }
+        const snapshots: CartProductSnapshot[] = products.map((product) => ({
+            id: product.id,
+            name: product.name,
+            price: product.price,
+            purchaseLimit: product.purchaseLimit
+        }));
+        hydrateFromProducts(snapshots);
+    }, [hydrateFromProducts, products]);
 
     useEffect(() => {
         if (typeof window === 'undefined') {
@@ -1017,42 +1015,32 @@ const KioskApp = () => {
     const cartCount = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart]);
     const cartTotal = useMemo(() => cart.reduce((sum, item) => sum + item.price * item.quantity, 0), [cart]);
 
-    const addProductToCart = (product: NormalizedProduct) => {
-        setCart((current) => {
-            const existing = current.find((item) => item.id === product.id);
-            const limit = product.purchaseLimit ?? null;
-            const currentQuantity = existing?.quantity ?? 0;
-            if (limit && currentQuantity >= limit) {
-                setLimitMessage(`Maximum ${limit} of this item per purchase`);
-                return current;
-            }
-            const nextQuantity = currentQuantity + 1;
-            const showLimitMessage = limit && nextQuantity >= limit;
-            setLimitMessage(showLimitMessage ? `Maximum ${limit} of this item per purchase` : '');
-            setToastMessage('Added to cart');
-            if (existing) {
-                return current.map((item) =>
-                    item.id === product.id
-                        ? {
-                            ...item,
-                            quantity: nextQuantity,
-                            price: product.price,
-                            purchaseLimit: product.purchaseLimit
-                        }
-                        : item
-                );
-            }
-            return [
-                ...current,
+    const addProductToCart = async (product: NormalizedProduct) => {
+        const existing = cart.find((item) => item.id === product.id);
+        const limit = product.purchaseLimit ?? null;
+        const currentQuantity = existing?.quantity ?? 0;
+        if (limit && currentQuantity >= limit) {
+            setLimitMessage(`Maximum ${limit} of this item per purchase`);
+            return;
+        }
+        const nextQuantity = currentQuantity + 1;
+        const showLimitMessage = limit && nextQuantity >= limit;
+        setLimitMessage(showLimitMessage ? `Maximum ${limit} of this item per purchase` : '');
+        try {
+            await setItemQuantity(
                 {
                     id: product.id,
                     name: product.name,
                     price: product.price,
-                    purchaseLimit: product.purchaseLimit,
-                    quantity: 1
-                }
-            ];
-        });
+                    purchaseLimit: product.purchaseLimit
+                },
+                nextQuantity
+            );
+            setToastMessage('Added to cart');
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Unable to update cart.';
+            setToastMessage(message);
+        }
     };
 
     const showOutOfStockPrompt = (
@@ -1185,33 +1173,72 @@ const KioskApp = () => {
         setOutOfStockPrompt(null);
     };
 
-    const incrementQuantity = (productId: string) => {
-        setCart((current) => {
-            const target = current.find((item) => item.id === productId);
-            if (!target) {
-                return current;
-            }
-            const limit = target.purchaseLimit ?? null;
-            if (limit && target.quantity >= limit) {
-                setLimitMessage(`Maximum ${limit} of this item per purchase`);
-                return current;
-            }
-            return updateQuantityInCart(current, productId, (quantity) => quantity + 1);
-        });
+    const incrementQuantity = async (productId: string) => {
+        const target = cart.find((item) => item.id === productId);
+        if (!target) {
+            return;
+        }
+        const limit = target.purchaseLimit ?? null;
+        if (limit && target.quantity >= limit) {
+            setLimitMessage(`Maximum ${limit} of this item per purchase`);
+            return;
+        }
+        try {
+            await setItemQuantity(
+                {
+                    id: target.id,
+                    name: target.name,
+                    price: target.price,
+                    purchaseLimit: target.purchaseLimit
+                },
+                target.quantity + 1
+            );
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Unable to update cart.';
+            setToastMessage(message);
+        }
     };
 
-    const decrementQuantity = (productId: string) => {
-        setCart((current) => updateQuantityInCart(current, productId, (quantity) => quantity - 1));
+    const decrementQuantity = async (productId: string) => {
+        const target = cart.find((item) => item.id === productId);
+        if (!target) {
+            return;
+        }
+        try {
+            await setItemQuantity(
+                {
+                    id: target.id,
+                    name: target.name,
+                    price: target.price,
+                    purchaseLimit: target.purchaseLimit
+                },
+                target.quantity - 1
+            );
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Unable to update cart.';
+            setToastMessage(message);
+        }
     };
 
-    const removeItem = (productId: string) => {
-        setCart((current) => current.filter((item) => item.id !== productId));
+    const removeItem = async (productId: string) => {
+        try {
+            await removeCartItem(productId);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Unable to remove item.';
+            setToastMessage(message);
+        }
     };
 
-    const clearCart = () => {
-        setCart([]);
-        setLimitMessage('');
-        setCheckoutVisible(false);
+    const clearCart = async () => {
+        try {
+            await clearCartItems();
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Unable to clear cart.';
+            setToastMessage(message);
+        } finally {
+            setLimitMessage('');
+            setCheckoutVisible(false);
+        }
     };
 
     const handleCheckout = () => {

@@ -30,6 +30,18 @@
 
 ## Sequential Implementation Plan
 
+## Progress Tracker
+
+- [x] Step 1 – Domain and data model alignment
+- [x] Step 2 – API layer and session persistence
+- [x] Step 3 – Client cart state service
+- [ ] Step 4 – Quantity controls and purchase limits
+- [ ] Step 5 – Totals, subtotals, and currency safety
+- [ ] Step 6 – Remove and clear cart operations
+- [ ] Step 7 – Inactivity timer and auto-clear
+- [ ] Step 8 – Performance and UX hardening
+- [ ] Step 9 – Testing and validation
+
 1. **Domain and Data Model Alignment**
    - Review existing product and session data structures to determine cart persistence strategy.
    - Define cart storage model (e.g., `cart_sessions`, `cart_items`) with session key, product ID, quantity, unit price snapshot, and timestamps.
