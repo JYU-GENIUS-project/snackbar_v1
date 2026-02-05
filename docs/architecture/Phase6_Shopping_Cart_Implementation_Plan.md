@@ -39,7 +39,7 @@
 - [x] Step 5 – Totals, subtotals, and currency safety
 - [x] Step 6 – Remove and clear cart operations
 - [x] Step 7 – Inactivity timer and auto-clear
-- [ ] Step 8 – Performance and UX hardening
+- [x] Step 8 – Performance and UX hardening
 - [ ] Step 9 – Testing and validation
 
 1. **Domain and Data Model Alignment**

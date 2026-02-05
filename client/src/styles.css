@@ -830,11 +830,27 @@ textarea {
   font-size: var(--kiosk-font-size-body);
 }
 
+.cart-item-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.cart-item-image {
+  width: 64px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 8px;
+  background: #e5e7eb;
+  flex-shrink: 0;
+}
+
 .cart-item-info {
   display: flex;
   justify-content: space-between;
   font-weight: 600;
   font-size: var(--kiosk-font-size-body);
+  width: 100%;
 }
 
 .cart-item-controls {

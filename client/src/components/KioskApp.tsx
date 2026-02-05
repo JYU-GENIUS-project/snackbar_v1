@@ -46,6 +46,7 @@ type NormalizedProduct = {
     isOutOfStock: boolean;
     isLowStock: boolean;
     status: string;
+    imageUrl: string | null;
     imageAlt: string;
     description: string;
     allergens: string;
@@ -358,6 +359,7 @@ const normalizeProduct = (product: ProductFeedProduct): NormalizedProduct => {
         isOutOfStock,
         isLowStock,
         status: product.status || 'active',
+        imageUrl: product.primaryMedia?.url || null,
         imageAlt: product.primaryMedia?.alt || product.name || 'Product image',
         description: product.description || metadataDescription || '',
         allergens: typeof product.allergens === 'string' && product.allergens.trim()
@@ -1009,7 +1011,8 @@ const KioskApp = () => {
             id: product.id,
             name: product.name,
             price: product.price,
-            purchaseLimit: product.purchaseLimit
+            purchaseLimit: product.purchaseLimit,
+            imageUrl: product.imageUrl
         }));
         hydrateFromProducts(snapshots);
     }, [hydrateFromProducts, products]);
@@ -1674,9 +1677,23 @@ const KioskApp = () => {
                                 const limitReached = item.purchaseLimit && item.quantity >= item.purchaseLimit;
                                 return (
                                     <div key={item.id} className="cart-item" data-product-name={item.name}>
-                                        <div className="cart-item-info">
-                                            <span className="item-name">{item.name}</span>
-                                            <span className="item-price">{formatPrice(item.price)}</span>
+                                        <div className="cart-item-header">
+                                            <img
+                                                src={item.imageUrl || DEFAULT_PRODUCT_IMAGE}
+                                                alt={item.name}
+                                                className="cart-item-image"
+                                                loading="lazy"
+                                                onError={(event) => {
+                                                    const target = event.currentTarget;
+                                                    if (target.src !== DEFAULT_PRODUCT_IMAGE) {
+                                                        target.src = DEFAULT_PRODUCT_IMAGE;
+                                                    }
+                                                }}
+                                            />
+                                            <div className="cart-item-info">
+                                                <span className="item-name">{item.name}</span>
+                                                <span className="item-price">{formatPrice(item.price)}</span>
+                                            </div>
                                         </div>
                                         <div className="cart-item-controls">
                                             <button

@@ -28,6 +28,7 @@ type CartItemRow = {
     unit_price: number | string;
     quantity: number;
     purchase_limit: number | null;
+    image_url: string | null;
 };
 
 type ProductRow = {
@@ -45,6 +46,7 @@ type CartItem = {
     unitPrice: number;
     quantity: number;
     purchaseLimit: number | null;
+    imageUrl: string | null;
     subtotal: number;
 };
 
@@ -104,6 +106,7 @@ const normalizeCartItems = (rows: CartItemRow[]): CartItem[] => {
             unitPrice,
             quantity,
             purchaseLimit: row.purchase_limit ?? null,
+            imageUrl: row.image_url ?? null,
             subtotal: unitPrice * quantity
         };
     });
@@ -172,10 +175,17 @@ const getOrCreateSession = async (client: DbClient, sessionKey: string): Promise
 
 const fetchCartItems = async (client: DbClient, sessionId: string): Promise<CartItemRow[]> => {
     const result = (await client.query(
-        `SELECT id, product_id, product_name, unit_price, quantity, purchase_limit
+        `SELECT cart_items.id,
+                cart_items.product_id,
+                cart_items.product_name,
+                cart_items.unit_price,
+                cart_items.quantity,
+                cart_items.purchase_limit,
+                products.image_url AS image_url
          FROM cart_items
-         WHERE cart_session_id = $1
-         ORDER BY created_at ASC`,
+         LEFT JOIN products ON products.id = cart_items.product_id
+         WHERE cart_items.cart_session_id = $1
+         ORDER BY cart_items.created_at ASC`,
         [sessionId]
     )) as DbQueryResult<CartItemRow>;
     return result.rows;

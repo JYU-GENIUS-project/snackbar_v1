@@ -10,6 +10,7 @@ type CartApiItem = {
     unitPrice: number | string;
     quantity: number;
     purchaseLimit: number | null;
+    imageUrl?: string | null;
 };
 
 type CartApiResponse = {
@@ -30,6 +31,7 @@ type CartItem = {
     price: number;
     purchaseLimit: number | null;
     quantity: number;
+    imageUrl: string | null;
 };
 
 type CartProductSnapshot = {
@@ -37,6 +39,7 @@ type CartProductSnapshot = {
     name: string;
     price: number;
     purchaseLimit: number | null;
+    imageUrl: string | null;
 };
 
 type UseCartResult = {
@@ -86,7 +89,8 @@ const normalizeCartItems = (items: CartApiItem[]): CartItem[] => {
                 name: item.name,
                 price: parseMoney(item.unitPrice),
                 purchaseLimit: item.purchaseLimit ?? null,
-                quantity: Number(item.quantity || 0)
+                quantity: Number(item.quantity || 0),
+                imageUrl: item.imageUrl ?? null
             };
         })
         .filter((item): item is CartItem => Boolean(item));
@@ -105,7 +109,8 @@ const buildOptimisticCart = (current: CartItem[], product: CartProductSnapshot, 
                     name: product.name,
                     price: product.price,
                     purchaseLimit: product.purchaseLimit,
-                    quantity
+                    quantity,
+                    imageUrl: product.imageUrl ?? item.imageUrl ?? null
                 }
                 : item
         );
@@ -117,7 +122,8 @@ const buildOptimisticCart = (current: CartItem[], product: CartProductSnapshot, 
             name: product.name,
             price: product.price,
             purchaseLimit: product.purchaseLimit,
-            quantity
+            quantity,
+            imageUrl: product.imageUrl ?? null
         }
     ];
 };
@@ -232,7 +238,8 @@ const useCart = (): UseCartResult => {
                     ...item,
                     name: product.name,
                     price: product.price,
-                    purchaseLimit: product.purchaseLimit
+                    purchaseLimit: product.purchaseLimit,
+                    imageUrl: product.imageUrl ?? item.imageUrl ?? null
                 };
             })
         );
