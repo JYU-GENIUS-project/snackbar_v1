@@ -170,7 +170,7 @@ US-023: Add New Product With All Information
     And enters product name "Red Bull"
     And enters price "3.00"
     And uploads product image
-    And selects category "Energy Drinks"
+    And selects category "Cold Drinks"
     And enters allergen information "Caffeine"
     And clicks "Save Product"
     Then the product should be created successfully
@@ -416,7 +416,7 @@ Uploads product image
 
 Selects category "${category}"
     [Documentation]    Selects product category
-    Select From List By Label    id=product-category    ${category}
+    Select From List By Label    id=category-select    ${category}
 
 Enters allergen information "${allergen}"
     [Documentation]    Enters allergen info
@@ -491,7 +491,7 @@ Changes the price from "${old_price}" to "${new_price}"
 
 Updates the category
     [Documentation]    Changes product category
-    Select From List By Index    id=product-category    1
+    Select From List By Index    id=category-select    1
 
 Clicks "Save Changes"
     [Documentation]    Saves product updates
@@ -569,7 +569,7 @@ A product exists that should be discontinued
         Enters product name "Old Product"
         Enters price "1.00"
         Uploads product image
-        Selects category "Energy Drinks"
+        Selects category "Cold Drinks"
         Enters allergen information "Sugar"
         Clicks "Save Product"
         Wait Until Page Contains Element    xpath=//tr[contains(., 'Old Product')]    timeout=10s
@@ -770,10 +770,13 @@ When the admin deletes a product
 Changes inventory quantities
     [Documentation]    Admin adjusts inventory (triggers audit log)
     Click Element    id=inventory-menu
-    Wait For Element And Click    css=.inventory-item:first-child    timeout=5s
-    Input Text    id=quantity-input    25
-    Click Button    id=update-quantity-button
-    Wait Until Page Contains    Inventory updated    timeout=5s
+    Wait Until Element Is Visible    id=inventory-table    timeout=10s
+    Click Element    xpath=//tr[contains(@class, 'inventory-item')][1]//button[contains(., 'Update Stock')]
+    Wait Until Element Is Visible    id=stock-update-dialog    timeout=5s
+    Clear Element Text    id=new-stock-quantity
+    Input Text    id=new-stock-quantity    25
+    Click Button    id=save-stock-button
+    Wait Until Page Contains    Stock updated successfully.    timeout=5s
 
 When the admin changes inventory quantities
     [Documentation]    Alias for changes inventory

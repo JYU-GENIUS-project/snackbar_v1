@@ -1,0 +1,14 @@
+{
+  "name": "snackbar-monorepo",
+  "private": true,
+  "workspaces": [
+    "client",
+    "server",
+    "packages/*"
+  ],
+  "scripts": {
+    "build:types": "npm run build --workspace @snackbar/shared-types",
+    "lint": "npm run lint --workspaces",
+    "test": "npm run test --workspaces"
+  }
+}

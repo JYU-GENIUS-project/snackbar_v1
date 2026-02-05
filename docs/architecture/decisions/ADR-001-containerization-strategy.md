@@ -25,6 +25,7 @@ Key requirements from the SRS that influence this decision:
 4. **SRS Section 16.6.3:** Explicit mention of Docker and Docker Compose for containerization
 
 The development team needs to ensure:
+
 - Consistent environments across development, staging, and production
 - Easy onboarding for new developers
 - Simplified deployment and rollback processes
@@ -143,18 +144,21 @@ We will adopt **Docker** as the containerization platform and **Docker Compose**
 ## Alternatives Considered
 
 ### 1. Traditional Server Deployment (Rejected)
+
 - **Description:** Install all components directly on bare metal or VM
 - **Pros:** No containerization overhead, simpler for single-server deployment
 - **Cons:** Environment inconsistency, difficult rollbacks, manual configuration management
 - **Rejection Reason:** Does not meet scalability and consistency requirements
 
 ### 2. Kubernetes (Deferred)
+
 - **Description:** Use Kubernetes for container orchestration
 - **Pros:** Auto-scaling, self-healing, production-grade orchestration
 - **Cons:** Significant operational complexity, overkill for single-kiosk deployment
 - **Rejection Reason:** Too complex for v1.0; may reconsider for multi-kiosk expansion in v1.2+
 
 ### 3. Serverless/FaaS (Rejected)
+
 - **Description:** Deploy API as serverless functions (AWS Lambda, Google Cloud Functions)
 - **Pros:** Auto-scaling, pay-per-use, minimal infrastructure management
 - **Cons:** Cold start latency issues, vendor lock-in, complex local development
@@ -169,7 +173,7 @@ We will adopt **Docker** as the containerization platform and **Docker Compose**
 1. **`docker-compose.yml`** - Main orchestration file (see C4_Architecture.md Section 4.2)
 2. **`server/Dockerfile`** - API server container definition (see C4_Architecture.md Section 4.3)
 3. **`nginx/nginx.conf`** - Nginx configuration (see C4_Architecture.md Section 4.5)
-4. **`server/ecosystem.config.js`** - PM2 configuration for clustering
+4. **`server/ecosystem.config.json`** - PM2 configuration for clustering
 5. **`.env.example`** - Template for environment variables
 
 ### Commands Reference

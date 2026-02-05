@@ -15,9 +15,9 @@ SSL_DIR="${SCRIPT_DIR}"
 DAYS=365
 KEY_SIZE=2048
 COUNTRY="FI"
-STATE="Central Finland"
+STATE="Central_Finland"
 LOCALITY="Jyvaskyla"
-ORGANIZATION="Snackbar Development"
+ORGANIZATION="Snackbar_Development"
 COMMON_NAME="localhost"
 
 echo "=== Generating Development SSL Certificates ==="
@@ -29,7 +29,7 @@ openssl genrsa -out "${SSL_DIR}/privkey.pem" ${KEY_SIZE}
 
 # Generate certificate signing request
 echo "Generating CSR..."
-openssl req -new \
+MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL="-subj" openssl req -new \
     -key "${SSL_DIR}/privkey.pem" \
     -out "${SSL_DIR}/csr.pem" \
     -subj "/C=${COUNTRY}/ST=${STATE}/L=${LOCALITY}/O=${ORGANIZATION}/CN=${COMMON_NAME}"

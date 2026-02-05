@@ -36,6 +36,7 @@ Open Kiosk Browser
     Maximize Browser Window
     Set Selenium Timeout    ${SELENIUM_TIMEOUT}
     Set Selenium Implicit Wait    ${SELENIUM_IMPLICIT_WAIT}
+    Execute Javascript    try { window.localStorage.setItem('snackbar-force-offline-feed', '1'); } catch (error) {}
     Reset Kiosk Test Controls
     Seed Default Kiosk Products
     Go To    ${KIOSK_URL}
@@ -48,12 +49,14 @@ Reset Kiosk Test Controls
     Apply Kiosk Test Controls    ${reset_payload}
     Execute Javascript    try { window.sessionStorage.removeItem('snackbar-trust-mode-disabled'); } catch (error) {}
     Execute Javascript    try { window.localStorage.removeItem('snackbar-offline-products'); } catch (error) {}
+    Execute Javascript    try { window.localStorage.removeItem('snackbar-force-offline-feed'); } catch (error) {}
 
 Seed Default Kiosk Products
     [Documentation]    Seeds an offline product snapshot so kiosk UI has deterministic data without backend dependencies
     ${timestamp}=    Get Current Timestamp ISO8601
-    ${snapshot_json}=    Set Variable    {"products":[{"id":"product-coca-cola","name":"Coca-Cola","price":2.5,"currency":"EUR","stockQuantity":25,"lowStockThreshold":5,"purchaseLimit":5,"categoryId":"cold-drinks","categoryIds":["cold-drinks"],"categories":[{"id":"cold-drinks","name":"Cold Drinks","isActive":true}],"description":"Classic cola beverage","metadata":{},"primaryMedia":{"url":"","alt":"Coca-Cola"}}],"generatedAt":"${timestamp}","lastUpdatedAt":"${timestamp}","inventoryTrackingEnabled":true,"statusFingerprint":"offline-default","status":null,"source":"offline"}
+    ${snapshot_json}=    Set Variable    {"products":[{"id":"product-red-bull","name":"Red Bull","price":2.99,"currency":"EUR","stockQuantity":0,"lowStockThreshold":5,"purchaseLimit":4,"categoryId":"cold-drinks","categoryIds":["cold-drinks"],"categories":[{"id":"cold-drinks","name":"Cold Drinks","isActive":true}],"description":"Energy drink 250ml can.","metadata":{},"primaryMedia":{"url":"","alt":"Red Bull"}},{"id":"product-coca-cola","name":"Coca-Cola","price":2.5,"currency":"EUR","stockQuantity":25,"lowStockThreshold":5,"purchaseLimit":5,"categoryId":"cold-drinks","categoryIds":["cold-drinks"],"categories":[{"id":"cold-drinks","name":"Cold Drinks","isActive":true}],"description":"Classic cola beverage","metadata":{},"primaryMedia":{"url":"","alt":"Coca-Cola"}}],"generatedAt":"${timestamp}","lastUpdatedAt":"${timestamp}","inventoryTrackingEnabled":true,"statusFingerprint":"offline-default","status":null,"source":"offline"}
     Execute Javascript    window.localStorage.setItem('snackbar-offline-products', '${snapshot_json}');
+    Execute Javascript    window.localStorage.setItem('snackbar-force-offline-feed', '1');
 
 Apply Kiosk Test Controls
     [Arguments]    ${controls}
@@ -67,6 +70,9 @@ Open Admin Browser
     Maximize Browser Window
     Set Selenium Timeout    ${SELENIUM_TIMEOUT}
     Set Selenium Implicit Wait    ${SELENIUM_IMPLICIT_WAIT}
+    Execute Javascript    try { window.sessionStorage.setItem('snackbar-force-mock', '1'); window.localStorage.setItem('snackbar-force-mock', '1'); } catch (error) {}
+    Execute Javascript    try { window.localStorage.setItem('snackbar-force-mock-categories', '1'); window.localStorage.removeItem('snackbar-mock-categories'); } catch (error) {}
+    Go To    ${ADMIN_URL}/?mock=1
 
 Close All Test Browsers
     [Documentation]    Closes all browsers opened during test
@@ -90,6 +96,12 @@ Ensure Admin Login Page Is Visible
     [Documentation]    Guarantees the admin login form can be reached even after a prior session
     ${login_present}=    Run Keyword And Return Status    Page Should Contain Element    id=login-form
     IF    ${login_present}
+        RETURN
+    END
+    ${logout_present}=    Run Keyword And Return Status    Page Should Contain Element    id=logout-button
+    IF    ${logout_present}
+        Click Element    id=logout-button
+        Wait Until Page Contains Element    id=login-form    timeout=10s
         RETURN
     END
     Expire Admin Session Immediately
@@ -119,6 +131,7 @@ Verify Cart Total
 Add Product To Cart
     [Arguments]    ${product_name}
     [Documentation]    Adds a product to the shopping cart
+    Ensure Cart Panel Closed
     Click Element    xpath=//div[@data-product-name='${product_name}']//button[contains(@class, 'add-to-cart')]
     Wait Until Page Contains    Added to cart    timeout=5s
 

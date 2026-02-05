@@ -2,15 +2,17 @@ module.exports = {
     root: true,
     env: {
         browser: true,
-        es2022: true,
+        es2024: true,
         node: true
     },
     extends: [
         'eslint:recommended',
+        'plugin:@typescript-eslint/recommended',
         'plugin:react/recommended',
         'plugin:react-hooks/recommended',
         'plugin:jsx-a11y/strict'
     ],
+    parser: '@typescript-eslint/parser',
     parserOptions: {
         ecmaVersion: 2024,
         sourceType: 'module',
@@ -23,13 +25,14 @@ module.exports = {
             version: 'detect'
         }
     },
-    plugins: ['react', 'react-hooks', 'jsx-a11y'],
+    plugins: ['@typescript-eslint', 'react', 'react-hooks', 'jsx-a11y'],
     rules: {
         'react/react-in-jsx-scope': 'off',
         'react/prop-types': 'off',
         'jsx-a11y/no-autofocus': 'off',
         'jsx-a11y/click-events-have-key-events': 'off',
-        'jsx-a11y/no-static-element-interactions': 'off'
+        'jsx-a11y/no-static-element-interactions': 'off',
+        '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }]
     },
     ignorePatterns: ['dist/', 'node_modules/']
 };

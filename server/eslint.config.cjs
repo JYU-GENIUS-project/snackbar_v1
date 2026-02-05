@@ -1,11 +1,36 @@
 const eslintJs = require('@eslint/js');
 const globals = require('globals');
+const tseslint = require('@typescript-eslint/eslint-plugin');
+const tsParser = require('@typescript-eslint/parser');
 
 module.exports = [
     {
         ignores: ['coverage/**', 'node_modules/**']
     },
     eslintJs.configs.recommended,
+    {
+        files: ['**/*.ts', '**/*.tsx'],
+        languageOptions: {
+            parser: tsParser,
+            parserOptions: {
+                project: './tsconfig.eslint.json',
+                tsconfigRootDir: __dirname
+            },
+            ecmaVersion: 2024,
+            sourceType: 'module',
+            globals: {
+                ...globals.node,
+                ...globals.jest
+            }
+        },
+        plugins: {
+            '@typescript-eslint': tseslint
+        },
+        rules: {
+            ...tseslint.configs['recommended-type-checked'].rules,
+            '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }]
+        }
+    },
     {
         files: ['**/*.js'],
         languageOptions: {

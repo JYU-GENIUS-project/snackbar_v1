@@ -17,12 +17,12 @@ US-029: Create Custom Product Categories
     [Setup]    Admin Login
     Given the admin is on the category management page
     When the admin clicks "Create New Category"
-    And enters category name "Energy Drinks"
+    And enters category name "Energy Drinks Plus"
     And clicks "Save Category"
     Then the category should be created successfully
-    And the category should appear in the category list    Energy Drinks
+    And the category should appear in the category list    Energy Drinks Plus
     And a success message should be displayed
-    And the category should be available for product assignment    Energy Drinks
+    And the category should be available for product assignment    Energy Drinks Plus
 
 
 US-029-Edge: Category Name Validation

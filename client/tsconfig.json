@@ -1,0 +1,32 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "allowJs": true,
+    "checkJs": false,
+    "types": [
+      "vite/client",
+      "react",
+      "react-dom"
+    ],
+    "baseUrl": ".",
+    "paths": {
+      "@snackbar/shared-types": [
+        "../packages/shared-types/src"
+      ],
+      "@snackbar/shared-types/*": [
+        "../packages/shared-types/src/*"
+      ]
+    }
+  },
+  "include": [
+    "src",
+    "vite.config.ts",
+    "vitest.config.ts"
+  ],
+  "references": [
+    {
+      "path": "../packages/shared-types"
+    }
+  ]
+}

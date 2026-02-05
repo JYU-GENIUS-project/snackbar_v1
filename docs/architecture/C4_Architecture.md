@@ -367,30 +367,32 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:3000/api/health || exit 1
 
 # Start with PM2
-CMD ["pm2-runtime", "ecosystem.config.js"]
+CMD ["pm2-runtime", "ecosystem.config.json"]
 ```
 
 ### 4.4 PM2 Ecosystem Configuration
 
-```javascript
-// server/ecosystem.config.js
-module.exports = {
-  apps: [{
-    name: 'snackbar-api',
-    script: './server.js',
-    instances: 2,
-    exec_mode: 'cluster',
-    env: {
-      NODE_ENV: 'production',
-      PORT: 3000
-    },
-    error_file: './logs/err.log',
-    out_file: './logs/out.log',
-    log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-    merge_logs: true,
-    max_memory_restart: '1G'
-  }]
-};
+```json
+// server/ecosystem.config.json
+{
+  "apps": [
+    {
+      "name": "snackbar-api",
+      "script": "./dist/server.js",
+      "instances": 2,
+      "exec_mode": "cluster",
+      "env": {
+        "NODE_ENV": "production",
+        "PORT": 3000
+      },
+      "error_file": "./logs/err.log",
+      "out_file": "./logs/out.log",
+      "log_date_format": "YYYY-MM-DD HH:mm:ss Z",
+      "merge_logs": true,
+      "max_memory_restart": "1G"
+    }
+  ]
+}
 ```
 
 ### 4.5 Nginx Configuration

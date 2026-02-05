@@ -1,6 +1,6 @@
 # Client – Snackbar Kiosk Frontend
 
-React front-end for the Snackbar kiosk experience. The kiosk consumes the public feed and status APIs exposed by the Express server and renders product browsing, availability overlays, and trust-mode messaging.
+React front-end for the Snackbar kiosk experience. The kiosk consumes the public feed and status APIs exposed by the Express server and renders product browsing, availability overlays, and trust-mode messaging. The client codebase is TypeScript-first.
 
 ## Getting Started
 
@@ -9,7 +9,7 @@ npm install
 npm run dev
 ```
 
-The dev server runs on <http://localhost:3000> by default. The kiosk expects the API gateway at `/api`; the Vite dev proxy in `vite.config.js` forwards requests to the backend container during development.
+The dev server runs on <http://localhost:3000> by default. The kiosk expects the API gateway at `/api`; the Vite dev proxy in `vite.config.ts` forwards requests to the backend container during development.
 
 ### Available Scripts
 

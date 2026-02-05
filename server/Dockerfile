@@ -21,6 +21,9 @@ RUN npm ci
 # Copy source code
 COPY . .
 
+# Build TypeScript output
+RUN npm run build
+
 # -----------------------------------------------------------------------------
 # Stage 2: Production
 # -----------------------------------------------------------------------------
@@ -32,9 +35,13 @@ WORKDIR /app
 RUN npm install -g pm2 && \
     apk add --no-cache curl
 
-# Copy node_modules and source from builder
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app .
+# Install production dependencies
+COPY package*.json ./
+RUN npm ci --omit=dev
+
+# Copy compiled output and runtime config
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/ecosystem.config.json ./ecosystem.config.json
 
 # Create directories for uploads and logs
 RUN mkdir -p uploads logs
@@ -52,7 +59,7 @@ EXPOSE 3000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:3000/api/health || exit 1
+    CMD curl -f http://localhost:3000/api/health || exit 1
 
 # Start with PM2 runtime
-CMD ["pm2-runtime", "ecosystem.config.js"]
+CMD ["pm2-runtime", "ecosystem.config.json"]
