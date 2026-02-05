@@ -37,6 +37,7 @@ This repository contains requirements engineering documentation and automated ac
 
 - **Backend**: Node.js 24.11 LTS with Express.js 5.1
 - **Frontend**: React 19.2
+- **Language**: TypeScript 5.4 (client + server)
 - **Database**: PostgreSQL 18
 - **Payment**: MobilePay API integration
 - **Testing**: Robot Framework with SeleniumLibrary
