@@ -306,6 +306,8 @@ const formatRelativeTimestamp = (isoValue?: string | null): string | null => {
 };
 
 const formatPrice = (value: number | string | null | undefined) => `${Number(value ?? 0).toFixed(2)}€`;
+const toCents = (value: number | string | null | undefined) => Math.round(Number(value ?? 0) * 100);
+const formatPriceFromCents = (cents: number) => `${(cents / 100).toFixed(2)}€`;
 const DEFAULT_PRODUCT_IMAGE = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300"><rect width="400" height="300" fill="%23e5e7eb"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="%236b7280" font-size="28">No Image</text></svg>';
 const REQUIRED_CUSTOMER_FILTERS = [
     { name: 'Hot Drinks', id: 'virtual-hot-drinks' }
@@ -1031,7 +1033,10 @@ const KioskApp = () => {
     }, [refetch]);
 
     const cartCount = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart]);
-    const cartTotal = useMemo(() => cart.reduce((sum, item) => sum + item.price * item.quantity, 0), [cart]);
+    const cartTotalCents = useMemo(
+        () => cart.reduce((sum, item) => sum + toCents(item.price) * item.quantity, 0),
+        [cart]
+    );
 
     const addProductToCart = async (product: NormalizedProduct) => {
         const existing = cart.find((item) => item.id === product.id);
@@ -1278,7 +1283,7 @@ const KioskApp = () => {
         setToastMessage('');
         logKioskEvent('kiosk.checkout_started', {
             cartSize: cart.length,
-            totalEuros: Number.isFinite(cartTotal) ? Number(cartTotal.toFixed(2)) : 0
+            totalEuros: Number.isFinite(cartTotalCents) ? Number((cartTotalCents / 100).toFixed(2)) : 0
         });
     };
 
@@ -1612,7 +1617,7 @@ const KioskApp = () => {
                                             >
                                                 +
                                             </button>
-                                            <span className="item-subtotal">{formatPrice(item.price * item.quantity)}</span>
+                                            <span className="item-subtotal">{formatPriceFromCents(toCents(item.price) * item.quantity)}</span>
                                             <button
                                                 type="button"
                                                 className="remove-item-button remove-button"
@@ -1629,7 +1634,7 @@ const KioskApp = () => {
                         </div>
                         <div className="cart-footer">
                             <div id="cart-total" className="cart-total">
-                                Total: {formatPrice(cartTotal)}
+                                Total: {formatPriceFromCents(cartTotalCents)}
                             </div>
                             <button
                                 id="checkout-button"
@@ -1733,7 +1738,7 @@ const KioskApp = () => {
                         />
                         <div className="checkout-summary">
                             <span className="checkout-total-label">Total due</span>
-                            <span className="checkout-total-amount">{formatPrice(cartTotal)}</span>
+                            <span className="checkout-total-amount">{formatPriceFromCents(cartTotalCents)}</span>
                         </div>
                         <div className="checkout-actions">
                             <button

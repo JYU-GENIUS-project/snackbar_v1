@@ -36,7 +36,7 @@
 - [x] Step 2 – API layer and session persistence
 - [x] Step 3 – Client cart state service
 - [x] Step 4 – Quantity controls and purchase limits
-- [ ] Step 5 – Totals, subtotals, and currency safety
+- [x] Step 5 – Totals, subtotals, and currency safety
 - [ ] Step 6 – Remove and clear cart operations
 - [ ] Step 7 – Inactivity timer and auto-clear
 - [ ] Step 8 – Performance and UX hardening
