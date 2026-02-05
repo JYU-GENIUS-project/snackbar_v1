@@ -40,7 +40,7 @@
 - [x] Step 6 – Remove and clear cart operations
 - [x] Step 7 – Inactivity timer and auto-clear
 - [x] Step 8 – Performance and UX hardening
-- [ ] Step 9 – Testing and validation
+- [x] Step 9 – Testing and validation
 
 1. **Domain and Data Model Alignment**
    - Review existing product and session data structures to determine cart persistence strategy.
