@@ -309,6 +309,8 @@ const formatPrice = (value: number | string | null | undefined) => `${Number(val
 const toCents = (value: number | string | null | undefined) => Math.round(Number(value ?? 0) * 100);
 const formatPriceFromCents = (cents: number) => `${(cents / 100).toFixed(2)}€`;
 const DEFAULT_PRODUCT_IMAGE = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300"><rect width="400" height="300" fill="%23e5e7eb"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="%236b7280" font-size="28">No Image</text></svg>';
+const CART_TIMEOUT_MS = 5 * 60 * 1000;
+const CART_WARNING_MS = 30 * 1000;
 const REQUIRED_CUSTOMER_FILTERS = [
     { name: 'Hot Drinks', id: 'virtual-hot-drinks' }
 ];
@@ -757,6 +759,9 @@ const KioskApp = () => {
     const [checkoutVisible, setCheckoutVisible] = useState(false);
     const [toastMessage, setToastMessage] = useState('');
     const [limitMessage, setLimitMessage] = useState('');
+    const [cartTimeoutWarning, setCartTimeoutWarning] = useState(false);
+    const cartTimeoutRef = useRef<number | null>(null);
+    const cartWarningRef = useRef<number | null>(null);
     const {
         cart,
         error: cartError,
@@ -1269,8 +1274,67 @@ const KioskApp = () => {
         } finally {
             setLimitMessage('');
             setCheckoutVisible(false);
+            setCartTimeoutWarning(false);
         }
     };
+
+    const resetCartTimeout = useCallback(() => {
+        if (cartTimeoutRef.current) {
+            window.clearTimeout(cartTimeoutRef.current);
+        }
+        if (cartWarningRef.current) {
+            window.clearTimeout(cartWarningRef.current);
+        }
+        setCartTimeoutWarning(false);
+
+        if (!hasCartItems) {
+            return;
+        }
+
+        cartWarningRef.current = window.setTimeout(() => {
+            setCartTimeoutWarning(true);
+        }, CART_TIMEOUT_MS - CART_WARNING_MS);
+
+        cartTimeoutRef.current = window.setTimeout(() => {
+            logKioskEvent('kiosk.cart_timeout', { cartSize: cart.length });
+            void clearCart();
+            setCartOpen(false);
+            setToastMessage('Cart cleared due to inactivity.');
+        }, CART_TIMEOUT_MS);
+    }, [cart.length, clearCart, hasCartItems]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') {
+            return undefined;
+        }
+
+        if (!hasCartItems) {
+            if (cartTimeoutRef.current) {
+                window.clearTimeout(cartTimeoutRef.current);
+            }
+            if (cartWarningRef.current) {
+                window.clearTimeout(cartWarningRef.current);
+            }
+            setCartTimeoutWarning(false);
+            return undefined;
+        }
+
+        resetCartTimeout();
+
+        const handleActivity = () => {
+            resetCartTimeout();
+        };
+
+        window.addEventListener('pointerdown', handleActivity);
+        window.addEventListener('keydown', handleActivity);
+        window.addEventListener('scroll', handleActivity, { passive: true });
+
+        return () => {
+            window.removeEventListener('pointerdown', handleActivity);
+            window.removeEventListener('keydown', handleActivity);
+            window.removeEventListener('scroll', handleActivity);
+        };
+    }, [hasCartItems, resetCartTimeout]);
 
     const handleCheckout = () => {
         if (!hasCartItems) {
@@ -1374,6 +1438,20 @@ const KioskApp = () => {
             {limitMessage && (
                 <div id="purchase-limit-message" className="kiosk-limit-message" role="alert">
                     {limitMessage}
+                </div>
+            )}
+
+            {cartTimeoutWarning && (
+                <div id="cart-timeout-warning" className="kiosk-warning-banner" role="status" aria-live="polite">
+                    Cart will clear in 30 seconds due to inactivity.
+                    <button
+                        type="button"
+                        className="button tertiary"
+                        style={{ marginLeft: '1rem' }}
+                        onClick={() => resetCartTimeout()}
+                    >
+                        Dismiss
+                    </button>
                 </div>
             )}
 

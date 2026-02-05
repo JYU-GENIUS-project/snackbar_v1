@@ -38,7 +38,7 @@
 - [x] Step 4 – Quantity controls and purchase limits
 - [x] Step 5 – Totals, subtotals, and currency safety
 - [x] Step 6 – Remove and clear cart operations
-- [ ] Step 7 – Inactivity timer and auto-clear
+- [x] Step 7 – Inactivity timer and auto-clear
 - [ ] Step 8 – Performance and UX hardening
 - [ ] Step 9 – Testing and validation
 
