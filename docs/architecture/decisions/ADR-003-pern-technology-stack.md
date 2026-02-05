@@ -26,8 +26,8 @@ Key requirements from the SRS influencing this decision:
 
 ### Team Considerations
 
-- Development team familiar with JavaScript/TypeScript ecosystem
-- Single codebase language (JavaScript) reduces context switching
+- Development team familiar with the JavaScript/TypeScript ecosystem
+- Single codebase language (TypeScript) reduces context switching
 - Rich ecosystem of npm packages for common functionality
 - Strong community support and documentation
 
@@ -44,7 +44,7 @@ We will adopt the **PERN stack** as the primary technology stack:
 
 ### Stack Components and Versions
 
-#### Backend (Node.js + Express.js)
+#### Backend (Node.js + Express.js + TypeScript)
 
 | Component | Version | Purpose |
 |-----------|---------|---------|
@@ -61,7 +61,7 @@ We will adopt the **PERN stack** as the primary technology stack:
 | **compression** | 1.7.x | Response compression |
 | **sharp** | 0.33.x | Image processing (resize, compress, WebP) |
 
-#### Frontend (React)
+#### Frontend (React + TypeScript)
 
 | Component | Version | Purpose |
 |-----------|---------|---------|
@@ -106,6 +106,7 @@ We will adopt the **PERN stack** as the primary technology stack:
 | **Jest** | 29.x | Unit and integration testing |
 | **Supertest** | 6.3.x | API endpoint testing |
 | **React Testing Library** | 14.x | React component testing |
+| **TypeScript** | 5.4.x | Static typing for client and server |
 
 #### Process Management and Deployment
 
@@ -116,16 +117,16 @@ We will adopt the **PERN stack** as the primary technology stack:
 | **Docker** | 24.x | Containerization |
 | **Docker Compose** | 2.x | Container orchestration |
 
-### Optional but Recommended: TypeScript
+### TypeScript Standard
 
-**TypeScript 5.3.x** is recommended for:
+**TypeScript 5.4.x** is the standard for this codebase:
 
-- Static type checking
-- Better IDE support and autocomplete
-- Catch errors at compile time
-- Self-documenting code
+- Static type checking across client and server
+- Stronger IDE support and autocomplete
+- Earlier error detection at compile time
+- Self-documenting interfaces and DTOs
 
-Type definitions needed:
+Type definitions required:
 
 - `@types/node`
 - `@types/express`
