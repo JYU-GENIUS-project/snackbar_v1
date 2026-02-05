@@ -1248,6 +1248,9 @@ const KioskApp = () => {
         try {
             await removeCartItem(productId);
             setLimitMessage('');
+            logKioskEvent('kiosk.cart_item_removed', {
+                productId
+            });
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Unable to remove item.';
             setToastMessage(message);
@@ -1257,6 +1260,9 @@ const KioskApp = () => {
     const clearCart = async () => {
         try {
             await clearCartItems();
+            logKioskEvent('kiosk.cart_cleared', {
+                cartSize: cart.length
+            });
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Unable to clear cart.';
             setToastMessage(message);
