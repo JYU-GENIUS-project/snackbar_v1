@@ -23,9 +23,9 @@ if (!rootElement) {
 
 const Devtools: ComponentType | null = import.meta.env.DEV
   ? lazy(async () => {
-      const module = await import('@tanstack/react-query-devtools');
-      return { default: module.ReactQueryDevtools };
-    })
+    const module = await import('@tanstack/react-query-devtools');
+    return { default: module.ReactQueryDevtools };
+  })
   : null;
 
 ReactDOM.createRoot(rootElement).render(
