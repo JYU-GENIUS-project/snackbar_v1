@@ -5,7 +5,7 @@ Resource         ../resources/common.robot
 Suite Setup      Open Kiosk Browser
 Suite Teardown   Close All Test Browsers
 Test Setup       Setup Cart Test
-Test Teardown    Clear Shopping Cart
+Test Teardown    Run Keywords    Clear Shopping Cart    AND    Clear Cart Timeout Test Controls
 Test Tags        customer    shopping-cart    high-priority
 
 
@@ -77,6 +77,7 @@ US-010: Automatic Cart Clearing After 5 Minutes Inactivity
     ...                next person if I walk away.
     [Tags]    US-010    timeout    auto-clear    slow
     
+    Configure Cart Timeout For Testing    5000    2000
     Given the cart contains items
     And the customer has been inactive
     When 5 minutes pass with no interaction
@@ -89,6 +90,7 @@ US-010-Edge: Timer Reset On Interaction
     [Documentation]    Edge case: Inactivity timer resets with any interaction
     [Tags]    US-010    edge-case    timer-reset
     
+    Configure Cart Timeout For Testing    12000    4000
     Given the cart contains items
     And 4 minutes and 50 seconds have passed
     When the customer scrolls the product grid
@@ -102,6 +104,7 @@ US-010-Boundary: Warning Before Timeout
     [Documentation]    Optional: Warning 30 seconds before timeout
     [Tags]    US-010    optional-feature    countdown-warning
     
+    Configure Cart Timeout For Testing    8000    2000
     Given the cart contains items
     When 4 minutes and 30 seconds of inactivity pass
     Then a warning message MAY be displayed
@@ -112,9 +115,43 @@ US-010-Boundary: Warning Before Timeout
 *** Keywords ***
 Setup Cart Test
     [Documentation]    Sets up test by navigating to kiosk and clearing cart
+    Clear Cart Timeout Test Controls
     Go To    ${KIOSK_URL}
     Wait For Page Load Complete
     Clear Shopping Cart If Not Empty
+
+Configure Cart Timeout For Testing
+    [Arguments]    ${timeout_ms}=5000    ${warning_lead_ms}=2000
+    ${timeout_value}=    Convert To Integer    ${timeout_ms}
+    ${warning_value}=    Convert To Integer    ${warning_lead_ms}
+    &{controls}=    Create Dictionary    cartTimeoutMs=${timeout_value}    cartWarningLeadMs=${warning_value}
+    Wait Until Keyword Succeeds    5s    0.1s    Kiosk Test Control Helper Is Ready
+    Apply Kiosk Test Controls    ${controls}
+    Wait Until Keyword Succeeds    3s    0.1s    Cart Timeout Override Applied    ${timeout_ms}    ${warning_lead_ms}
+
+Clear Cart Timeout Test Controls
+    [Documentation]    Removes cart timeout overrides without resetting offline data
+    &{controls}=    Create Dictionary    cartTimeoutMs=${NONE}    cartWarningLeadMs=${NONE}
+    Apply Kiosk Test Controls    ${controls}
+
+Kiosk Test Control Helper Is Ready
+    ${helper_ready}=    Execute Javascript    return Boolean(window.snackbarApplyTestControls);
+    Should Be True    ${helper_ready}
+
+Cart Timeout Override Applied
+    [Arguments]    ${expected_timeout}    ${expected_warning}
+    ${expected_timeout_int}=    Convert To Integer    ${expected_timeout}
+    ${expected_warning_int}=    Convert To Integer    ${expected_warning}
+    ${state}=    Execute Javascript    return window.snackbarCurrentTestControls || null;
+    Should Not Be Equal    ${state}    ${NONE}
+    ${timeout}=    Get From Dictionary    ${state}    cartTimeoutMs
+    ${warning}=    Get From Dictionary    ${state}    cartWarningLeadMs
+    Should Be Equal As Integers    ${timeout}    ${expected_timeout_int}
+    ${clamped_warning}=    Evaluate    min(${expected_warning_int}, ${expected_timeout_int})
+    Should Be Equal As Integers    ${warning}    ${clamped_warning}
+    ${stored}=    Execute Javascript    return window.localStorage.getItem('snackbar-test-controls');
+    Log    Persisted test controls ${stored}
+    Log    Cart timeout controls ${state}
 
 The customer adds "${product_name}" to the cart
     [Documentation]    Adds specified product to cart
@@ -131,14 +168,28 @@ All items should be visible in the cart
     ${cart_items}=    Get WebElements    css=.cart-item
     ${count}=    Get Length    ${cart_items}
     Should Be True    ${count} > 0
+    ${item_names}=    Get WebElements    css=.cart-item .item-name
+    ${item_prices}=    Get WebElements    css=.cart-item .item-price
+    Length Should Be    ${item_names}    ${count}
+    Length Should Be    ${item_prices}    ${count}
 
 Each item should show name and price
     [Documentation]    Verifies each cart item shows required info
-    ${cart_items}=    Get WebElements    css=.cart-item
-    FOR    ${item}    IN    @{cart_items}
-        Element Should Be Visible    ${item}/descendant::*[@class='item-name']
-        Element Should Be Visible    ${item}/descendant::*[@class='item-price']
+    ${item_names}=    Get WebElements    css=.cart-item .item-name
+    ${item_prices}=    Get WebElements    css=.cart-item .item-price
+    ${name_count}=    Get Length    ${item_names}
+    ${price_count}=    Get Length    ${item_prices}
+    Should Be True    ${name_count} > 0
+    Should Be Equal As Integers    ${name_count}    ${price_count}
+    FOR    ${name_element}    IN    @{item_names}
+        ${name_text}=    Get Text    ${name_element}
+        Should Not Be Empty    ${name_text}
     END
+    FOR    ${price_element}    IN    @{item_prices}
+        ${price_text}=    Get Text    ${price_element}
+        Should Match Regexp    ${price_text}    ^\\d+\.\\d{2}€$
+    END
+    Ensure Cart Panel Closed
 
 The cart is empty
     [Documentation]    Verifies cart starts empty
@@ -170,7 +221,7 @@ The total should update immediately after each addition
     [Documentation]    Sets up cart with product at specific quantity
     Add Product To Cart    ${product_name}
     ${current_qty}=    Get Product Quantity In Cart    ${product_name}
-    WHILE    ${current_qty} < ${quantity}
+    WHILE    $current_qty < $quantity
         Click Plus Button For Product    ${product_name}
         ${current_qty}=    Evaluate    ${current_qty} + 1
     END
@@ -222,13 +273,15 @@ The cart has ${expected_count} items
 
 The customer clicks remove button for "${product_name}"
     [Documentation]    Clicks remove button for specific product
+    Ensure Cart Panel Closed
     Click Element    id=cart-icon
     Wait Until Element Is Visible    id=cart-items    timeout=5s
-    Click Element    xpath=//div[@data-product-name='${product_name}']//button[@class='remove-button']
+    Click Element    xpath=//div[@data-product-name='${product_name}']//button[contains(@class, 'remove-button')]
 
 "${product_name}" should be removed from the cart
     [Documentation]    Verifies product no longer in cart
-    Page Should Not Contain Element    xpath=//div[@data-product-name='${product_name}']
+    Wait Until Page Does Not Contain Element    xpath=//div[@id='cart-items']//div[@data-product-name='${product_name}']    timeout=5s
+    Ensure Cart Panel Closed
 
 The cart total should reflect the removal
     [Documentation]    Verifies total updated after removal
@@ -264,11 +317,7 @@ The customer has been inactive
 
 The cart should be automatically cleared
     [Documentation]    Verifies cart was cleared automatically
-    ${badge}=    Run Keyword And Return Status    Element Should Be Visible    id=cart-badge
-    IF    ${badge}
-        ${count}=    Get Text    id=cart-badge
-        Should Be Equal    ${count}    0
-    END
+    Wait Until Keyword Succeeds    8s    0.5s    Verify Cart Item Count    0
 
 The screen should return to the home screen
     [Documentation]    Verifies screen returned to home
@@ -342,37 +391,45 @@ The user should be able to dismiss or interact to reset
 Get Product Quantity In Cart
     [Arguments]    ${product_name}
     [Documentation]    Returns current quantity of product in cart
+    Ensure Cart Panel Closed
     Click Element    id=cart-icon
     Wait Until Element Is Visible    id=cart-items    timeout=5s
     ${qty_element}=    Get WebElement    
-    ...    xpath=//div[@data-product-name='${product_name}']//span[@class='quantity-value']
+    ...    xpath=//div[@data-product-name='${product_name}']//span[contains(@class, 'quantity-value')]
     ${qty}=    Get Text    ${qty_element}
     Press Keys    None    ESCAPE
+    Ensure Cart Panel Closed
     RETURN    ${qty}
 
 Get Product Subtotal In Cart
     [Arguments]    ${product_name}
     [Documentation]    Returns subtotal for product in cart
+    Ensure Cart Panel Closed
     Click Element    id=cart-icon
     Wait Until Element Is Visible    id=cart-items    timeout=5s
     ${subtotal_element}=    Get WebElement    
-    ...    xpath=//div[@data-product-name='${product_name}']//span[@class='item-subtotal']
+    ...    xpath=//div[@data-product-name='${product_name}']//span[contains(@class, 'item-subtotal')]
     ${subtotal}=    Get Text    ${subtotal_element}
     Press Keys    None    ESCAPE
+    Ensure Cart Panel Closed
     RETURN    ${subtotal}
 
 Click Plus Button For Product
     [Arguments]    ${product_name}
     [Documentation]    Clicks plus button for specified product
+    Ensure Cart Panel Closed
     Click Element    id=cart-icon
     Wait Until Element Is Visible    id=cart-items    timeout=5s
-    Click Element    xpath=//div[@data-product-name='${product_name}']//button[@class='quantity-plus-button']
+    Click Element    xpath=//div[@data-product-name='${product_name}']//button[contains(@class, 'quantity-plus-button')]
     Sleep    0.5s
+    Ensure Cart Panel Closed
 
 Click Minus Button For Product
     [Arguments]    ${product_name}
     [Documentation]    Clicks minus button for specified product
+    Ensure Cart Panel Closed
     Click Element    id=cart-icon
     Wait Until Element Is Visible    id=cart-items    timeout=5s
-    Click Element    xpath=//div[@data-product-name='${product_name}']//button[@class='quantity-minus-button']
+    Click Element    xpath=//div[@data-product-name='${product_name}']//button[contains(@class, 'quantity-minus-button')]
     Sleep    0.5s
+    Ensure Cart Panel Closed

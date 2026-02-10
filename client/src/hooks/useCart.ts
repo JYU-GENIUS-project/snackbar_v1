@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { apiRequest, type ApiError } from '../services/apiClient.js';
 
 const CART_SESSION_STORAGE_KEY = 'snackbar-kiosk-session';
+const OFFLINE_FLAG_STORAGE_KEY = 'snackbar-force-offline-feed';
+const OFFLINE_CART_STORAGE_PREFIX = 'snackbar-offline-cart:';
 
 type CartApiItem = {
     id?: string;
@@ -40,6 +42,94 @@ type CartProductSnapshot = {
     price: number;
     purchaseLimit: number | null;
     imageUrl: string | null;
+};
+
+const offlineCartStorageKey = (sessionKey: string): string => `${OFFLINE_CART_STORAGE_PREFIX}${sessionKey}`;
+
+const isOfflineModeEnabled = (): boolean => {
+    if (typeof window === 'undefined') {
+        return false;
+    }
+    if (window.localStorage.getItem(OFFLINE_FLAG_STORAGE_KEY) === '1') {
+        return true;
+    }
+    if (typeof navigator !== 'undefined' && typeof navigator.onLine === 'boolean' && navigator.onLine === false) {
+        return true;
+    }
+    return false;
+};
+
+const readOfflineCartItems = (sessionKey: string): CartItem[] => {
+    if (typeof window === 'undefined') {
+        return [];
+    }
+    try {
+        const raw = window.localStorage.getItem(offlineCartStorageKey(sessionKey));
+        if (!raw) {
+            return [];
+        }
+        const parsed = JSON.parse(raw) as Array<Record<string, unknown>> | null;
+        if (!Array.isArray(parsed)) {
+            return [];
+        }
+        return parsed
+            .map((entry) => {
+                if (!entry || typeof entry !== 'object') {
+                    return null;
+                }
+                const id = typeof entry.id === 'string' && entry.id ? entry.id : null;
+                const name = typeof entry.name === 'string' && entry.name ? entry.name : null;
+                if (!id || !name) {
+                    return null;
+                }
+                const quantity = Number(entry.quantity ?? 0);
+                if (!Number.isFinite(quantity) || quantity < 0) {
+                    return null;
+                }
+                const purchaseLimitRaw = entry.purchaseLimit;
+                const purchaseLimit =
+                    purchaseLimitRaw === null || purchaseLimitRaw === undefined
+                        ? null
+                        : Number.isFinite(Number(purchaseLimitRaw))
+                            ? Number(purchaseLimitRaw)
+                            : null;
+                const price = parseMoney(entry.price as number | string);
+                const imageUrl = typeof entry.imageUrl === 'string' ? entry.imageUrl : null;
+                return {
+                    id,
+                    name,
+                    price,
+                    purchaseLimit,
+                    quantity,
+                    imageUrl
+                } satisfies CartItem;
+            })
+            .filter((item): item is CartItem => Boolean(item));
+    } catch {
+        return [];
+    }
+};
+
+const persistOfflineCartItems = (sessionKey: string, items: CartItem[]): void => {
+    if (typeof window === 'undefined') {
+        return;
+    }
+    try {
+        window.localStorage.setItem(offlineCartStorageKey(sessionKey), JSON.stringify(items));
+    } catch {
+        // Swallow persistence issues in offline mode
+    }
+};
+
+const clearOfflineCartItems = (sessionKey: string): void => {
+    if (typeof window === 'undefined') {
+        return;
+    }
+    try {
+        window.localStorage.removeItem(offlineCartStorageKey(sessionKey));
+    } catch {
+        // Ignore storage cleanup errors
+    }
 };
 
 type UseCartResult = {
@@ -139,12 +229,19 @@ const useCart = (): UseCartResult => {
     const refreshCart = useCallback(async () => {
         setLoading(true);
         setError(null);
+        if (isOfflineModeEnabled()) {
+            setCart(readOfflineCartItems(sessionKeyRef.current));
+            setLoading(false);
+            return;
+        }
         try {
             const response = await apiRequest<CartApiResponse>({
                 path: '/cart',
                 headers
             });
-            setCart(normalizeCartItems(response.data.items || []));
+            const normalized = normalizeCartItems(response.data.items || []);
+            setCart(normalized);
+            persistOfflineCartItems(sessionKeyRef.current, normalized);
         } catch (err) {
             setError(err as ApiError);
         } finally {
@@ -157,14 +254,24 @@ const useCart = (): UseCartResult => {
     }, [refreshCart]);
 
     const applyServerCart = useCallback((response: CartApiResponse) => {
-        setCart(normalizeCartItems(response.data.items || []));
+        const normalized = normalizeCartItems(response.data.items || []);
+        setCart(normalized);
+        persistOfflineCartItems(sessionKeyRef.current, normalized);
     }, []);
 
     const setItemQuantity = useCallback(
         async (product: CartProductSnapshot, quantity: number) => {
             const previous = cart;
-            setCart((current) => buildOptimisticCart(current, product, quantity));
             setError(null);
+            if (isOfflineModeEnabled()) {
+                setCart((current) => {
+                    const optimistic = buildOptimisticCart(current, product, quantity);
+                    persistOfflineCartItems(sessionKeyRef.current, optimistic);
+                    return optimistic;
+                });
+                return;
+            }
+            setCart((current) => buildOptimisticCart(current, product, quantity));
             try {
                 const response = await apiRequest<CartApiResponse, { productId: string; quantity: number }>({
                     path: '/cart/items',
@@ -188,8 +295,16 @@ const useCart = (): UseCartResult => {
     const removeItem = useCallback(
         async (productId: string) => {
             const previous = cart;
-            setCart((current) => current.filter((item) => item.id !== productId));
             setError(null);
+            if (isOfflineModeEnabled()) {
+                setCart((current) => {
+                    const filtered = current.filter((item) => item.id !== productId);
+                    persistOfflineCartItems(sessionKeyRef.current, filtered);
+                    return filtered;
+                });
+                return;
+            }
+            setCart((current) => current.filter((item) => item.id !== productId));
             try {
                 const response = await apiRequest<CartApiResponse>({
                     path: `/cart/items/${productId}`,
@@ -208,8 +323,13 @@ const useCart = (): UseCartResult => {
 
     const clearCart = useCallback(async () => {
         const previous = cart;
-        setCart([]);
         setError(null);
+        if (isOfflineModeEnabled()) {
+            setCart([]);
+            clearOfflineCartItems(sessionKeyRef.current);
+            return;
+        }
+        setCart([]);
         try {
             const response = await apiRequest<CartApiResponse>({
                 path: '/cart/clear',

@@ -54,7 +54,7 @@ Reset Kiosk Test Controls
 Seed Default Kiosk Products
     [Documentation]    Seeds an offline product snapshot so kiosk UI has deterministic data without backend dependencies
     ${timestamp}=    Get Current Timestamp ISO8601
-    ${snapshot_json}=    Set Variable    {"products":[{"id":"product-red-bull","name":"Red Bull","price":2.99,"currency":"EUR","stockQuantity":0,"lowStockThreshold":5,"purchaseLimit":4,"categoryId":"cold-drinks","categoryIds":["cold-drinks"],"categories":[{"id":"cold-drinks","name":"Cold Drinks","isActive":true}],"description":"Energy drink 250ml can.","metadata":{},"primaryMedia":{"url":"","alt":"Red Bull"}},{"id":"product-coca-cola","name":"Coca-Cola","price":2.5,"currency":"EUR","stockQuantity":25,"lowStockThreshold":5,"purchaseLimit":5,"categoryId":"cold-drinks","categoryIds":["cold-drinks"],"categories":[{"id":"cold-drinks","name":"Cold Drinks","isActive":true}],"description":"Classic cola beverage","metadata":{},"primaryMedia":{"url":"","alt":"Coca-Cola"}}],"generatedAt":"${timestamp}","lastUpdatedAt":"${timestamp}","inventoryTrackingEnabled":true,"statusFingerprint":"offline-default","status":null,"source":"offline"}
+    ${snapshot_json}=    Set Variable    {"products":[{"id":"product-red-bull","name":"Red Bull","price":2.99,"currency":"EUR","stockQuantity":0,"lowStockThreshold":5,"purchaseLimit":4,"categoryId":"cold-drinks","categoryIds":["cold-drinks"],"categories":[{"id":"cold-drinks","name":"Cold Drinks","isActive":true}],"description":"Energy drink 250ml can.","metadata":{},"primaryMedia":{"url":"","alt":"Red Bull"}},{"id":"product-coca-cola","name":"Coca-Cola","price":2.5,"currency":"EUR","stockQuantity":25,"lowStockThreshold":5,"purchaseLimit":5,"categoryId":"cold-drinks","categoryIds":["cold-drinks"],"categories":[{"id":"cold-drinks","name":"Cold Drinks","isActive":true}],"description":"Classic cola beverage","metadata":{},"primaryMedia":{"url":"","alt":"Coca-Cola"}},{"id":"product-chips","name":"Chips","price":1.5,"currency":"EUR","stockQuantity":50,"lowStockThreshold":10,"purchaseLimit":5,"categoryId":"snacks","categoryIds":["snacks"],"categories":[{"id":"snacks","name":"Snacks","isActive":true}],"description":"Crispy potato chips portion.","metadata":{},"primaryMedia":{"url":"","alt":"Chips"}},{"id":"product-cookie","name":"Cookie","price":1.0,"currency":"EUR","stockQuantity":40,"lowStockThreshold":8,"purchaseLimit":6,"categoryId":"bakery","categoryIds":["bakery"],"categories":[{"id":"bakery","name":"Bakery","isActive":true}],"description":"Fresh baked chocolate chip cookie.","metadata":{},"primaryMedia":{"url":"","alt":"Cookie"}}],"generatedAt":"${timestamp}","lastUpdatedAt":"${timestamp}","inventoryTrackingEnabled":true,"statusFingerprint":"offline-default","status":null,"source":"offline"}
     Execute Javascript    window.localStorage.setItem('snackbar-offline-products', '${snapshot_json}');
     Execute Javascript    window.localStorage.setItem('snackbar-force-offline-feed', '1');
 
@@ -132,15 +132,19 @@ Add Product To Cart
     [Arguments]    ${product_name}
     [Documentation]    Adds a product to the shopping cart
     Ensure Cart Panel Closed
-    Click Element    xpath=//div[@data-product-name='${product_name}']//button[contains(@class, 'add-to-cart')]
+    ${add_button}=    Set Variable    xpath=//div[@data-product-name='${product_name}']//button[contains(@class, 'add-to-cart')]
+    Scroll Element Into View    ${add_button}
+    Click Element    ${add_button}
     Wait Until Page Contains    Added to cart    timeout=5s
 
 Clear Shopping Cart
     [Documentation]    Clears all items from the shopping cart
+    Ensure Cart Panel Closed
     Click Element    id=cart-icon
     Wait Until Element Is Visible    id=clear-cart-button    timeout=5s
     Click Button    id=clear-cart-button
     Wait Until Page Contains    Your cart is empty    timeout=5s
+    Ensure Cart Panel Closed
 
 Ensure Cart Panel Closed
     [Documentation]    Closes the cart overlay if it is open to avoid UI overlays blocking touch targets
