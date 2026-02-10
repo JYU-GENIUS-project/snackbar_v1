@@ -46,14 +46,14 @@ US-008: Adjust Item Quantities With Plus-Minus Buttons
     
     Given "Coca-Cola" is in the cart with quantity 1
     When the customer clicks the "+" button for "Coca-Cola"
-    Then the quantity should be 2
-    And the subtotal should update to "5.00€"
+    Then the quantity for "Coca-Cola" should be 2
+    And the subtotal for "Coca-Cola" should update to "5.00€"
     When the customer clicks the "+" button again
-    Then the quantity should be 3
-    And the subtotal should update to "7.50€"
+    Then the quantity for "Coca-Cola" should be 3
+    And the subtotal for "Coca-Cola" should update to "7.50€"
     When the customer clicks the "-" button
-    Then the quantity should be 2
-    And the subtotal should update to "5.00€"
+    Then the quantity for "Coca-Cola" should be 2
+    And the subtotal for "Coca-Cola" should update to "5.00€"
     And all buttons should meet 44x44px touch target minimum
 
 
@@ -175,6 +175,9 @@ All items should be visible in the cart
 
 Each item should show name and price
     [Documentation]    Verifies each cart item shows required info
+    Ensure Cart Panel Closed
+    Click Element    id=cart-icon
+    Wait Until Element Is Visible    id=cart-items    timeout=5s
     ${item_names}=    Get WebElements    css=.cart-item .item-name
     ${item_prices}=    Get WebElements    css=.cart-item .item-price
     ${name_count}=    Get Length    ${item_names}
@@ -182,12 +185,11 @@ Each item should show name and price
     Should Be True    ${name_count} > 0
     Should Be Equal As Integers    ${name_count}    ${price_count}
     FOR    ${name_element}    IN    @{item_names}
-        ${name_text}=    Get Text    ${name_element}
-        Should Not Be Empty    ${name_text}
+        ${name_text}=    Wait Until Keyword Succeeds    3s    0.2s    Get Populated Text    ${name_element}
     END
     FOR    ${price_element}    IN    @{item_prices}
-        ${price_text}=    Get Text    ${price_element}
-        Should Match Regexp    ${price_text}    ^\\d+\.\\d{2}€$
+        ${price_text}=    Wait Until Keyword Succeeds    3s    0.2s    Get Populated Text    ${price_element}
+        Should Match Regexp    ${price_text}    ^\\d+\\.\\d{2}€$
     END
     Ensure Cart Panel Closed
 
@@ -221,7 +223,9 @@ The total should update immediately after each addition
     [Documentation]    Sets up cart with product at specific quantity
     Add Product To Cart    ${product_name}
     ${current_qty}=    Get Product Quantity In Cart    ${product_name}
-    WHILE    $current_qty < $quantity
+    ${current_qty}=    Convert To Integer    ${current_qty}
+    ${target_qty}=    Convert To Integer    ${quantity}
+    WHILE    ${current_qty} < ${target_qty}
         Click Plus Button For Product    ${product_name}
         ${current_qty}=    Evaluate    ${current_qty} + 1
     END
@@ -230,15 +234,13 @@ The customer clicks the "+" button for "${product_name}"
     [Documentation]    Clicks increment button for product
     Click Plus Button For Product    ${product_name}
 
-The quantity should be ${expected_qty}
+The quantity for "${product_name}" should be ${expected_qty}
     [Documentation]    Verifies product quantity in cart
-    ${qty}=    Get Product Quantity In Cart    ${product_name}
-    Should Be Equal As Numbers    ${qty}    ${expected_qty}
+    Wait Until Keyword Succeeds    3s    0.2s    Product Quantity Should Equal    ${product_name}    ${expected_qty}
 
-The subtotal should update to "${expected_subtotal}"
+The subtotal for "${product_name}" should update to "${expected_subtotal}"
     [Documentation]    Verifies product subtotal
-    ${subtotal}=    Get Product Subtotal In Cart    ${product_name}
-    Should Contain    ${subtotal}    ${expected_subtotal}
+    Wait Until Keyword Succeeds    3s    0.2s    Product Subtotal Should Match    ${product_name}    ${expected_subtotal}
 
 The customer clicks the "+" button again
     [Documentation]    Clicks increment button again
@@ -394,9 +396,7 @@ Get Product Quantity In Cart
     Ensure Cart Panel Closed
     Click Element    id=cart-icon
     Wait Until Element Is Visible    id=cart-items    timeout=5s
-    ${qty_element}=    Get WebElement    
-    ...    xpath=//div[@data-product-name='${product_name}']//span[contains(@class, 'quantity-value')]
-    ${qty}=    Get Text    ${qty_element}
+    ${qty}=    Wait Until Keyword Succeeds    3s    0.2s    Fetch Product Quantity Text    ${product_name}
     Press Keys    None    ESCAPE
     Ensure Cart Panel Closed
     RETURN    ${qty}
@@ -433,3 +433,27 @@ Click Minus Button For Product
     Click Element    xpath=//div[@data-product-name='${product_name}']//button[contains(@class, 'quantity-minus-button')]
     Sleep    0.5s
     Ensure Cart Panel Closed
+
+Fetch Product Quantity Text
+    [Arguments]    ${product_name}
+    ${qty_element}=    Get WebElement    
+    ...    xpath=//div[@data-product-name='${product_name}']//span[contains(@class, 'quantity-value')]
+    ${qty}=    Get Text    ${qty_element}
+    Should Not Be Empty    ${qty}
+    RETURN    ${qty}
+
+Product Quantity Should Equal
+    [Arguments]    ${product_name}    ${expected_qty}
+    ${qty}=    Get Product Quantity In Cart    ${product_name}
+    Should Be Equal As Numbers    ${qty}    ${expected_qty}
+
+Product Subtotal Should Match
+    [Arguments]    ${product_name}    ${expected_subtotal}
+    ${subtotal}=    Get Product Subtotal In Cart    ${product_name}
+    Should Contain    ${subtotal}    ${expected_subtotal}
+
+Get Populated Text
+    [Arguments]    ${element}
+    ${text}=    Get Text    ${element}
+    Should Not Be Empty    ${text}
+    RETURN    ${text}
