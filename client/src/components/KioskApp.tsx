@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent } from 'react';
 import { useProductFeed, type ProductFeedProduct } from '../hooks/useProductFeed.js';
+import useCart, { type CartItem, type CartProductSnapshot } from '../hooks/useCart.js';
 import useKioskStatus, { type KioskStatusPayload, type InventoryAvailabilityEntry } from '../hooks/useKioskStatus.js';
 import ProductGridSkeleton from './ProductGridSkeleton.js';
 import ProductDetailModal from './ProductDetailModal';
@@ -9,6 +10,8 @@ import { logKioskEvent } from '../utils/analytics.js';
 
 const TEST_CONTROL_STORAGE_KEY = 'snackbar-test-controls';
 const TEST_CONTROL_ALLOWED_STATUSES = new Set(['open', 'closed', 'maintenance']);
+const CART_TIMEOUT_MS = 5 * 60 * 1000;
+const CART_WARNING_MS = 30 * 1000;
 
 const TRUST_MODE_STORAGE_KEY = 'snackbar-trust-mode-disabled';
 const OUT_OF_STOCK_DIALOG_TITLE_ID = 'kiosk-out-of-stock-title';
@@ -19,6 +22,8 @@ type KioskTestControls = {
     statusMessage?: string | null;
     statusNextOpen?: string | null;
     inventoryTrackingEnabled?: boolean;
+    cartTimeoutMs?: number;
+    cartWarningLeadMs?: number;
 };
 
 type NormalizedTestControls = {
@@ -27,6 +32,8 @@ type NormalizedTestControls = {
     statusMessage?: string | null;
     statusNextOpen?: string | null;
     inventoryTrackingEnabled?: boolean | null;
+    cartTimeoutMs?: number | null;
+    cartWarningLeadMs?: number | null;
 };
 
 type NormalizedCategory = {
@@ -45,6 +52,7 @@ type NormalizedProduct = {
     isOutOfStock: boolean;
     isLowStock: boolean;
     status: string;
+    imageUrl: string | null;
     imageAlt: string;
     description: string;
     allergens: string;
@@ -54,13 +62,6 @@ type NormalizedProduct = {
     available: boolean;
 };
 
-type CartItem = {
-    id: string;
-    name: string;
-    price: number;
-    purchaseLimit: number | null;
-    quantity: number;
-};
 
 type StatusOverlay = {
     active: boolean;
@@ -123,6 +124,26 @@ const normalizeTestControls = (input: unknown): NormalizedTestControls | null =>
         }
     }
 
+    if (Object.prototype.hasOwnProperty.call(candidate, 'cartTimeoutMs')) {
+        const timeoutValue = candidate.cartTimeoutMs;
+        if (timeoutValue === null || timeoutValue === undefined) {
+            normalized.cartTimeoutMs = null;
+        } else {
+            const numeric = Number(timeoutValue);
+            normalized.cartTimeoutMs = Number.isFinite(numeric) && numeric > 0 ? numeric : null;
+        }
+    }
+
+    if (Object.prototype.hasOwnProperty.call(candidate, 'cartWarningLeadMs')) {
+        const warningValue = candidate.cartWarningLeadMs;
+        if (warningValue === null || warningValue === undefined) {
+            normalized.cartWarningLeadMs = null;
+        } else {
+            const numeric = Number(warningValue);
+            normalized.cartWarningLeadMs = Number.isFinite(numeric) && numeric >= 0 ? Math.max(0, numeric) : null;
+        }
+    }
+
     return normalized;
 };
 
@@ -148,7 +169,9 @@ const mergeTestControls = (current: KioskTestControls | null | undefined, update
         'statusOverride',
         'statusMessage',
         'statusNextOpen',
-        'inventoryTrackingEnabled'
+        'inventoryTrackingEnabled',
+        'cartTimeoutMs',
+        'cartWarningLeadMs'
     ];
 
     fields.forEach((key) => {
@@ -218,6 +241,15 @@ const readTestControls = (): KioskTestControls => {
             && normalized.inventoryTrackingEnabled !== null
             && normalized.inventoryTrackingEnabled !== undefined) {
             sanitized.inventoryTrackingEnabled = normalized.inventoryTrackingEnabled;
+        }
+        if (typeof normalized.cartTimeoutMs === 'number' && Number.isFinite(normalized.cartTimeoutMs) && normalized.cartTimeoutMs > 0) {
+            sanitized.cartTimeoutMs = normalized.cartTimeoutMs;
+        }
+        if (typeof normalized.cartWarningLeadMs === 'number'
+            && Number.isFinite(normalized.cartWarningLeadMs)
+            && normalized.cartWarningLeadMs >= 0) {
+            const baseTimeout = sanitized.cartTimeoutMs ?? CART_TIMEOUT_MS;
+            sanitized.cartWarningLeadMs = Math.min(normalized.cartWarningLeadMs, baseTimeout);
         }
         return sanitized;
     } catch (error) {
@@ -312,6 +344,8 @@ const formatRelativeTimestamp = (isoValue?: string | null): string | null => {
 };
 
 const formatPrice = (value: number | string | null | undefined) => `${Number(value ?? 0).toFixed(2)}€`;
+const toCents = (value: number | string | null | undefined) => Math.round(Number(value ?? 0) * 100);
+const formatPriceFromCents = (cents: number) => `${(cents / 100).toFixed(2)}€`;
 const DEFAULT_PRODUCT_IMAGE = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300"><rect width="400" height="300" fill="%23e5e7eb"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="%236b7280" font-size="28">No Image</text></svg>';
 const REQUIRED_CUSTOMER_FILTERS = [
     { name: 'Hot Drinks', id: 'virtual-hot-drinks' }
@@ -360,6 +394,7 @@ const normalizeProduct = (product: ProductFeedProduct): NormalizedProduct => {
         isOutOfStock,
         isLowStock,
         status: product.status || 'active',
+        imageUrl: product.primaryMedia?.url || null,
         imageAlt: product.primaryMedia?.alt || product.name || 'Product image',
         description: product.description || metadataDescription || '',
         allergens: typeof product.allergens === 'string' && product.allergens.trim()
@@ -477,6 +512,20 @@ const updateQuantityInCart = (
             };
         })
         .filter((item): item is CartItem => Boolean(item));
+};
+
+const parsePurchaseLimitDetails = (details: unknown): { limit?: number } | null => {
+    if (!details || typeof details !== 'object') {
+        return null;
+    }
+
+    const candidate = details as Record<string, unknown>;
+    if (candidate.code !== 'PURCHASE_LIMIT') {
+        return null;
+    }
+
+    const limit = typeof candidate.limit === 'number' ? candidate.limit : Number.parseInt(String(candidate.limit), 10);
+    return Number.isFinite(limit) ? { limit } : { limit: undefined };
 };
 
 const KioskApp = () => {
@@ -743,11 +792,23 @@ const KioskApp = () => {
     }, [sortedProducts]);
 
     const [selectedCategory, setSelectedCategory] = useState<string>('All Products');
-    const [cart, setCart] = useState<CartItem[]>([]);
     const [cartOpen, setCartOpen] = useState(false);
     const [checkoutVisible, setCheckoutVisible] = useState(false);
     const [toastMessage, setToastMessage] = useState('');
     const [limitMessage, setLimitMessage] = useState('');
+    const [cartTimeoutWarning, setCartTimeoutWarning] = useState(false);
+    const cartTimeoutRef = useRef<number | null>(null);
+    const cartWarningRef = useRef<number | null>(null);
+    const ignoreActivityUntilRef = useRef<number>(0);
+    const {
+        cart,
+        error: cartError,
+        setItemQuantity,
+        removeItem: removeCartItem,
+        clearCart: clearCartItems,
+        hydrateFromProducts
+    } = useCart();
+    const hasCartItems = cart.length > 0;
     const [outOfStockPrompt, setOutOfStockPrompt] = useState<NormalizedProduct | null>(null);
     const [selectedProduct, setSelectedProduct] = useState<NormalizedProduct | null>(null);
     const outOfStockDialogRef = useRef<HTMLDivElement | null>(null);
@@ -969,27 +1030,29 @@ const KioskApp = () => {
     }, [toastMessage]);
 
     useEffect(() => {
-        if (products.length === 0) {
-            setCart([]);
+        if (!cartError) {
             return;
         }
-        setCart((current) =>
-            current
-                .map((item) => {
-                    const source = products.find((product) => product.id === item.id);
-                    if (!source) {
-                        return null;
-                    }
-                    return {
-                        ...item,
-                        name: source.name,
-                        price: source.price,
-                        purchaseLimit: source.purchaseLimit
-                    };
-                })
-                .filter((item): item is CartItem => Boolean(item))
-        );
-    }, [products]);
+        const limitInfo = parsePurchaseLimitDetails(cartError.details);
+        if (limitInfo?.limit) {
+            setLimitMessage(`Maximum ${limitInfo.limit} of this item per purchase`);
+        }
+        setToastMessage(cartError.message || 'Unable to update cart.');
+    }, [cartError]);
+
+    useEffect(() => {
+        if (products.length === 0) {
+            return;
+        }
+        const snapshots: CartProductSnapshot[] = products.map((product) => ({
+            id: product.id,
+            name: product.name,
+            price: product.price,
+            purchaseLimit: product.purchaseLimit,
+            imageUrl: product.imageUrl
+        }));
+        hydrateFromProducts(snapshots);
+    }, [hydrateFromProducts, products]);
 
     useEffect(() => {
         if (typeof window === 'undefined') {
@@ -1015,44 +1078,37 @@ const KioskApp = () => {
     }, [refetch]);
 
     const cartCount = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart]);
-    const cartTotal = useMemo(() => cart.reduce((sum, item) => sum + item.price * item.quantity, 0), [cart]);
+    const cartTotalCents = useMemo(
+        () => cart.reduce((sum, item) => sum + toCents(item.price) * item.quantity, 0),
+        [cart]
+    );
 
-    const addProductToCart = (product: NormalizedProduct) => {
-        setCart((current) => {
-            const existing = current.find((item) => item.id === product.id);
-            const limit = product.purchaseLimit ?? null;
-            const currentQuantity = existing?.quantity ?? 0;
-            if (limit && currentQuantity >= limit) {
-                setLimitMessage(`Maximum ${limit} of this item per purchase`);
-                return current;
-            }
-            const nextQuantity = currentQuantity + 1;
-            const showLimitMessage = limit && nextQuantity >= limit;
-            setLimitMessage(showLimitMessage ? `Maximum ${limit} of this item per purchase` : '');
-            setToastMessage('Added to cart');
-            if (existing) {
-                return current.map((item) =>
-                    item.id === product.id
-                        ? {
-                            ...item,
-                            quantity: nextQuantity,
-                            price: product.price,
-                            purchaseLimit: product.purchaseLimit
-                        }
-                        : item
-                );
-            }
-            return [
-                ...current,
+    const addProductToCart = async (product: NormalizedProduct) => {
+        const existing = cart.find((item) => item.id === product.id);
+        const limit = product.purchaseLimit ?? null;
+        const currentQuantity = existing?.quantity ?? 0;
+        if (limit && currentQuantity >= limit) {
+            setLimitMessage(`Maximum ${limit} of this item per purchase`);
+            return;
+        }
+        const nextQuantity = currentQuantity + 1;
+        const showLimitMessage = limit && nextQuantity >= limit;
+        setLimitMessage(showLimitMessage ? `Maximum ${limit} of this item per purchase` : '');
+        try {
+            await setItemQuantity(
                 {
                     id: product.id,
                     name: product.name,
                     price: product.price,
-                    purchaseLimit: product.purchaseLimit,
-                    quantity: 1
-                }
-            ];
-        });
+                    purchaseLimit: product.purchaseLimit
+                },
+                nextQuantity
+            );
+            setToastMessage('Added to cart');
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Unable to update cart.';
+            setToastMessage(message);
+        }
     };
 
     const showOutOfStockPrompt = (
@@ -1185,34 +1241,169 @@ const KioskApp = () => {
         setOutOfStockPrompt(null);
     };
 
-    const incrementQuantity = (productId: string) => {
-        setCart((current) => {
-            const target = current.find((item) => item.id === productId);
-            if (!target) {
-                return current;
+    const incrementQuantity = async (productId: string) => {
+        const target = cart.find((item) => item.id === productId);
+        if (!target) {
+            return;
+        }
+        const limit = target.purchaseLimit ?? null;
+        if (limit && target.quantity >= limit) {
+            setLimitMessage(`Maximum ${limit} of this item per purchase`);
+            return;
+        }
+        try {
+            await setItemQuantity(
+                {
+                    id: target.id,
+                    name: target.name,
+                    price: target.price,
+                    purchaseLimit: target.purchaseLimit
+                },
+                target.quantity + 1
+            );
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Unable to update cart.';
+            setToastMessage(message);
+        }
+    };
+
+    const decrementQuantity = async (productId: string) => {
+        const target = cart.find((item) => item.id === productId);
+        if (!target) {
+            return;
+        }
+        try {
+            await setItemQuantity(
+                {
+                    id: target.id,
+                    name: target.name,
+                    price: target.price,
+                    purchaseLimit: target.purchaseLimit
+                },
+                target.quantity - 1
+            );
+            setLimitMessage('');
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Unable to update cart.';
+            setToastMessage(message);
+        }
+    };
+
+    const removeItem = async (productId: string) => {
+        try {
+            await removeCartItem(productId);
+            setLimitMessage('');
+            logKioskEvent('kiosk.cart_item_removed', {
+                productId
+            });
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Unable to remove item.';
+            setToastMessage(message);
+        }
+    };
+
+    const clearCart = useCallback(async () => {
+        try {
+            await clearCartItems();
+            logKioskEvent('kiosk.cart_cleared', {
+                cartSize: cart.length
+            });
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Unable to clear cart.';
+            setToastMessage(message);
+        } finally {
+            setLimitMessage('');
+            setCheckoutVisible(false);
+            setCartTimeoutWarning(false);
+        }
+    }, [cart.length, clearCartItems]);
+
+    const resolvedCartTimeoutMs = useMemo(() => {
+        const override = Number(testControls.cartTimeoutMs);
+        if (Number.isFinite(override) && override > 0) {
+            return override;
+        }
+        return CART_TIMEOUT_MS;
+    }, [testControls.cartTimeoutMs]);
+
+    const resolvedCartWarningLeadMs = useMemo(() => {
+        const override = Number(testControls.cartWarningLeadMs);
+        if (Number.isFinite(override) && override >= 0) {
+            return Math.min(override, resolvedCartTimeoutMs);
+        }
+        return Math.min(CART_WARNING_MS, resolvedCartTimeoutMs);
+    }, [resolvedCartTimeoutMs, testControls.cartWarningLeadMs]);
+
+    const resetCartTimeout = useCallback(() => {
+        if (cartTimeoutRef.current) {
+            window.clearTimeout(cartTimeoutRef.current);
+        }
+        if (cartWarningRef.current) {
+            window.clearTimeout(cartWarningRef.current);
+        }
+        setCartTimeoutWarning(false);
+
+        if (!hasCartItems) {
+            return;
+        }
+
+        const totalTimeout = resolvedCartTimeoutMs;
+        const warningLead = Math.min(resolvedCartWarningLeadMs, totalTimeout);
+        ignoreActivityUntilRef.current = 0;
+
+        if (warningLead > 0 && warningLead < totalTimeout) {
+            cartWarningRef.current = window.setTimeout(() => {
+                ignoreActivityUntilRef.current = Date.now() + 250;
+                setCartTimeoutWarning(true);
+            }, totalTimeout - warningLead);
+        }
+
+        cartTimeoutRef.current = window.setTimeout(() => {
+            logKioskEvent('kiosk.cart_timeout', {
+                cartSize: cart.length,
+                timeoutMs: totalTimeout
+            });
+            void clearCart();
+            setCartOpen(false);
+            setToastMessage('Cart cleared due to inactivity.');
+        }, totalTimeout);
+    }, [cart.length, clearCart, hasCartItems, resolvedCartTimeoutMs, resolvedCartWarningLeadMs]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') {
+            return undefined;
+        }
+
+        if (!hasCartItems) {
+            if (cartTimeoutRef.current) {
+                window.clearTimeout(cartTimeoutRef.current);
             }
-            const limit = target.purchaseLimit ?? null;
-            if (limit && target.quantity >= limit) {
-                setLimitMessage(`Maximum ${limit} of this item per purchase`);
-                return current;
+            if (cartWarningRef.current) {
+                window.clearTimeout(cartWarningRef.current);
             }
-            return updateQuantityInCart(current, productId, (quantity) => quantity + 1);
-        });
-    };
+            setCartTimeoutWarning(false);
+            return undefined;
+        }
 
-    const decrementQuantity = (productId: string) => {
-        setCart((current) => updateQuantityInCart(current, productId, (quantity) => quantity - 1));
-    };
+        resetCartTimeout();
 
-    const removeItem = (productId: string) => {
-        setCart((current) => current.filter((item) => item.id !== productId));
-    };
+        const handleActivity = () => {
+            if (ignoreActivityUntilRef.current && Date.now() < ignoreActivityUntilRef.current) {
+                return;
+            }
+            resetCartTimeout();
+        };
 
-    const clearCart = () => {
-        setCart([]);
-        setLimitMessage('');
-        setCheckoutVisible(false);
-    };
+        window.addEventListener('pointerdown', handleActivity);
+        window.addEventListener('keydown', handleActivity);
+        window.addEventListener('scroll', handleActivity, { passive: true });
+
+        return () => {
+            window.removeEventListener('pointerdown', handleActivity);
+            window.removeEventListener('keydown', handleActivity);
+            window.removeEventListener('scroll', handleActivity);
+        };
+    }, [hasCartItems, resetCartTimeout]);
 
     const handleCheckout = () => {
         if (!hasCartItems) {
@@ -1231,7 +1422,7 @@ const KioskApp = () => {
         setToastMessage('');
         logKioskEvent('kiosk.checkout_started', {
             cartSize: cart.length,
-            totalEuros: Number.isFinite(cartTotal) ? Number(cartTotal.toFixed(2)) : 0
+            totalEuros: Number.isFinite(cartTotalCents) ? Number((cartTotalCents / 100).toFixed(2)) : 0
         });
     };
 
@@ -1249,13 +1440,31 @@ const KioskApp = () => {
         setCartOpen((current) => !current);
     };
 
-    const hasCartItems = cart.length > 0;
-
     useEffect(() => {
         if (!hasCartItems) {
             setCheckoutVisible(false);
         }
     }, [hasCartItems]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') {
+            return undefined;
+        }
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key !== 'Escape') {
+                return;
+            }
+            if (!cartOpen || checkoutVisible || outOfStockPrompt) {
+                return;
+            }
+            event.preventDefault();
+            setCartOpen(false);
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [cartOpen, checkoutVisible, outOfStockPrompt]);
 
     return (
         <div className={`kiosk-app${overlayInfo.active ? ' kiosk-unavailable' : ''}`}>
@@ -1316,6 +1525,20 @@ const KioskApp = () => {
             {limitMessage && (
                 <div id="purchase-limit-message" className="kiosk-limit-message" role="alert">
                     {limitMessage}
+                </div>
+            )}
+
+            {cartTimeoutWarning && (
+                <div id="cart-timeout-warning" className="kiosk-warning-banner" role="status" aria-live="polite">
+                    Cart will clear in 30 seconds due to inactivity.
+                    <button
+                        type="button"
+                        className="button tertiary"
+                        style={{ marginLeft: '1rem' }}
+                        onClick={() => resetCartTimeout()}
+                    >
+                        Dismiss
+                    </button>
                 </div>
             )}
 
@@ -1538,9 +1761,23 @@ const KioskApp = () => {
                                 const limitReached = item.purchaseLimit && item.quantity >= item.purchaseLimit;
                                 return (
                                     <div key={item.id} className="cart-item" data-product-name={item.name}>
-                                        <div className="cart-item-info">
-                                            <span className="item-name">{item.name}</span>
-                                            <span className="item-price">{formatPrice(item.price)}</span>
+                                        <div className="cart-item-header">
+                                            <img
+                                                src={item.imageUrl || DEFAULT_PRODUCT_IMAGE}
+                                                alt={item.name}
+                                                className="cart-item-image"
+                                                loading="lazy"
+                                                onError={(event) => {
+                                                    const target = event.currentTarget;
+                                                    if (target.src !== DEFAULT_PRODUCT_IMAGE) {
+                                                        target.src = DEFAULT_PRODUCT_IMAGE;
+                                                    }
+                                                }}
+                                            />
+                                            <div className="cart-item-info">
+                                                <span className="item-name">{item.name}</span>
+                                                <span className="item-price">{formatPrice(item.price)}</span>
+                                            </div>
                                         </div>
                                         <div className="cart-item-controls">
                                             <button
@@ -1565,7 +1802,7 @@ const KioskApp = () => {
                                             >
                                                 +
                                             </button>
-                                            <span className="item-subtotal">{formatPrice(item.price * item.quantity)}</span>
+                                            <span className="item-subtotal">{formatPriceFromCents(toCents(item.price) * item.quantity)}</span>
                                             <button
                                                 type="button"
                                                 className="remove-item-button remove-button"
@@ -1582,7 +1819,7 @@ const KioskApp = () => {
                         </div>
                         <div className="cart-footer">
                             <div id="cart-total" className="cart-total">
-                                Total: {formatPrice(cartTotal)}
+                                Total: {formatPriceFromCents(cartTotalCents)}
                             </div>
                             <button
                                 id="checkout-button"
@@ -1686,7 +1923,7 @@ const KioskApp = () => {
                         />
                         <div className="checkout-summary">
                             <span className="checkout-total-label">Total due</span>
-                            <span className="checkout-total-amount">{formatPrice(cartTotal)}</span>
+                            <span className="checkout-total-amount">{formatPriceFromCents(cartTotalCents)}</span>
                         </div>
                         <div className="checkout-actions">
                             <button

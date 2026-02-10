@@ -68,6 +68,12 @@ const AuditActions = {
     // Inventory
     INVENTORY_UPDATED: 'INVENTORY_UPDATED',
 
+    // Cart session events
+    CART_ITEM_ADDED: 'CART_ITEM_ADDED',
+    CART_ITEM_REMOVED: 'CART_ITEM_REMOVED',
+    CART_CLEARED: 'CART_CLEARED',
+    CART_TIMEOUT: 'CART_TIMEOUT',
+
     // Configuration
     CONFIG_UPDATED: 'CONFIG_UPDATED'
 } as const;
@@ -80,6 +86,7 @@ const EntityTypes = {
     PRODUCT: 'PRODUCT',
     CATEGORY: 'CATEGORY',
     INVENTORY: 'INVENTORY',
+    CART_SESSION: 'CART_SESSION',
     CONFIG: 'CONFIG',
     SESSION: 'SESSION'
 } as const;
