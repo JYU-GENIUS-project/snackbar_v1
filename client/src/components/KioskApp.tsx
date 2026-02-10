@@ -10,6 +10,8 @@ import { logKioskEvent } from '../utils/analytics.js';
 
 const TEST_CONTROL_STORAGE_KEY = 'snackbar-test-controls';
 const TEST_CONTROL_ALLOWED_STATUSES = new Set(['open', 'closed', 'maintenance']);
+const CART_TIMEOUT_MS = 5 * 60 * 1000;
+const CART_WARNING_MS = 30 * 1000;
 
 const TRUST_MODE_STORAGE_KEY = 'snackbar-trust-mode-disabled';
 const OUT_OF_STOCK_DIALOG_TITLE_ID = 'kiosk-out-of-stock-title';
@@ -20,6 +22,8 @@ type KioskTestControls = {
     statusMessage?: string | null;
     statusNextOpen?: string | null;
     inventoryTrackingEnabled?: boolean;
+    cartTimeoutMs?: number;
+    cartWarningLeadMs?: number;
 };
 
 type NormalizedTestControls = {
@@ -28,6 +32,8 @@ type NormalizedTestControls = {
     statusMessage?: string | null;
     statusNextOpen?: string | null;
     inventoryTrackingEnabled?: boolean | null;
+    cartTimeoutMs?: number | null;
+    cartWarningLeadMs?: number | null;
 };
 
 type NormalizedCategory = {
@@ -118,6 +124,26 @@ const normalizeTestControls = (input: unknown): NormalizedTestControls | null =>
         }
     }
 
+    if (Object.prototype.hasOwnProperty.call(candidate, 'cartTimeoutMs')) {
+        const timeoutValue = candidate.cartTimeoutMs;
+        if (timeoutValue === null || timeoutValue === undefined) {
+            normalized.cartTimeoutMs = null;
+        } else {
+            const numeric = Number(timeoutValue);
+            normalized.cartTimeoutMs = Number.isFinite(numeric) && numeric > 0 ? numeric : null;
+        }
+    }
+
+    if (Object.prototype.hasOwnProperty.call(candidate, 'cartWarningLeadMs')) {
+        const warningValue = candidate.cartWarningLeadMs;
+        if (warningValue === null || warningValue === undefined) {
+            normalized.cartWarningLeadMs = null;
+        } else {
+            const numeric = Number(warningValue);
+            normalized.cartWarningLeadMs = Number.isFinite(numeric) && numeric >= 0 ? Math.max(0, numeric) : null;
+        }
+    }
+
     return normalized;
 };
 
@@ -143,7 +169,9 @@ const mergeTestControls = (current: KioskTestControls | null | undefined, update
         'statusOverride',
         'statusMessage',
         'statusNextOpen',
-        'inventoryTrackingEnabled'
+        'inventoryTrackingEnabled',
+        'cartTimeoutMs',
+        'cartWarningLeadMs'
     ];
 
     fields.forEach((key) => {
@@ -213,6 +241,15 @@ const readTestControls = (): KioskTestControls => {
             && normalized.inventoryTrackingEnabled !== null
             && normalized.inventoryTrackingEnabled !== undefined) {
             sanitized.inventoryTrackingEnabled = normalized.inventoryTrackingEnabled;
+        }
+        if (typeof normalized.cartTimeoutMs === 'number' && Number.isFinite(normalized.cartTimeoutMs) && normalized.cartTimeoutMs > 0) {
+            sanitized.cartTimeoutMs = normalized.cartTimeoutMs;
+        }
+        if (typeof normalized.cartWarningLeadMs === 'number'
+            && Number.isFinite(normalized.cartWarningLeadMs)
+            && normalized.cartWarningLeadMs >= 0) {
+            const baseTimeout = sanitized.cartTimeoutMs ?? CART_TIMEOUT_MS;
+            sanitized.cartWarningLeadMs = Math.min(normalized.cartWarningLeadMs, baseTimeout);
         }
         return sanitized;
     } catch (error) {
@@ -310,8 +347,6 @@ const formatPrice = (value: number | string | null | undefined) => `${Number(val
 const toCents = (value: number | string | null | undefined) => Math.round(Number(value ?? 0) * 100);
 const formatPriceFromCents = (cents: number) => `${(cents / 100).toFixed(2)}€`;
 const DEFAULT_PRODUCT_IMAGE = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300"><rect width="400" height="300" fill="%23e5e7eb"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="%236b7280" font-size="28">No Image</text></svg>';
-const CART_TIMEOUT_MS = 5 * 60 * 1000;
-const CART_WARNING_MS = 30 * 1000;
 const REQUIRED_CUSTOMER_FILTERS = [
     { name: 'Hot Drinks', id: 'virtual-hot-drinks' }
 ];
@@ -764,6 +799,7 @@ const KioskApp = () => {
     const [cartTimeoutWarning, setCartTimeoutWarning] = useState(false);
     const cartTimeoutRef = useRef<number | null>(null);
     const cartWarningRef = useRef<number | null>(null);
+    const ignoreActivityUntilRef = useRef<number>(0);
     const {
         cart,
         error: cartError,
@@ -772,6 +808,7 @@ const KioskApp = () => {
         clearCart: clearCartItems,
         hydrateFromProducts
     } = useCart();
+    const hasCartItems = cart.length > 0;
     const [outOfStockPrompt, setOutOfStockPrompt] = useState<NormalizedProduct | null>(null);
     const [selectedProduct, setSelectedProduct] = useState<NormalizedProduct | null>(null);
     const outOfStockDialogRef = useRef<HTMLDivElement | null>(null);
@@ -1265,7 +1302,7 @@ const KioskApp = () => {
         }
     };
 
-    const clearCart = async () => {
+    const clearCart = useCallback(async () => {
         try {
             await clearCartItems();
             logKioskEvent('kiosk.cart_cleared', {
@@ -1279,7 +1316,23 @@ const KioskApp = () => {
             setCheckoutVisible(false);
             setCartTimeoutWarning(false);
         }
-    };
+    }, [cart.length, clearCartItems]);
+
+    const resolvedCartTimeoutMs = useMemo(() => {
+        const override = Number(testControls.cartTimeoutMs);
+        if (Number.isFinite(override) && override > 0) {
+            return override;
+        }
+        return CART_TIMEOUT_MS;
+    }, [testControls.cartTimeoutMs]);
+
+    const resolvedCartWarningLeadMs = useMemo(() => {
+        const override = Number(testControls.cartWarningLeadMs);
+        if (Number.isFinite(override) && override >= 0) {
+            return Math.min(override, resolvedCartTimeoutMs);
+        }
+        return Math.min(CART_WARNING_MS, resolvedCartTimeoutMs);
+    }, [resolvedCartTimeoutMs, testControls.cartWarningLeadMs]);
 
     const resetCartTimeout = useCallback(() => {
         if (cartTimeoutRef.current) {
@@ -1294,17 +1347,27 @@ const KioskApp = () => {
             return;
         }
 
-        cartWarningRef.current = window.setTimeout(() => {
-            setCartTimeoutWarning(true);
-        }, CART_TIMEOUT_MS - CART_WARNING_MS);
+        const totalTimeout = resolvedCartTimeoutMs;
+        const warningLead = Math.min(resolvedCartWarningLeadMs, totalTimeout);
+        ignoreActivityUntilRef.current = 0;
+
+        if (warningLead > 0 && warningLead < totalTimeout) {
+            cartWarningRef.current = window.setTimeout(() => {
+                ignoreActivityUntilRef.current = Date.now() + 250;
+                setCartTimeoutWarning(true);
+            }, totalTimeout - warningLead);
+        }
 
         cartTimeoutRef.current = window.setTimeout(() => {
-            logKioskEvent('kiosk.cart_timeout', { cartSize: cart.length });
+            logKioskEvent('kiosk.cart_timeout', {
+                cartSize: cart.length,
+                timeoutMs: totalTimeout
+            });
             void clearCart();
             setCartOpen(false);
             setToastMessage('Cart cleared due to inactivity.');
-        }, CART_TIMEOUT_MS);
-    }, [cart.length, clearCart, hasCartItems]);
+        }, totalTimeout);
+    }, [cart.length, clearCart, hasCartItems, resolvedCartTimeoutMs, resolvedCartWarningLeadMs]);
 
     useEffect(() => {
         if (typeof window === 'undefined') {
@@ -1325,6 +1388,9 @@ const KioskApp = () => {
         resetCartTimeout();
 
         const handleActivity = () => {
+            if (ignoreActivityUntilRef.current && Date.now() < ignoreActivityUntilRef.current) {
+                return;
+            }
             resetCartTimeout();
         };
 
@@ -1374,13 +1440,31 @@ const KioskApp = () => {
         setCartOpen((current) => !current);
     };
 
-    const hasCartItems = cart.length > 0;
-
     useEffect(() => {
         if (!hasCartItems) {
             setCheckoutVisible(false);
         }
     }, [hasCartItems]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') {
+            return undefined;
+        }
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key !== 'Escape') {
+                return;
+            }
+            if (!cartOpen || checkoutVisible || outOfStockPrompt) {
+                return;
+            }
+            event.preventDefault();
+            setCartOpen(false);
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [cartOpen, checkoutVisible, outOfStockPrompt]);
 
     return (
         <div className={`kiosk-app${overlayInfo.active ? ' kiosk-unavailable' : ''}`}>
