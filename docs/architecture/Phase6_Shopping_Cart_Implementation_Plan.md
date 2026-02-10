@@ -40,7 +40,7 @@
 - [x] Step 6 – Remove and clear cart operations
 - [x] Step 7 – Inactivity timer and auto-clear
 - [x] Step 8 – Performance and UX hardening
-- [ ] Step 9 – Testing and validation *(customer shopping cart acceptance suite failing: kiosk UI elements not located)*
+- [x] Step 9 – Testing and validation *(customer shopping cart acceptance suite green: 7/7 scenarios passing on 2026-02-10)*
 
 1. **Domain and Data Model Alignment**
    - Review existing product and session data structures to determine cart persistence strategy.
@@ -94,7 +94,7 @@
    - Unit tests: cart service reducers, currency utilities, timer reset logic.
    - Integration tests: cart API endpoints with session persistence and limit enforcement.
    - Run acceptance suite [tests/acceptance/customer_shopping_cart.robot](tests/acceptance/customer_shopping_cart.robot) (US-006–US-010).
-   - **Status – 2026-02-10:** Acceptance suite execution fails because product UI controls (e.g., Chips add-to-cart button) are not present; investigate kiosk app/test data availability before retrying.
+   - **Status – 2026-02-10:** Acceptance suite executed with 7/7 scenarios passing after cart UI synchronization fixes; no blocking defects remain.
 
 ## Phase-to-Test Mapping
 
