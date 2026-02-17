@@ -190,28 +190,35 @@
 ### High Priority (Must Have for v1.0)
 
 **Customer Flow:**
+
 - US-001, US-002, US-006, US-007, US-008, US-009, US-010, US-011, US-012, US-013, US-014, US-016, US-018
 
 **Admin Core Features:**
+
 - US-019, US-020, US-023, US-024, US-025, US-027, US-028, US-032, US-033, US-034, US-036, US-039, US-046, US-048, US-049, US-050, US-051
 
 **System Requirements:**
+
 - US-057, US-058, US-059, US-060, US-061, US-062, US-063, US-065, US-066, US-067, US-068
 
 ### Medium Priority (Should Have)
 
 **Customer Enhancement:**
+
 - US-003, US-004, US-005, US-015, US-017
 
 **Admin Enhancement:**
+
 - US-021, US-022, US-026, US-029, US-030, US-031, US-035, US-037, US-038, US-040, US-041, US-042, US-043, US-044, US-045, US-047, US-052, US-053, US-054, US-055
 
 **System Enhancement:**
+
 - US-064
 
 ### Low Priority (Nice to Have for v1.1+)
 
 **Admin Advanced Features:**
+
 - US-056
 
 ---

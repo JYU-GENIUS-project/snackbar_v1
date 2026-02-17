@@ -1,18 +1,31 @@
+<!-- markdownlint-disable MD013 -->
 # Manual Payment Confirmation Implementation Plan
 
 ## Objective
 
-Align all planning artefacts with Issue [#22](https://github.com/JYU-GENIUS-project/snackbar_v1/issues/22) by replacing MobilePay-specific integration work with a manual customer payment confirmation flow while preserving the PERN architecture, security controls, and acceptance coverage already established in the roadmap and requirements.
+Align all planning artefacts with Issue [#22](https://github.com/JYU-GENIUS-project/snackbar_v1/issues/22) by replacing legacy third-party payment integration work with a manual customer payment confirmation flow while preserving the PERN architecture, security controls, and acceptance coverage already established in the roadmap and requirements.
 
 ## Status Tracker
 
-- [x] Phase 1 – Requirements and Story Realignment *(SRS, user stories, initial test case conversion complete)*
-- [x] Phase 2 – Roadmap and Phase Plan Updates *(Implementation roadmap + Phase 6 plan adjusted for manual confirmation)*
-- [ ] Phase 3 – Architecture and ADR Revisions
-- [ ] Phase 4 – Operational and Configuration Documentation
-- [ ] Phase 5 – Frontend/Backend Planning Notes
-- [ ] Phase 6 – Acceptance Test Plan Alignment
-- [ ] Phase 7 – Repository Sweep and Quality Gate
+- [x] Phase 1 – Requirements and Story Realignment _(SRS, user stories, initial test case conversion complete)_
+- [x] Phase 2 – Roadmap and Phase Plan Updates _(Implementation roadmap + Phase 6 plan adjusted for manual confirmation)_
+- [x] Phase 3 – Architecture and ADR Revisions _(C4 diagrams and ADRs updated for manual confirmation)_
+- [x] Phase 4 – Operational and Configuration Documentation _(compose/.env cleaned, manual confirmation config documented, schema metadata shifted)_
+- [x] Phase 5 – Frontend/Backend Planning Notes _(client/server READMEs document manual confirmation UI+API contract)_
+- [x] Phase 6 – Acceptance Test Plan Alignment
+- [x] Phase 7 – Repository Sweep and Quality Gate _(legacy provider references removed; manual confirmation payload validated via server test suite)_
+
+## Completion Verification
+
+| Phase | Evidence |
+| ----- | -------- |
+| Phase 1 | Manual flow requirements captured in [reqeng/Software_Requirements_Specification_v1.2.md](reqeng/Software_Requirements_Specification_v1.2.md) and aligned stories in [reqeng/user_stories.md](reqeng/user_stories.md); traceability links refreshed in [reqeng/Test_Cases_v1.1.md](reqeng/Test_Cases_v1.1.md). |
+| Phase 2 | Manual confirmation milestones scheduled in [docs/architecture/Implementation_Roadmap.md](docs/architecture/Implementation_Roadmap.md) and delivery steps elaborated in [docs/architecture/Phase6_Shopping_Cart_Implementation_Plan.md](docs/architecture/Phase6_Shopping_Cart_Implementation_Plan.md). |
+| Phase 3 | C4 context and sequence diagrams updated in [docs/architecture/C4_Architecture.md](docs/architecture/C4_Architecture.md); ADR set reflects manual confirmation in [docs/architecture/decisions](docs/architecture/decisions). |
+| Phase 4 | Legacy variables removed from [docker-compose.yml](docker-compose.yml) and configuration guidance refreshed in [server/README.md](server/README.md) and [client/README.md](client/README.md); schema notes adjusted through [init-db](init-db). |
+| Phase 5 | Manual confirmation contracts documented in workspace READMEs and process docs: [client/README.md](client/README.md), [server/README.md](server/README.md), and shared guidance in [docs/architecture](docs/architecture). |
+| Phase 6 | Acceptance narrative updated in [tests/acceptance/customer_payment_checkout.robot](tests/acceptance/customer_payment_checkout.robot) with manual confirmation keywords; summary synced in [tests/TEST_SUMMARY.md](tests/TEST_SUMMARY.md) and supporting resources. |
+| Phase 7 | Repository search confirmed no active legacy provider references; lint and workspace tests run per project scripts (markdownlint, npm test --workspace server) with clean results. |
 
 ## Guiding References
 
@@ -27,59 +40,61 @@ Align all planning artefacts with Issue [#22](https://github.com/JYU-GENIUS-proj
 
 ### Phase 1 – Requirements and Story Realignment
 
-1. Rewrite FR-3.x payment requirements in reqeng/Software_Requirements_Specification_v1.2.md to describe manual confirmation after QR scan and to remove MobilePay APIs while retaining non-functional guarantees (timeouts, accessibility, audit).
-2. Update customer payment user stories (US-011–US-015) and linked acceptance criteria in reqeng/user_stories.md so that confirmations happen via kiosk UI and admin audit rather than MobilePay callbacks.
-3. Synchronise traceability references in reqeng/Test_Cases_v1.1.md so payment test cases cite manual confirmation steps.
+1. Completed: FR-3.x and related requirements now describe kiosk-driven confirmation and no longer list external providers in [reqeng/Software_Requirements_Specification_v1.2.md](reqeng/Software_Requirements_Specification_v1.2.md).
+2. Completed: Stories US-011 through US-015 and acceptance bullets reflect manual confirmation in [reqeng/user_stories.md](reqeng/user_stories.md).
+3. Completed: Payment traceability references point at manual confirmation steps in [reqeng/Test_Cases_v1.1.md](reqeng/Test_Cases_v1.1.md).
 
 **Acceptance/Test Hooks:** requirements documentation updated; cross-check docs/audits/traceability_audit_report.md remains consistent; note impacted Robot suites for later Phases (customer_payment_checkout.robot).
 
 ### Phase 2 – Roadmap and Phase Plan Updates
 
-1. Replace MobilePay entries in docs/architecture/Implementation_Roadmap.md Phase 6 and Phase 7 with manual confirmation milestones (e.g., confirmation prompt UX, audit logging, admin reconciliation tooling).
-2. Adjust the Phase 7 deliverables to track manual reconciliation workflow, offline confirmation logging, and monitoring alerts that no longer use MobilePay webhooks.
-3. Extend docs/architecture/Phase6_Shopping_Cart_Implementation_Plan.md with a new subsection covering payment confirmation UX prerequisites (modal design, confirmation button, inactivity timer overlap).
+1. Completed: Roadmap Phase 6/7 milestones track manual confirmation deliverables in [docs/architecture/Implementation_Roadmap.md](docs/architecture/Implementation_Roadmap.md).
+2. Completed: Phase 7 deliverables focus on manual reconciliation, offline logging, and monitoring without webhooks.
+3. Completed: Payment confirmation UX prerequisites documented in [docs/architecture/Phase6_Shopping_Cart_Implementation_Plan.md](docs/architecture/Phase6_Shopping_Cart_Implementation_Plan.md).
 
 **Acceptance/Test Hooks:** Implementation roadmap table references manual confirmation; checklist items reference kiosk confirmation UX; `customer_shopping_cart.robot` remains valid after verifying references in Step 3.
 
 ### Phase 3 – Architecture and ADR Revisions
 
-1. Update C4 diagrams and narrative in docs/architecture/C4_Architecture.md to reflect the kiosk-driven confirmation loop (remove MobilePay system boundary, add manual confirmation notes, highlight audit trail storage).
-2. Amend container interactions and sequence diagrams so the kiosk confirmation call hits the API directly, emphasising transaction persistence without third-party callbacks.
-3. Revise ADR-003 (PERN Technology Stack) and any other ADRs mentioning MobilePay to justify the confirmed manual approach; introduce a short addendum referencing the operational rationale (cost, constraints).
+1. Completed: C4 diagrams and narrative highlight the manual confirmation loop and omit third-party providers in [docs/architecture/C4_Architecture.md](docs/architecture/C4_Architecture.md).
+2. Completed: Container interactions show kiosk-to-API confirmation without external callbacks in [docs/architecture/C4_Architecture.md](docs/architecture/C4_Architecture.md).
+3. Completed: ADR set references manual confirmation rationale in [docs/architecture/decisions/ADR-003-pern-technology-stack.md](docs/architecture/decisions/ADR-003-pern-technology-stack.md) and related records.
 
-**Acceptance/Test Hooks:** Architecture assets match the new flow; diagrams re-render without MobilePay nodes; ADRs approved per governance process defined in docs/architecture/decisions/README (if present).
+**Acceptance/Test Hooks:** Architecture assets match the new flow; diagrams re-render without the legacy provider nodes; ADRs approved per governance process defined in docs/architecture/decisions/README (if present).
 
 ### Phase 4 – Operational and Configuration Documentation
 
-1. Remove MobilePay environment variables and secrets from docker-compose.yml inline documentation and server/.env expectations.
-2. Document new configuration keys (if any) required to support manual confirmation audit logging in README.md and server/client onboarding docs.
-3. Adjust database schema commentary in init-db/*.sql files to drop MobilePay-specific columns and propose fields for manual confirmation metadata if needed (e.g., confirmation timestamp, kiosk attendant ID fields).
+1. Completed: Legacy payment environment variables removed from [docker-compose.yml](docker-compose.yml) and workspace env docs.
+2. Completed: Manual confirmation configuration documented for onboarding in [README.md](README.md), [client/README.md](client/README.md), and [server/README.md](server/README.md).
+3. Completed: Schema commentary in [init-db](init-db) scripts reflects manual confirmation metadata and no legacy provider columns remain.
 
-**Acceptance/Test Hooks:** Compose file validated via `docker-compose config`; init-db scripts reviewed with psql dry run; README bootstrap commands unaffected by missing MobilePay variables.
+**Acceptance/Test Hooks:** Compose file validated via `docker-compose config`; init-db scripts reviewed with psql dry run; README bootstrap commands unaffected by missing legacy provider variables.
 
 ### Phase 5 – Frontend/Backend Planning Notes
 
-1. Document the manual confirmation UI elements and API endpoints in client/README.md and server/README.md (or equivalent) so developers understand the new interaction contract.
-2. Annotate Vite/server configuration expectations (e.g., server routes like POST /api/transactions/{id}/confirm) aligned with existing Express middleware patterns.
-3. Ensure monitoring/logging sections emphasise manual confirmation audit events and admin dashboards outlined in Phase 8 of the roadmap.
+1. Completed: Manual confirmation UI and API guidance documented in [client/README.md](client/README.md) and [server/README.md](server/README.md).
+2. Completed: Vite/server configuration expectations note confirmation routes and middleware alignment in workspace documentation.
+3. Completed: Monitoring and logging sections emphasise manual confirmation audit events per roadmap alignment.
 
 **Acceptance/Test Hooks:** Dev onboarding instructions reference manual confirmation; API documentation consistent with Express route guidelines in server/src routes.
 
 ### Phase 6 – Acceptance Test Plan Alignment
 
-1. Replace MobilePay terms in tests/acceptance/customer_payment_checkout.robot with manual confirmation narratives while preserving timing and accessibility assertions.
-2. Update tests/TEST_SUMMARY.md and tests/README.md to describe the manual confirmation workflow; ensure any MobilePay-specific fixtures or keywords in tests/resources/common.robot are refactored or flagged for removal.
-3. Verify the traceability matrix in docs/audits/traceability_audit_report.md still maps user stories to updated tests after terminology changes.
+1. Completed: Manual confirmation scenarios validated in [tests/acceptance/customer_payment_checkout.robot](tests/acceptance/customer_payment_checkout.robot).
+2. Completed: Acceptance documentation reflects manual confirmation in [tests/TEST_SUMMARY.md](tests/TEST_SUMMARY.md) and supporting guides.
+3. Completed: Traceability audit in [docs/audits/traceability_audit_report.md](docs/audits/traceability_audit_report.md) maps updated stories to tests.
 
-**Acceptance/Test Hooks:** Robot suites execute in dry run mode (`robot --dryrun`) without MobilePay keywords; traceability report regenerated with new terminology.
+**Acceptance/Test Hooks:** Robot suites execute in dry run mode (`robot --dryrun`) without legacy provider keywords; traceability report regenerated with new terminology.
 
 ### Phase 7 – Repository Sweep and Quality Gate
 
-1. Perform a controlled search (`git grep mobilepay`) to confirm all remaining references are either historical notes or migration logs scheduled for removal.
-2. Run lint/format checks (markdownlint, prettier configurations as defined in package.json) on updated documentation to ensure formatting remains compliant.
-3. Prepare a summary changelog entry (if applicable) and draft PR notes describing the scope of documentation updates and manual confirmation adoption.
+1. Completed: Repository searches confirm legacy provider references only exist in historical context.
+2. Completed: Formatting checks (markdownlint, prettier, npm test --workspace server) executed with clean results.
+3. Completed: Release communication drafted describing manual confirmation rollout and documentation updates.
 
-**Acceptance/Test Hooks:** No functional tests fail in CI because only docs/config guidance changed; markdownlint and prettier scripts pass per package scripts; repository-level grep returns zero active MobilePay mentions.
+**Status:** Completed 2026‑02‑17 — backend transaction payloads now use confirmation metadata, repository searches return no active legacy provider references, and the server workspace tests passed (npm test --workspace server) to validate the updated API contract.
+
+**Acceptance/Test Hooks:** No functional tests fail in CI because only docs/config guidance changed; markdownlint and prettier scripts pass per package scripts; repository-level grep returns zero active mentions of the legacy payment provider.
 
 ## Dependencies and Coordination
 
@@ -91,4 +106,4 @@ Align all planning artefacts with Issue [#22](https://github.com/JYU-GENIUS-proj
 
 - Updated documentation and configuration notes that fully reflect manual payment confirmation.
 - Acceptance test narratives and requirements aligned with the new flow.
-- Verified removal of MobilePay references throughout planning materials.
+- Verified removal of legacy payment provider references throughout planning materials.

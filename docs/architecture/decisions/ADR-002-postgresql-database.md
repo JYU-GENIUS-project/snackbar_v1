@@ -49,7 +49,7 @@ We will use **PostgreSQL version 18** as the primary relational database for the
 ### PostgreSQL-Specific Features to Utilize
 
 | Feature | Use Case | SRS Reference |
-|---------|----------|---------------|
+| ------- | -------- | ------------- |
 | **UUID (uuid-ossp)** | Primary keys for all entities | Section 8.1 |
 | **DECIMAL(5,2)** | Monetary values (prices 0.01-999.99 EUR) | FR-6.1.1 |
 | **TIMESTAMP WITH TIME ZONE** | Accurate datetime handling | Section 8.1.3 |
@@ -61,7 +61,7 @@ We will use **PostgreSQL version 18** as the primary relational database for the
 
 ### Connection Pool Configuration
 
-```
+```ini
 POOL_MIN=2      # Minimum connections
 POOL_MAX=10     # Maximum connections
 POOL_IDLE_TIMEOUT=30000  # 30 seconds idle timeout
@@ -70,10 +70,10 @@ POOL_IDLE_TIMEOUT=30000  # 30 seconds idle timeout
 ### Database Schema Overview
 
 | Table | Purpose | Key Features |
-|-------|---------|--------------|
+| ----- | ------- | ------------ |
 | `Product` | Product catalog | UUID PK, JSONB categories, soft delete |
 | `Category` | Product categories | Unique names, display ordering |
-| `Transaction` | Purchase records | ENUM status, MobilePay reference |
+| `Transaction` | Purchase records | ENUM status, manual confirmation metadata |
 | `TransactionItem` | Line items | Snapshot pricing, quantity tracking |
 | `SystemConfiguration` | System settings | Operating hours, maintenance mode |
 | `Admin` | Administrator accounts | bcrypt password hash |
@@ -82,7 +82,7 @@ POOL_IDLE_TIMEOUT=30000  # 30 seconds idle timeout
 
 ### PostgreSQL Server Configuration (Production)
 
-```
+```yaml
 max_connections: 100
 shared_buffers: 512MB (25% of RAM)
 effective_cache_size: 1.5GB (50-75% of RAM)
@@ -170,24 +170,28 @@ maintenance_work_mem: 128MB
 ## Alternatives Considered
 
 ### 1. MySQL/MariaDB (Rejected)
+
 - **Description:** Popular open-source relational database
 - **Pros:** Wide adoption, good performance, familiar to many developers
 - **Cons:** Less advanced JSON support, no native UUID type, ENUM limitations
 - **Rejection Reason:** SRS explicitly specifies PostgreSQL; PostgreSQL offers superior JSONB and UUID support needed for this project
 
 ### 2. MongoDB (Rejected)
+
 - **Description:** Document-oriented NoSQL database
 - **Pros:** Flexible schema, native JSON storage, horizontal scaling
 - **Cons:** Weaker ACID guarantees, less suited for relational data, no native transactions across collections
 - **Rejection Reason:** System has clear relational data model (products, transactions, line items); ACID transactions required for payment processing
 
 ### 3. SQLite (Rejected)
+
 - **Description:** Embedded file-based database
 - **Pros:** Zero configuration, no server process, portable
 - **Cons:** Limited concurrency, file-based (harder to backup), no network access
 - **Rejection Reason:** Does not meet production reliability requirements; limited to single-writer scenarios
 
 ### 4. Cloud-Managed Database (Deferred)
+
 - **Description:** AWS RDS, Google Cloud SQL, or Azure Database for PostgreSQL
 - **Pros:** Managed backups, automatic failover, scaling options
 - **Cons:** Ongoing costs, internet dependency, vendor lock-in

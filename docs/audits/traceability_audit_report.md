@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD013 -->
 # Traceability Audit Report
 
 **Date:** 2025-11-25  
@@ -13,7 +14,7 @@ This report documents the traceability audit between user stories defined in `re
 ### Key Findings
 
 | Metric | Value |
-|--------|-------|
+| --- | --- |
 | Total User Stories | 68 |
 | User Stories Covered | 68 |
 | User Stories Missing Coverage | 0 |
@@ -24,6 +25,7 @@ This report documents the traceability audit between user stories defined in `re
 ## Audit Methodology
 
 The audit examined:
+
 1. **Requirements Source:** `reqeng/user_stories.md` - containing 68 user stories (US-001 through US-068)
 2. **SRS Reference:** `reqeng/Software_Requirements_Specification_v1.2.md`
 3. **Test Files Scanned:** 14 Robot Framework files in `tests/` directory
@@ -31,6 +33,7 @@ The audit examined:
    - 2 resource files (shared keywords and common setup)
 
 User stories were considered covered if their ID appeared in either:
+
 - `[Tags]` section of a test case
 - `[Documentation]` section of a test case
 - Test case name (e.g., `US-019: Secure Admin Login...`)
@@ -42,7 +45,7 @@ User stories were considered covered if their ID appeared in either:
 ### Customer User Stories (US-001 to US-018)
 
 | User Story | Category | Test File | Status |
-|------------|----------|-----------|--------|
+| --- | --- | --- | --- |
 | US-001 | Product Browsing | customer_product_browsing.robot | ✅ Covered |
 | US-002 | Category Filtering | customer_product_browsing.robot | ✅ Covered |
 | US-003 | Allergen Information | customer_product_browsing.robot | ✅ Covered |
@@ -53,8 +56,8 @@ User stories were considered covered if their ID appeared in either:
 | US-008 | Quantity Adjustment | customer_shopping_cart.robot | ✅ Covered |
 | US-009 | Remove Items | customer_shopping_cart.robot | ✅ Covered |
 | US-010 | Cart Timeout | customer_shopping_cart.robot | ✅ Covered |
-| US-011 | QR Code Generation | customer_payment_checkout.robot | ✅ Covered |
-| US-012 | MobilePay Payment | customer_payment_checkout.robot | ✅ Covered |
+| US-011 | Confirmation Prompt Timing | customer_payment_checkout.robot | ✅ Covered |
+| US-012 | Manual Payment Confirmation | customer_payment_checkout.robot | ✅ Covered |
 | US-013 | Success Message | customer_payment_checkout.robot | ✅ Covered |
 | US-014 | Error Message | customer_payment_checkout.robot | ✅ Covered |
 | US-015 | Uncertain Payment | customer_payment_checkout.robot | ✅ Covered |
@@ -65,7 +68,7 @@ User stories were considered covered if their ID appeared in either:
 ### Admin User Stories (US-019 to US-056)
 
 | User Story | Category | Test File | Status |
-|------------|----------|-----------|--------|
+| --- | --- | --- | --- |
 | US-019 | Admin Login | admin_authentication_products.robot | ✅ Covered |
 | US-020 | Session Timeout | admin_authentication_products.robot | ✅ Covered |
 | US-021 | Multi-Admin | admin_authentication_products.robot | ✅ Covered |
@@ -108,17 +111,17 @@ User stories were considered covered if their ID appeared in either:
 ### System User Stories (US-057 to US-068)
 
 | User Story | Category | Test File | Status |
-|------------|----------|-----------|--------|
-| US-057 | QR Code Performance | admin_monitoring_troubleshooting.robot | ✅ Covered |
+| --- | --- | --- | --- |
+| US-057 | Confirmation Prompt Performance | admin_monitoring_troubleshooting.robot | ✅ Covered |
 | US-058 | Display Performance | admin_monitoring_troubleshooting.robot | ✅ Covered |
 | US-059 | Transaction Persistence | system_technical_security.robot | ✅ Covered |
 | US-060 | Automated Backups | system_technical_security.robot | ✅ Covered |
 | US-061 | Password Hashing | system_technical_security.robot | ✅ Covered |
 | US-062 | Image Validation | system_technical_security.robot | ✅ Covered |
-| US-063 | HTTPS/TLS | system_technical_security.robot | ✅ Covered |
+| US-063 | Manual Confirmation Transport Security | system_technical_security.robot | ✅ Covered |
 | US-064 | EXIF Stripping | system_integration_communication.robot | ✅ Covered |
-| US-065 | API Retry | system_integration_communication.robot | ✅ Covered |
-| US-066 | Graceful Errors | system_integration_communication.robot | ✅ Covered |
+| US-065 | Confirmation Audit Retry | system_integration_communication.robot | ✅ Covered |
+| US-066 | Manual Confirmation Resilience | system_integration_communication.robot | ✅ Covered |
 | US-067 | Email Retry | system_integration_communication.robot | ✅ Covered |
 | US-068 | Transaction Logging | system_integration_communication.robot | ✅ Covered |
 
@@ -129,7 +132,7 @@ User stories were considered covered if their ID appeared in either:
 ### Acceptance Test Files (12 files)
 
 | File | User Stories Covered |
-|------|---------------------|
+| --- | --- |
 | `tests/acceptance/customer_product_browsing.robot` | US-001 to US-005 |
 | `tests/acceptance/customer_shopping_cart.robot` | US-006 to US-010 |
 | `tests/acceptance/customer_payment_checkout.robot` | US-011 to US-015 |
@@ -146,7 +149,7 @@ User stories were considered covered if their ID appeared in either:
 ### Resource Files (2 files - shared keywords, not test cases)
 
 | File | Purpose |
-|------|---------|
+| --- | --- |
 | `tests/resources/common.robot` | Common keywords and setup used across test files |
 | `tests/resources/system_integration_keywords.robot` | Specialized keywords for system integration tests |
 
@@ -166,4 +169,4 @@ The traceability audit confirms that **100% of user stories** (US-001 through US
 
 ---
 
-*Report generated by automated traceability audit script*
+Report generated by automated traceability audit script.

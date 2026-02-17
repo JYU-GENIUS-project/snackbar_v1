@@ -9,30 +9,28 @@ Test Tags        customer    payment    checkout    high-priority
 
 
 *** Test Cases ***
-US-011: QR Code Generation Within 1 Second
-    [Documentation]    As a customer, I want to see a QR code generated within 1 second 
-    ...                after clicking checkout so that I can complete my purchase quickly.
-    [Tags]    US-011    qr-code    performance
+US-011: Confirmation Prompt Within 1 Second
+    [Documentation]    As a customer, I want the manual confirmation prompt to appear within 
+    ...                1 second after checkout so that I can follow the payment instructions immediately.
+    [Tags]    US-011    confirmation    performance
     
     Given the cart contains items totaling 5.00€
     When the customer clicks the checkout button
-    Then a QR code should be generated within 1 second
-    And the QR code should be visible and scannable
-    And the QR code should be minimum 200x200 pixels
+    Then a confirmation prompt should appear within 1 second
+    And the confirmation modal should display payment guidance
+    And the confirm payment button should be prominent
 
 
-US-012: Pay Using MobilePay By Scanning QR Code
-    [Documentation]    As a customer, I want to pay using MobilePay by scanning the 
-    ...                QR code so that I can complete the transaction using my preferred 
-    ...                mobile payment method.
-    [Tags]    US-012    mobilepay    qr-payment
+US-012: Confirm Payment On Kiosk
+    [Documentation]    As a customer, I want to confirm my payment on the kiosk so that the 
+    ...                transaction is recorded without requiring a third-party app.
+    [Tags]    US-012    manual-confirmation    payment
     
-    Given a valid payment QR code is displayed
-    When the customer scans the QR code with MobilePay
-    And completes the payment in MobilePay
-    Then the kiosk should receive payment confirmation
-    And payment success message should be displayed
-    And the transaction should be logged as COMPLETED
+    Given a confirmation prompt is displayed
+    When the customer confirms payment on the kiosk
+    And the kiosk records manual confirmation
+    Then payment success message should be displayed
+    And the transaction should be logged as CONFIRMED
 
 
 US-013: Success Message With Green Checkmark
@@ -119,69 +117,64 @@ The customer clicks the checkout button
     Set Test Variable    ${START_TIME}    ${start_time}
     Click Button    id=checkout-button
 
-A QR code should be generated within 1 second
-    [Documentation]    Verifies QR code appears within 1 second
-    Wait Until Element Is Visible    id=payment-qr-code    timeout=2s
+A confirmation prompt should appear within 1 second
+    [Documentation]    Verifies confirmation prompt appears quickly after checkout
+    Wait Until Element Is Visible    id=manual-confirmation-modal    timeout=2s
     ${end_time}=    Get Time    epoch
     ${duration}=    Evaluate    ${end_time} - ${START_TIME}
-    Should Be True    ${duration} <= 1.0    QR generation took ${duration}s, expected ≤1s
+    Should Be True    ${duration} <= 1.0    Confirmation prompt took ${duration}s, expected ≤1s
 
-The QR code should be visible and scannable
-    [Documentation]    Verifies QR code is displayed properly
-    Element Should Be Visible    id=payment-qr-code
-    # Verify it's an image or canvas element
-    ${element_type}=    Get Element Attribute    id=payment-qr-code    tagName
-    Should Be True    '${element_type}' in ['IMG', 'CANVAS', 'SVG']
+The confirmation modal should display payment guidance
+    [Documentation]    Verifies manual payment guidance is shown
+    Element Should Be Visible    id=manual-confirmation-modal
+    ${message}=    Get Text    id=manual-confirmation-modal
+    Should Contain    ${message}    Confirm your payment
+    Should Contain    ${message}    Show receipt to staff
 
-The QR code should be minimum 200x200 pixels
-    [Documentation]    Verifies QR code meets minimum size requirement
-    ${width}=    Get Element Attribute    id=payment-qr-code    offsetWidth
-    ${height}=    Get Element Attribute    id=payment-qr-code    offsetHeight
-    Should Be True    ${width} >= 200    QR code width ${width}px < 200px
-    Should Be True    ${height} >= 200    QR code height ${height}px < 200px
+The confirm payment button should be prominent
+    [Documentation]    Verifies confirm button is available and primary CTA
+    Element Should Be Visible    id=confirm-payment-button
+    ${class}=    Get Element Attribute    id=confirm-payment-button    class
+    Should Contain    ${class}    primary
 
-A valid payment QR code is displayed
-    [Documentation]    Precondition: QR code is shown
+A confirmation prompt is displayed
+    [Documentation]    Precondition: confirmation modal is visible
     Add Product To Cart    Coca-Cola
     Click Element    id=cart-icon
     Wait Until Element Is Visible    id=checkout-button    timeout=5s
     Click Button    id=checkout-button
-    Wait Until Element Is Visible    id=payment-qr-code    timeout=2s
+    Wait Until Element Is Visible    id=manual-confirmation-modal    timeout=2s
 
-The customer scans the QR code with MobilePay
-    [Documentation]    Simulates scanning QR code (test simulation)
-    # In real testing, this would involve actual MobilePay test app
-    # For automation, we simulate the scan action
-    Log    Simulating MobilePay QR code scan
-    # Trigger test payment via API or mock
+The customer confirms payment on the kiosk
+    [Documentation]    Simulates the customer pressing the confirm button
+    Click Button    id=confirm-payment-button
 
-Completes the payment in MobilePay
-    [Documentation]    Simulates payment completion
-    # Simulate payment confirmation from MobilePay
-    # In real test, this would be actual MobilePay sandbox transaction
-    Sleep    2s    # Simulate payment processing time
-    Execute Javascript    window.simulatePaymentSuccess()
+The kiosk records manual confirmation
+    [Documentation]    Simulates backend confirmation recording
+    Sleep    1s
+    Execute Javascript    window.simulateManualConfirmationSuccess()
 
-The kiosk should receive payment confirmation
-    [Documentation]    Verifies kiosk received payment confirmation
+The kiosk should receive manual confirmation
+    [Documentation]    Verifies kiosk received manual confirmation
     Wait Until Element Is Visible    id=payment-success-message    timeout=10s
 
 Payment Success Message Should Be Displayed
     [Documentation]    Verifies payment success message appears
     Element Should Be Visible    id=payment-success-message
 
-The transaction should be logged as COMPLETED
+The transaction should be logged as CONFIRMED
     [Documentation]    Verifies transaction status (would check via API/DB)
     # This would verify via backend API or database query
-    Log    Transaction status: COMPLETED (verified via backend)
+    Log    Transaction status: CONFIRMED (verified via backend)
 
 Payment has been completed successfully
     [Documentation]    Simulates successful payment scenario
     Add Product To Cart    Coca-Cola
     Click Element    id=cart-icon
     Click Button    id=checkout-button
-    Wait Until Element Is Visible    id=payment-qr-code    timeout=2s
-    Execute Javascript    window.simulatePaymentSuccess()
+    Wait Until Element Is Visible    id=manual-confirmation-modal    timeout=2s
+    Click Button    id=confirm-payment-button
+    Execute Javascript    window.simulateManualConfirmationSuccess()
     Wait Until Element Is Visible    id=payment-success-message    timeout=10s
 
 The success message is displayed
@@ -232,8 +225,9 @@ Payment has failed
     Add Product To Cart    Coca-Cola
     Click Element    id=cart-icon
     Click Button    id=checkout-button
-    Wait Until Element Is Visible    id=payment-qr-code    timeout=2s
-    Execute Javascript    window.simulatePaymentFailure()
+    Wait Until Element Is Visible    id=manual-confirmation-modal    timeout=2s
+    Click Button    id=confirm-payment-button
+    Execute Javascript    window.simulateManualConfirmationFailure()
     Wait Until Element Is Visible    id=payment-error-message    timeout=10s
 
 The error message is displayed
@@ -290,8 +284,9 @@ Payment was potentially charged but confirmation unclear
     Add Product To Cart    Coca-Cola
     Click Element    id=cart-icon
     Click Button    id=checkout-button
-    Wait Until Element Is Visible    id=payment-qr-code    timeout=2s
-    Execute Javascript    window.simulatePaymentUncertain()
+    Wait Until Element Is Visible    id=manual-confirmation-modal    timeout=2s
+    Click Button    id=confirm-payment-button
+    Execute Javascript    window.simulateManualConfirmationPending()
     Wait Until Element Is Visible    id=payment-uncertain-message    timeout=10s
 
 The uncertain status message is displayed
@@ -308,7 +303,7 @@ The message should show a warning icon (⚠️)
 The message should indicate "Payment processor error"
     [Documentation]    Verifies error type mentioned
     ${message}=    Get Text    id=payment-uncertain-message
-    Should Contain    ${message}    Payment processor error
+    Should Contain    ${message}    Manual confirmation pending
 
 The message should say "If you were charged, you may take your items"
     [Documentation]    Verifies customer guidance provided
@@ -341,7 +336,7 @@ A transaction is marked as PAYMENT_UNCERTAIN
 Admin reviews the uncertain payment in admin portal
     [Documentation]    Admin accesses uncertain payment view
     # Would navigate to admin portal and find transaction
-    Log    Admin reviewing uncertain payment #12345
+    Log    Admin reviewing pending confirmation #12345
 
 Admin should be able to mark it as "Confirmed" or "Refunded"
     [Documentation]    Verifies reconciliation options available

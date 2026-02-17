@@ -7,7 +7,7 @@ Documentation       System Technical & Security User Stories (US-059 to US-063)
 ...                 - Automated backup scheduling
 ...                 - Password security (hashing)
 ...                 - Image upload validation and sanitization
-...                 - Secure API communication (HTTPS/TLS)
+...                 - Secure confirmation service communication (HTTPS/TLS)
 
 Library             SeleniumLibrary
 Resource            ../resources/common.robot
@@ -162,44 +162,44 @@ US-062: Image Upload Security Comprehensive Test
     And image processing should be performed in a sandboxed environment
     And the system should scan for steganography or hidden data (optional, log warning)
 
-US-063: Communicate With MobilePay API Over HTTPS/TLS 1.2+ - Main Scenario
-    [Documentation]    As a system, I want to communicate with MobilePay API over HTTPS/TLS 1.2+
-    ...                so that payment data is encrypted in transit.
-    [Tags]    US-063    system    security    payment    critical
+US-063: Secure Manual Confirmation Events Over HTTPS/TLS 1.2+ - Main Scenario
+    [Documentation]    As a system, I want to transmit manual confirmation events over HTTPS/TLS 1.2+
+    ...                so that confirmation data is encrypted in transit.
+    [Tags]    US-063    system    security    confirmation    critical
     
-    Given the system is configured to communicate with MobilePay API
-    When the system initiates a payment request
+    Given the system is configured to communicate with the confirmation service
+    When the system sends a manual confirmation event
     Then the connection should use HTTPS protocol (not HTTP)
     And the TLS version should be 1.2 or higher (preferably 1.3)
     And the certificate should be valid and issued by a trusted CA
-    And the system should verify the MobilePay API certificate chain
-    And sensitive payment data should only be transmitted over the encrypted connection
+    And the system should verify the confirmation service certificate chain
+    And sensitive confirmation data should only be transmitted over the encrypted connection
 
 US-063: TLS Security Configuration - Edge Case
-    [Documentation]    Verify TLS configuration meets security standards
-    [Tags]    US-063    system    security    payment    edge-case
+    [Documentation]    Verify TLS configuration meets confirmation service security standards
+    [Tags]    US-063    system    security    confirmation    edge-case
     
-    Given the MobilePay API integration is active
+    Given the confirmation service integration is active
     When examining the TLS configuration
     Then weak cipher suites (RC4, DES, 3DES) should be disabled
     And strong cipher suites (AES-GCM, ChaCha20) should be preferred
     And the system should reject connections with TLS 1.0 or 1.1
     And the system should enforce certificate hostname verification
-    And the system should implement certificate pinning for MobilePay API (recommended)
+    And the system should implement certificate pinning for the confirmation service (recommended)
 
-US-063: Secure Payment Data Transmission - Comprehensive Test
-    [Documentation]    Comprehensive payment security validation
-    [Tags]    US-063    system    security    payment    comprehensive
+US-063: Secure Confirmation Data Transmission - Comprehensive Test
+    [Documentation]    Comprehensive confirmation security validation
+    [Tags]    US-063    system    security    confirmation    comprehensive
     
     Given a customer is completing a payment
-    When monitoring the payment flow
-    Then all API calls to MobilePay should use HTTPS with TLS 1.2+
-    And payment request/response data should be encrypted in transit
-    And no sensitive payment data should be logged in plaintext
+    When monitoring the manual confirmation flow
+    Then all confirmation service calls should use HTTPS with TLS 1.2+
+    And confirmation request/response data should be encrypted in transit
+    And no sensitive confirmation data should be logged in plaintext
     And connection failures should fall back to retry, never downgrade to HTTP
-    And the system should implement timeout and retry logic for API calls
-    And API authentication tokens should be transmitted securely
-    And the system should validate all API responses to prevent man-in-the-middle attacks
+    And the system should implement timeout and retry logic for confirmation calls
+    And confirmation service authentication tokens should be transmitted securely
+    And the system should validate all confirmation responses to prevent man-in-the-middle attacks
     And PCI-DSS compliance requirements should be met for payment data handling
 
 *** Keywords ***
@@ -210,7 +210,7 @@ the system is operational
     Log    System is operational and ready for transactions
 
 a customer completes a purchase transaction
-    Log    Customer completes purchase: 2x Coffee (€3.00 each), Total: €6.00, Payment: MobilePay
+    Log    Customer completes purchase: 2x Coffee (€3.00 each), Total: €6.00, Confirmation: Manual
 
 the transaction data should be persisted to the database within 1 second
     Log    Verifying transaction persisted within 1 second
@@ -231,7 +231,7 @@ the transaction should include timestamp, items, quantities, prices, and payment
     Log    - Prices: €3.00 each
     Log    - Total: €6.00
     Log    - Payment Status: Confirmed
-    Log    - Payment Method: MobilePay
+    Log    - Payment Method: Manual Confirmation
 
 the data should be immediately queryable from the admin portal
     Log    Admin can query transaction immediately after persistence
@@ -256,7 +256,7 @@ the admin portal should show all 10 transactions correctly
     Log    Transaction IDs: TXN-001 through TXN-010
 
 a transaction is in progress with payment confirmed
-    Log    Transaction in progress: Payment confirmed by MobilePay
+    Log    Transaction in progress: Payment confirmed via manual workflow
 
 the system experiences a simulated failure before final save
     Log    SIMULATED FAILURE: System crash before transaction commit
@@ -520,13 +520,13 @@ the system should scan for steganography or hidden data (optional, log warning)
     Log    Steganography scan: No hidden data detected
     Log    (Optional security layer)
 
-# MobilePay API Security Keywords (US-063)
-the system is configured to communicate with MobilePay API
-    Log    MobilePay API endpoint: https://api.mobilepay.dk/v1
-    Log    API credentials configured securely
+# Manual Confirmation Service Security Keywords (US-063)
+the system is configured to communicate with the confirmation service
+    Log    Confirmation service endpoint: https://confirm.snackbar.local/v1
+    Log    Service credentials configured securely
 
-the system initiates a payment request
-    Log    Initiating payment request for €6.00
+the system sends a manual confirmation event
+    Log    Sending confirmation event for transaction €6.00
 
 the connection should use HTTPS protocol (not HTTP)
     Log    Protocol check: HTTPS ✓
@@ -541,18 +541,18 @@ the certificate should be valid and issued by a trusted CA
     Log    Certificate valid until: 2026-03-15
     Log    Certificate chain: VALID
 
-the system should verify the MobilePay API certificate chain
+the system should verify the confirmation service certificate chain
     Log    Verifying certificate chain
     Log    Root CA: Trusted
     Log    Intermediate CA: Valid
     Log    Certificate chain: VERIFIED
 
-sensitive payment data should only be transmitted over the encrypted connection
-    Log    Payment data encrypted with TLS 1.3
+sensitive confirmation data should only be transmitted over the encrypted connection
+    Log    Confirmation data encrypted with TLS 1.3
     Log    Data in transit: ENCRYPTED
 
-the MobilePay API integration is active
-    Log    MobilePay API integration active and ready
+the confirmation service integration is active
+    Log    Confirmation service integration active and ready
 
 examining the TLS configuration
     Log    Reviewing TLS/SSL configuration
@@ -572,50 +572,50 @@ the system should reject connections with TLS 1.0 or 1.1
 
 the system should enforce certificate hostname verification
     Log    Hostname verification: ENABLED
-    Log    Expected hostname: api.mobilepay.dk
-    Log    Actual hostname: api.mobilepay.dk ✓
+    Log    Expected hostname: confirm.snackbar.local
+    Log    Actual hostname: confirm.snackbar.local ✓
 
-the system should implement certificate pinning for MobilePay API (recommended)
+the system should implement certificate pinning for the confirmation service (recommended)
     Log    Certificate pinning: IMPLEMENTED
     Log    Pinned certificate hash: sha256/abc123...
     Log    Extra protection against MITM attacks
 
 a customer is completing a payment
-    Log    Customer checkout: €6.00 via MobilePay
+    Log    Customer checkout: €6.00 via manual confirmation
 
-monitoring the payment flow
-    Log    Monitoring network traffic and API calls
+monitoring the manual confirmation flow
+    Log    Monitoring confirmation events and service calls
 
-all API calls to MobilePay should use HTTPS with TLS 1.2+
-    Log    Payment request: HTTPS/TLS 1.3 ✓
-    Log    Payment status check: HTTPS/TLS 1.3 ✓
-    Log    All API calls secured
+all confirmation service calls should use HTTPS with TLS 1.2+
+    Log    Confirmation event: HTTPS/TLS 1.3 ✓
+    Log    Confirmation status check: HTTPS/TLS 1.3 ✓
+    Log    All service calls secured
 
-payment request/response data should be encrypted in transit
+confirmation request/response data should be encrypted in transit
     Log    Request: Encrypted with TLS 1.3
     Log    Response: Encrypted with TLS 1.3
     Log    Packet inspection: Data unreadable without decryption
 
-no sensitive payment data should be logged in plaintext
-    Log    Log file check: Payment data masked
-    Log    Example log: "Payment request for €** to MobilePay"
+no sensitive confirmation data should be logged in plaintext
+    Log    Log file check: Confirmation data masked
+    Log    Example log: "Confirmation event for €** recorded"
 
 connection failures should fall back to retry, never downgrade to HTTP
     Log    Connection failed: Retrying with HTTPS
     Log    HTTP downgrade: PREVENTED
     Log    Retry count: 3 attempts
 
-the system should implement timeout and retry logic for API calls
+the system should implement timeout and retry logic for confirmation calls
     Log    Timeout: 30 seconds
     Log    Retry strategy: Exponential backoff (1s, 2s, 4s)
     Log    Max retries: 3
 
-API authentication tokens should be transmitted securely
+confirmation service authentication tokens should be transmitted securely
     Log    Bearer token: Transmitted in HTTPS header
     Log    Token stored encrypted at rest
     Log    Token never in URL parameters
 
-the system should validate all API responses to prevent man-in-the-middle attacks
+the system should validate all confirmation responses to prevent man-in-the-middle attacks
     Log    Response signature validation: ENABLED
     Log    Response integrity: VERIFIED
     Log    MITM attack: PREVENTED

@@ -60,7 +60,7 @@ We will adopt **Docker** as the containerization platform and **Docker Compose**
 ### Docker Compose Services
 
 | Service | Image/Build | Purpose | Ports |
-|---------|-------------|---------|-------|
+| ------- | ----------- | ------- | ----- |
 | `postgres` | `postgres:18` | Primary database | 5432 |
 | `api` | Custom Dockerfile | Node.js API server | 3000 |
 | `nginx` | `nginx:1.24-alpine` | Reverse proxy, SSL termination | 80, 443 |
@@ -68,7 +68,7 @@ We will adopt **Docker** as the containerization platform and **Docker Compose**
 ### Volume Strategy
 
 | Volume | Purpose | Mount Point |
-|--------|---------|-------------|
+| ------ | ------- | ----------- |
 | `postgres_data` | Database persistence | `/var/lib/postgresql/data` |
 | `uploads` | Product images | `/app/uploads` (API), `/usr/share/nginx/uploads` (Nginx) |
 | `logs` | Application logs | `/app/logs` |

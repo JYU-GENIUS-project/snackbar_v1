@@ -44,6 +44,14 @@ Phase 5 requires both customer-facing suites:
 
 The first suite already passes with the current UI. Re-run the status suite after making status or telemetry changes to document compliance with Implementation Roadmap Step 33.
 
+## Manual Payment Confirmation UI
+
+- Checkout renders a dedicated `Confirm Payment` modal that blocks navigation until the customer taps the primary confirmation button or cancels back to the cart.
+- The modal enumerates payment steps (scan QR / pay at register) and calls `POST /api/transactions/{transactionId}/confirm` after the customer affirms payment; success responses trigger the receipt-ready state and clear the cart.
+- Idle sessions auto-close the modal after `CONFIRMATION_TIMEOUT_SECONDS`, returning the cart to pending status and surfacing a toast that prompts the customer to seek staff assistance.
+- All confirmation attempts emit analytics events (`kiosk.payment_confirmation_started`, `kiosk.payment_confirmation_completed`, `kiosk.payment_confirmation_timeout`) so the admin dashboard can reconcile kiosk-side confirmations with audit logs.
+- UI text lives under `src/i18n/paymentConfirmation.ts` for future localisation; copy updates should keep the audit reference code (`CONF-###`) visible so staff can cite the kiosk record during disputes.
+
 ## Deployment Checklist
 
 - Ensure the backend exposes the status and feed routes behind `/api` with CORS enabled for the kiosk origin.

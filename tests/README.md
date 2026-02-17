@@ -7,12 +7,14 @@ This directory contains Robot Framework acceptance tests for the Snackbar Self-S
 The tests are organized by functional areas and user story categories across **12 test suites** with **175 test cases**:
 
 ### Customer Test Suites (40 tests)
+
 - **customer_product_browsing.robot** - Product browsing and discovery (US-001 to US-005) - 8 tests
 - **customer_shopping_cart.robot** - Shopping cart management (US-006 to US-010) - 7 tests
-- **customer_payment_checkout.robot** - Payment and checkout (US-011 to US-015) - 7 tests
+- **customer_payment_checkout.robot** - Payment, manual confirmation, and post-payment messaging (US-011 to US-015) - 7 tests
 - **customer_system_status.robot** - System status and availability (US-016 to US-018) - 18 tests
 
 ### Administrator Test Suites (105 tests)
+
 - **admin_authentication_products.robot** - Admin authentication and product management (US-019 to US-028) - 18 tests
 - **admin_category_management.robot** - Category management (US-029 to US-031) - 9 tests
 - **admin_inventory_management.robot** - Inventory management (US-032 to US-038) - 7 tests
@@ -21,6 +23,7 @@ The tests are organized by functional areas and user story categories across **1
 - **admin_monitoring_troubleshooting.robot** - Monitoring and troubleshooting (US-053 to US-058) - 21 tests
 
 ### System/Technical Test Suites (30 tests)
+
 - **system_technical_security.robot** - Technical and security requirements (US-059 to US-063) - 15 tests
 - **system_integration_communication.robot** - Integration and communication (US-064 to US-068) - 15 tests
 
@@ -51,12 +54,14 @@ sudo apt-get install chromium-chromedriver
 1. **Set up the application**: Ensure the Snackbar Kiosk application and Admin Portal are running and accessible.
 
 2. **Configure URLs** in `tests/resources/common.robot`:
+
    ```robot
    ${KIOSK_URL}    http://localhost:3000
    ${ADMIN_URL}    http://localhost:3000/admin
    ```
 
 3. **Configure test credentials** in `tests/resources/common.robot`:
+
    ```robot
    ${VALID_ADMIN_USERNAME}    admin
    ${VALID_ADMIN_PASSWORD}    SecurePass123!
@@ -153,6 +158,7 @@ US-001: View Products In Grid Layout
 ### Resource Files
 
 **common.robot** contains:
+
 - Common keywords used across all test suites
 - Shared variables (URLs, credentials, timeouts)
 - Helper functions for verification and interaction
@@ -160,6 +166,7 @@ US-001: View Products In Grid Layout
 ### Test Data
 
 Sample test data files are located in `/tests/data/`:
+
 - See the `data/README.md` for instructions on creating required test images
 - Test images are not included in version control for security reasons
 
@@ -168,12 +175,14 @@ Sample test data files are located in `/tests/data/`:
 ### High-Priority User Stories Covered
 
 #### Customer Stories (Kiosk Interface)
+
 - **US-001 to US-005**: Product browsing and discovery
 - **US-006 to US-010**: Shopping cart management
-- **US-011 to US-015**: Payment and checkout
+- **US-011 to US-015**: Manual payment confirmation and checkout feedback
 - **US-016 to US-018**: System status and availability
 
 #### Administrator Stories (Admin Portal)
+
 - **US-019 to US-022**: Authentication and session management
 - **US-023 to US-028**: Product management
 - **US-029 to US-031**: Category management
@@ -183,6 +192,7 @@ Sample test data files are located in `/tests/data/`:
 - **US-053 to US-058**: Monitoring and troubleshooting
 
 #### System/Technical Stories
+
 - **US-059 to US-063**: Technical and security requirements
 - **US-064 to US-068**: Integration and communication
 
@@ -190,7 +200,7 @@ Sample test data files are located in `/tests/data/`:
 
 - **175 acceptance test cases** covering all 68 user stories
 - **Edge cases** included for critical scenarios
-- **Performance tests** for QR code generation, real-time updates, and response times
+- **Performance tests** for confirmation prompt display (<1s), real-time updates, and response times
 - **Security tests** for authentication, session management, and data protection
 - **Accessibility tests** for WCAG AA compliance
 
@@ -241,23 +251,29 @@ jobs:
 ## Best Practices
 
 ### 1. Test Independence
+
 Each test should be independent and not rely on the execution order or state from other tests.
 
 ### 2. Use Tags Effectively
+
 Tag tests by:
+
 - User story ID (US-001, US-002, etc.)
 - Functional area (customer, admin, payment, etc.)
 - Priority (high-priority, medium-priority, etc.)
 - Test type (edge-case, performance, security, etc.)
 
 ### 3. Page Object Pattern
+
 For larger test suites, consider implementing the Page Object pattern to separate test logic from UI locators.
 
 ### 4. Wait Strategies
+
 - Use explicit waits (`Wait Until Element Is Visible`) instead of fixed sleeps
 - Set appropriate timeouts based on expected response times
 
 ### 5. Error Handling
+
 - Include negative test cases to verify error handling
 - Test edge cases and boundary conditions
 
@@ -266,6 +282,7 @@ For larger test suites, consider implementing the Page Object pattern to separat
 ### Common Issues
 
 1. **WebDriver Not Found**
+
    ```
    Solution: Install ChromeDriver and ensure it's in your PATH
    brew install chromedriver  # Mac
@@ -273,18 +290,21 @@ For larger test suites, consider implementing the Page Object pattern to separat
    ```
 
 2. **Element Not Found**
+
    ```
    Solution: Check that element IDs match the actual application
    Use browser dev tools to inspect elements
    ```
 
 3. **Timeout Errors**
+
    ```
    Solution: Increase timeout values in common.robot
    ${SELENIUM_TIMEOUT}    20s
    ```
 
 4. **Browser Window Issues**
+
    ```
    Solution: Run in headless mode or maximize window
    robot --variable BROWSER:headlesschrome tests/acceptance/

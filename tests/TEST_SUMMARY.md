@@ -1,11 +1,13 @@
 # Robot Framework Acceptance Tests - Summary
 
 ## Overview
+
 Comprehensive Robot Framework acceptance test suite created for the Snackbar Self-Service Kiosk System based on user stories defined in `/reqeng/user_stories.md`.
 
 ## Test Statistics
 
 ### Files Created
+
 - **18 files** total in the tests directory
 - **12 test suites** (.robot files)
 - **1 resource file** with common keywords
@@ -16,12 +18,14 @@ Comprehensive Robot Framework acceptance test suite created for the Snackbar Sel
 ### Test Coverage
 
 #### Total Test Cases: **175 tests**
+
 - ✅ All tests pass syntax validation (`robot --dryrun`)
 - ✅ Gherkin-style (Given-When-Then) format
 - ✅ Comprehensive edge case coverage
 - ✅ Performance and accessibility checks included
 
-#### By Test Suite:
+#### By Test Suite
+
 1. **customer_product_browsing.robot** - 8 tests (US-001 to US-005)
 2. **customer_shopping_cart.robot** - 7 tests (US-006 to US-010)
 3. **customer_payment_checkout.robot** - 7 tests (US-011 to US-015)
@@ -35,10 +39,11 @@ Comprehensive Robot Framework acceptance test suite created for the Snackbar Sel
 11. **system_technical_security.robot** - 15 tests (US-059 to US-063)
 12. **system_integration_communication.robot** - 15 tests (US-064 to US-068)
 
-#### By Priority:
+#### By Priority
+
 - **High Priority User Stories**: All 68 user stories covered
 - **Edge Cases**: Comprehensive edge case tests included
-- **Performance Tests**: Transaction persistence (<1s), QR generation (<1s), kiosk UI updates (<300ms), filter response (<300ms), sync (<5s), statistics (<2s), CSV export (<30s), log export (<10s)
+- **Performance Tests**: Transaction persistence (<1s), confirmation prompt display (<1s), kiosk UI updates (<300ms), filter response (<300ms), sync (<5s), statistics (<2s), CSV export (<30s), log export (<10s)
 - **Security Tests**: Authentication, session timeout, password hashing (bcrypt/Argon2), image upload validation, TLS 1.2+ for payments, audit immutability
 - **Accessibility Tests**: WCAG AA compliance, touch target validation, font size verification
 - **Compliance Tests**: Data retention (3 years), PCI-DSS payment handling, GDPR compliance (anonymous transactions)
@@ -46,6 +51,7 @@ Comprehensive Robot Framework acceptance test suite created for the Snackbar Sel
 ## User Stories Covered
 
 ### Customer Stories (40 tests)
+
 ✅ US-001: View products in grid layout
 ✅ US-002: Filter products by category  
 ✅ US-003: View allergen information
@@ -56,8 +62,8 @@ Comprehensive Robot Framework acceptance test suite created for the Snackbar Sel
 ✅ US-008: Adjust quantities with +/- buttons
 ✅ US-009: Remove individual items from cart
 ✅ US-010: Automatic cart clearing after 5 minutes
-✅ US-011: QR code generation within 1 second
-✅ US-012: Pay using MobilePay by scanning QR
+✅ US-011: Confirmation prompt appears within 1 second
+✅ US-012: Confirm payment directly on the kiosk
 ✅ US-013: Success message with green checkmark
 ✅ US-014: Error message with retry options
 ✅ US-015: Uncertain payment status notification
@@ -66,6 +72,7 @@ Comprehensive Robot Framework acceptance test suite created for the Snackbar Sel
 ✅ US-018: Touch-optimized text and buttons
 
 ### Admin Stories (105 tests)
+
 ✅ US-019: Secure admin login with username/password
 ✅ US-020: Session timeout after 30 minutes
 ✅ US-021: Create and manage multiple admin accounts
@@ -108,21 +115,24 @@ Comprehensive Robot Framework acceptance test suite created for the Snackbar Sel
 ✅ US-058: Kiosk display update performance (<300ms)
 
 ### System/Technical Stories (30 tests)
+
 ✅ US-059: Transaction data persistence (<1 second)
 ✅ US-060: Automated daily backups at 02:00
 ✅ US-061: Password hashing (bcrypt/Argon2)
 ✅ US-062: Image upload validation and sanitization
-✅ US-063: MobilePay API secure communication (HTTPS/TLS 1.2+)
+✅ US-063: Secure transmission of manual confirmation events
 ✅ US-064: Strip EXIF metadata from uploaded images
-✅ US-065: Retry failed MobilePay API calls with exponential backoff
-✅ US-066: Handle MobilePay API unavailability gracefully
+✅ US-065: Retry failed confirmation audit writes with exponential backoff
+✅ US-066: Handle manual confirmation service unavailability gracefully
 ✅ US-067: Retry failed email notifications up to 3 times
 ✅ US-068: Log all payment transactions with detailed status
 
 ## Test Infrastructure
 
 ### Resource Files
+
 **common.robot** (6.5 KB)
+
 - 20+ reusable keywords
 - Configuration variables (URLs, credentials, timeouts)
 - Helper functions for verification
@@ -131,7 +141,9 @@ Comprehensive Robot Framework acceptance test suite created for the Snackbar Sel
 - Performance timing utilities
 
 ### Documentation
+
 **tests/README.md** (8.2 KB)
+
 - Installation instructions
 - Running tests (all, specific suites, by tag)
 - Test structure explanation
@@ -139,7 +151,9 @@ Comprehensive Robot Framework acceptance test suite created for the Snackbar Sel
 - Troubleshooting guide
 
 ### Configuration
+
 **requirements.txt**
+
 - robotframework >= 6.1.0
 - robotframework-seleniumlibrary >= 6.1.0
 - selenium >= 4.15.0
@@ -148,6 +162,7 @@ Comprehensive Robot Framework acceptance test suite created for the Snackbar Sel
 ## Key Features
 
 ### Gherkin-Style Tests
+
 ```robot
 Given the kiosk is operational
 When the customer views the home screen
@@ -156,13 +171,16 @@ And each product should show an image
 ```
 
 ### Comprehensive Tagging
+
 Tests are tagged by:
+
 - User Story ID (US-001, US-002, etc.)
 - Functional area (customer, admin, payment, inventory)
 - Priority (high-priority, medium-priority)
 - Test type (edge-case, performance, security)
 
 ### Verification Types
+
 - ✅ Functional behavior
 - ✅ UI/UX requirements (touch targets ≥44x44px, font sizes)
 - ✅ Performance (response times, timeouts)
@@ -172,6 +190,7 @@ Tests are tagged by:
 ## Running the Tests
 
 ### Quick Start
+
 ```bash
 # Install dependencies
 pip install -r tests/requirements.txt
@@ -186,7 +205,9 @@ robot --include US-001 tests/acceptance/
 ```
 
 ### Test Execution
+
 The tests are designed to run against a live application instance. Configure URLs in `tests/resources/common.robot`:
+
 ```robot
 ${KIOSK_URL}    http://localhost:3000
 ${ADMIN_URL}    http://localhost:3000/admin
@@ -195,6 +216,7 @@ ${ADMIN_URL}    http://localhost:3000/admin
 ## Validation Results
 
 All tests successfully validated using `robot --dryrun`:
+
 - ✅ Syntax validation: **PASS**
 - ✅ Keyword resolution: **PASS**
 - ✅ Variable resolution: **PASS**

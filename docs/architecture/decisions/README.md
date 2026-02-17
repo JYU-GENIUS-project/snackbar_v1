@@ -9,7 +9,7 @@ Architecture Decision Records are documents that capture important architectural
 ## ADR Index
 
 | ADR | Title | Status | Date |
-|-----|-------|--------|------|
+| --- | ----- | ------ | ---- |
 | [ADR-001](ADR-001-containerization-strategy.md) | Containerization Strategy with Docker and Docker Compose | Accepted | 2025-12-02 |
 | [ADR-002](ADR-002-postgresql-database.md) | PostgreSQL as Primary Database | Accepted | 2025-12-02 |
 | [ADR-003](ADR-003-pern-technology-stack.md) | PERN Technology Stack Selection | Accepted | 2025-12-02 |
@@ -17,18 +17,22 @@ Architecture Decision Records are documents that capture important architectural
 ## ADR Summary
 
 ### ADR-001: Containerization Strategy
+
 **Decision:** Use Docker and Docker Compose for containerization and orchestration.
 
 **Key Points:**
+
 - PostgreSQL, API Server, and Nginx run as separate containers
 - Docker Compose manages dependencies and networking
 - Volumes persist database data and uploads
 - Multi-stage builds for optimized images
 
 ### ADR-002: PostgreSQL as Primary Database
+
 **Decision:** Use PostgreSQL 18 as the primary relational database.
 
 **Key Points:**
+
 - UUID support via uuid-ossp extension
 - JSONB for flexible data storage (categories, audit logs)
 - ENUM types for status fields
@@ -36,9 +40,11 @@ Architecture Decision Records are documents that capture important architectural
 - 3-year data retention with backup strategy
 
 ### ADR-003: PERN Technology Stack
+
 **Decision:** Use PERN stack (PostgreSQL, Express.js, React, Node.js) as the core technology.
 
 **Key Points:**
+
 - Single language (JavaScript/TypeScript) across full stack
 - Node.js 24.11 LTS with Express.js 5.1 for backend
 - React 19.2 with Vite 5.0 for frontend
@@ -102,7 +108,7 @@ When creating new ADRs, use the following template:
 ## ADR Status Definitions
 
 | Status | Description |
-|--------|-------------|
+| ------ | ----------- |
 | **Proposed** | Decision is under discussion and not yet accepted |
 | **Accepted** | Decision has been approved and is in effect |
 | **Deprecated** | Decision is no longer relevant or recommended |

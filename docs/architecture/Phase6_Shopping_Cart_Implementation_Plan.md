@@ -68,6 +68,7 @@
 - Provide immediate visual feedback states (waiting, success, failure) that comply with FR-3.4/3.5 timing and accessibility rules.
 - **Acceptance linkage:** Sets preconditions for US-011–US-014 and the forthcoming manual confirmation robot steps.
 
+<!-- markdownlint-disable MD029 -->
 4. **Quantity Controls and Purchase Limits**
    - Add +/- controls per cart item with disabled state when limit is reached (FR-2.4).
    - Display the exact limit message: “Maximum [X] of this item per purchase.”
@@ -103,6 +104,8 @@
    - Integration tests: cart API endpoints with session persistence and limit enforcement.
    - Run acceptance suite [tests/acceptance/customer_shopping_cart.robot](tests/acceptance/customer_shopping_cart.robot) (US-006–US-010).
    - **Status – 2026-02-10:** Acceptance suite executed with 7/7 scenarios passing after cart UI synchronization fixes; no blocking defects remain.
+
+<!-- markdownlint-enable MD029 -->
 
 ## Phase-to-Test Mapping
 

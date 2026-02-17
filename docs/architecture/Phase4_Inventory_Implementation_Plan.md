@@ -70,7 +70,7 @@
     - Ensure authenticated admin clients subscribe to SSE stream; kiosk channel can be layered later if required.
     - Implement server heartbeat with retry or backoff to avoid PM2 worker duplication; potentially leverage shared Redis or in-memory guard.
     - Update kiosk and admin clients to subscribe to events, showing banners and immediate table refresh (Implementation_Roadmap step 27).
-   - **Status**: Implemented via [server/src/routes/inventory.js](server/src/routes/inventory.js#L34-L58) SSE endpoint and [server/src/services/inventoryEvents.js](server/src/services/inventoryEvents.js#L1-L97); kiosk channel remains future scope.
+      - **Status**: Implemented via [server/src/routes/inventory.js](server/src/routes/inventory.js#L34-L58) SSE endpoint and [server/src/services/inventoryEvents.js](server/src/services/inventoryEvents.js#L1-L97); kiosk channel remains future scope.
 
 6. **Admin Portal UX Enhancements**
     - Replace mock inventory data in client/src/components/ProductManager.jsx with API-backed hooks (new useInventory hook in hooks/useInventory.js).

@@ -12,7 +12,7 @@
 ## Document Revision History
 
 | Version | Date | Author | Changes |
-|---------|------|--------|---------|
+| ------- | ---- | ------ | ------- |
 | 1.0 | 2025-11-06 | Requirements Engineering Team | Initial requirements specification |
 | 1.1 | 2025-11-10 | Requirements Engineering Team | Clarified ambiguous terms, resolved contradictions, added missing requirements, specified EUR as currency |
 | 1.2 | 2025-11-12 | Requirements Engineering Team | Added PERN stack technology specifications, PostgreSQL data types, deployment requirements |
@@ -737,45 +737,49 @@ The system operates as a trust-based, self-service solution where customers sele
 The kiosk interface SHALL provide the following screens:
 
 1. **Home/Product Grid Screen:**
-   - Touchscreen-optimized grid layout (2-3 columns depending on screen size)
-   - Product cards with images (800x600px), names (16px), prices (18px bold)
-   - Category filter buttons/tabs at top
-   - Shopping cart icon with item count badge
-   - All products visible without horizontal scrolling
+    - Touchscreen-optimized grid layout (2-3 columns depending on screen size)
+    - Product cards with images (800x600px), names (16px), prices (18px bold)
+    - Category filter buttons/tabs at top
+    - Shopping cart icon with item count badge
+    - All products visible without horizontal scrolling
 
 2. **Product Detail Screen (Optional):**
-   - Large product image
-   - Full description and allergen information
-   - Price and availability status
-   - Add to cart button (44x44px minimum)
+    - Large product image
+    - Full description and allergen information
+    - Price and availability status
+    - Add to cart button (44x44px minimum)
 
 3. **Shopping Cart Screen:**
-   - List of cart items with thumbnails
-   - Quantity controls (+/- buttons, 44x44px each)
-   - Remove item buttons
-   - Running total prominently displayed
-   - "Continue Shopping" and "Checkout" buttons
+    - List of cart items with thumbnails
+    - Quantity controls (+/- buttons, 44x44px each)
+    - Remove item buttons
+    - Running total prominently displayed
+    - "Continue Shopping" and "Checkout" buttons
 
 4. **Checkout Screen:**
-  - Order summary (items, quantities, total)
-  - QR code display (minimum 200x200px)
-  - Instructions: "Scan QR code with your payment app, then tap 'I have paid' on this screen"
-  - Cancel button
+
+    - Order summary (items, quantities, total)
+    - QR code display (minimum 200x200px)
+    - Instructions: "Scan QR code with your payment app, then tap 'I have paid' on this screen"
+    - Cancel button
 
 5. **Payment Confirmation Screen:**
-   - Success message with green checkmark icon
-   - Order summary
-   - "Start New Order" button
+
+    - Success message with green checkmark icon
+    - Order summary
+    - "Start New Order" button
 
 6. **Payment Failure Screen:**
-   - Error message with red X icon
-   - "Try Again" and "Cancel" buttons
-   - Support contact information
+
+    - Error message with red X icon
+    - "Try Again" and "Cancel" buttons
+    - Support contact information
 
 7. **Closed/Maintenance Screen:**
-   - Large status message
-   - Operating hours (if closed)
-   - Estimated return time (if maintenance, optional)
+
+    - Large status message
+    - Operating hours (if closed)
+    - Estimated return time (if maintenance, optional)
 
 #### 5.1.2 Admin Web Portal
 
@@ -1381,7 +1385,7 @@ INDEX idx_error_log_component ON ErrorLog(Component)
 ## 10. Risks and Mitigation
 
 | Risk | Impact | Probability | Mitigation Strategy | Residual Risk |
-|------|--------|-------------|---------------------|---------------|
+| ---- | ------ | ----------- | ------------------- | ------------- |
 | **Confirmation service outage** | High | Low | Display clear error messages; log incidents; email admin if confirmation unavailable > 15 min; document manual receipt procedure | Medium |
 | **Internet connectivity loss** | High | Medium | Display "service unavailable" message; document offline procedures; consider local caching for browsing in v1.1+ | Medium |
 | **Inventory discrepancy (theft/honor system)** | Medium | Medium | Negative stock tracking; manual adjustment tools; regular admin audits; trust-based messaging | Low |
@@ -1599,7 +1603,7 @@ The system will be considered complete and ready for production when:
 
 - **Environment Variables:** (stored in .env file, never committed to version control)
 
-  ```
+  ```ini
   # Node.js Application
   NODE_ENV=production
   PORT=3000
@@ -1830,7 +1834,7 @@ This section provides comprehensive details on all technologies, frameworks, lib
 
 **Choose one of the following:**
 
-**Option A: Material-UI (MUI)**
+##### Option A: Material-UI (MUI)
 
 - **@mui/material:** Version 5.14.x
 - **@mui/icons-material:** Version 5.14.x
@@ -1840,7 +1844,7 @@ This section provides comprehensive details on all technologies, frameworks, lib
 - Accessibility built-in
 - Responsive by default
 
-**Option B: Chakra UI**
+##### Option B: Chakra UI
 
 - **@chakra-ui/react:** Version 2.8.x
 - **@emotion/react:** Version 11.11.x (peer dependency)
@@ -1854,7 +1858,7 @@ This section provides comprehensive details on all technologies, frameworks, lib
 
 **Choose one of the following:**
 
-**Option A: date-fns**
+##### Option A: date-fns
 
 - **date-fns:** Version 2.30.x
 - Modern JavaScript date utility library
@@ -1862,7 +1866,7 @@ This section provides comprehensive details on all technologies, frameworks, lib
 - Immutable and pure functions
 - i18n support
 
-**Option B: Day.js**
+##### Option B: Day.js
 
 - **dayjs:** Version 1.11.x
 - Lightweight alternative to Moment.js
