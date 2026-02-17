@@ -60,7 +60,7 @@ The system consists of two main components:
 - **Kiosk** - The customer-facing touchscreen interface
 - **Admin Portal** - Web-based administrative interface
 - **SKU** - Stock Keeping Unit (individual product)
-- **MobilePay** - Payment service provider
+- **Manual Payment Confirmation** - Customer acknowledgement step presented by the kiosk after payment
 - **CSV** - Comma-Separated Values file format
 - **JSON** - JavaScript Object Notation file format
 - **WebP** - Modern image format for web (with JPEG fallback)
@@ -103,10 +103,10 @@ The system operates as a trust-based, self-service solution where customers sele
 ### 2.4 Design and Implementation Constraints
 
 - Trust-based system (no physical locking mechanisms)
-- Integration with MobilePay API
+- Manual customer payment confirmation flow after QR scan
 - Web-based or application-based (customer-agnostic)
 - Must support both desktop and tablet interfaces for admin portal
-- Must work with existing MobilePay merchant account
+- Must capture and store payment confirmations with auditable metadata
 - **Technology Stack (PERN):**
   - **Backend:** Node.js 24.11 LTS with Express.js 5.1
   - **Frontend:** React 19.2 with modern hooks and functional components
@@ -186,11 +186,11 @@ The system operates as a trust-based, self-service solution where customers sele
 
 **FR-3.1:** Upon checkout confirmation, the system SHALL generate a unique QR code for the transaction within 1 second.
 
-**FR-3.2:** The system SHALL integrate with MobilePay API for payment processing.
+**FR-3.2:** The system SHALL display clear payment instructions and provide an "I have paid" confirmation control that customers must activate after completing payment with their preferred method.
 
-**FR-3.3:** The system SHALL support NFC payment options where applicable.
+**FR-3.3:** The system SHALL persist each manual confirmation event with timestamp, kiosk session identifier, cart total, and declared payment method for audit purposes.
 
-**FR-3.4:** Upon successful payment, the system SHALL:
+**FR-3.4:** Upon manual confirmation, the system SHALL:
 
 - Display on-screen confirmation message for minimum 3 seconds: "✅ Payment Complete! You can now take your items."
 - Show purchased items and total amount
@@ -212,20 +212,20 @@ The system operates as a trust-based, self-service solution where customers sele
 - Log transaction with status "FAILED"
 - Allow customer to retry or cancel
 
-**FR-3.5.1:** If MobilePay indicates timeout (no response after 60 seconds), display: "⏱️ Payment timed out. Please try again."
+**FR-3.5.1:** If the customer does not confirm payment within 60 seconds of QR display, show: "⏱️ Waiting for confirmation. Please confirm payment or ask for assistance."
 
-**FR-3.5.2:** For edge case where customer was charged but system doesn't receive confirmation:
+**FR-3.5.2:** For edge case where a customer reports payment but the kiosk confirmation did not complete:
 
 - Display message: "⚠️ Payment processor error. If you were charged, you may take your items. Contact [admin email] if charged incorrectly."
 - Log transaction as "PAYMENT_UNCERTAIN"
 - Do NOT deduct inventory automatically
 - Admin can reconcile these transactions manually (see FR-8.2.4)
 
-**FR-3.6:** MobilePay API unavailability handling:
+**FR-3.6:** Manual confirmation unavailability handling:
 
-- If MobilePay API is unreachable for more than 30 seconds, display error: "🚫 Payment system temporarily unavailable. Please try again later or contact [admin email]."
-- Log API downtime incidents with timestamp
-- Admin receives email notification if API is down for more than 15 minutes
+- If confirmation cannot be recorded (e.g., server offline) for more than 30 seconds, display: "🚫 Payment confirmation unavailable. Please contact [admin email] to record your purchase."
+- Log confirmation persistence failures with timestamp and kiosk session metadata
+- Admin receives email notification if confirmations fail for more than 15 minutes
 - Kiosk remains accessible for browsing (checkout button disabled)
 
 #### 3.1.4 System Status Display
@@ -407,11 +407,11 @@ The system operates as a trust-based, self-service solution where customers sele
 
 - Admin can view "Uncertain Payments" report showing transactions with status "PAYMENT_UNCERTAIN"
 - Admin can mark transactions as "CONFIRMED" (deduct inventory) or "REFUNDED" (no action)
-- Admin can manually adjust inventory after verification with MobilePay logs
+- Admin can manually adjust inventory after verification with confirmation audit logs
 
 **FR-8.3:** The system SHALL automatically deduct inventory quantities when purchases are completed (if tracking enabled).
 
-**FR-8.3.1:** Deduction occurs immediately upon payment confirmation from MobilePay.
+**FR-8.3.1:** Deduction occurs immediately after the customer confirms payment and the kiosk records the confirmation event.
 
 **FR-8.3.2:** Deduction formula: `new_stock = current_stock - quantity_purchased` (can result in negative values).
 
@@ -533,7 +533,7 @@ The system operates as a trust-based, self-service solution where customers sele
 - Low stock alerts (when threshold reached)
 - System errors (uncaught exceptions, API failures)
 - Payment failures (FAILED or PAYMENT_UNCERTAIN transactions)
-- MobilePay API downtime (if down for > 15 minutes)
+- Manual confirmation persistence failures lasting > 15 minutes
 - Database storage reaching 80% capacity
 
 **FR-11.2.1:** Email delivery requirements:
@@ -635,11 +635,11 @@ The system operates as a trust-based, self-service solution where customers sele
 - Filename sanitization
 - Virus/malware scanning (optional, recommended for production)
 
-**NFR-9:** Payment processing SHALL be handled through MobilePay API with appropriate security measures:
+**NFR-9:** Manual payment confirmation flows SHALL maintain end-to-end security:
 
-- All communication over HTTPS/TLS 1.2+
-- API credentials stored in environment variables (not hardcoded)
-- Payment data never stored in system (only transaction IDs and status)
+- All kiosk-to-API communication over HTTPS/TLS 1.2+
+- Confirmation audit records stored with tamper-evident metadata (timestamp, session, device)
+- No third-party payment credentials stored in the system (only confirmation metadata and transaction status)
 
 **NFR-10:** Admin sessions SHALL timeout after 30 minutes of inactivity (see FR-5.4).
 
@@ -757,10 +757,10 @@ The kiosk interface SHALL provide the following screens:
    - "Continue Shopping" and "Checkout" buttons
 
 4. **Checkout Screen:**
-   - Order summary (items, quantities, total)
-   - QR code display (minimum 200x200px)
-   - Instructions: "Scan QR code with MobilePay"
-   - Cancel button
+  - Order summary (items, quantities, total)
+  - QR code display (minimum 200x200px)
+  - Instructions: "Scan QR code with your payment app, then tap 'I have paid' on this screen"
+  - Cancel button
 
 5. **Payment Confirmation Screen:**
    - Success message with green checkmark icon
@@ -873,26 +873,23 @@ The admin portal SHALL provide the following pages:
   - Timestamp with time zone for accurate datetime handling
 - **Security:** SSL/TLS encrypted connections, credentials in environment variables
 
-#### 5.3.2 MobilePay API
+#### 5.3.2 Manual Payment Confirmation Service
 
-- **Purpose:** Payment processing
-- **Integration Method:** RESTful API
-- **Authentication:** API key in Authorization header
+- **Purpose:** Record customer attestation that payment has been completed and trigger transaction finalization.
+- **Integration Method:** Internal RESTful API between kiosk client and Express backend.
+- **Authentication:** Kiosk session token or device identifier supplied with each request.
 - **Endpoints Used:**
-  - POST /payments - Initiate payment, receive QR code
-  - GET /payments/{id} - Check payment status
-  - Webhook callback for payment confirmation
-- **Requirements:** Merchant API access (already available)
+  - POST /transactions/{id}/confirm - Persist confirmation metadata and move transaction to COMPLETED.
+  - POST /transactions/{id}/report-uncertain - Flag transaction as PAYMENT_UNCERTAIN when customer cannot confirm.
 - **Responsibilities:**
-  - Transaction authorization
-  - Payment confirmation/failure handling
-  - QR code generation and expiration management (handled by MobilePay)
-  - Duplicate transaction prevention (handled by MobilePay)
+  - Capture confirmation timestamp, kiosk session, cart snapshot, and declared payment method.
+  - Transition transaction status (COMPLETED, PAYMENT_UNCERTAIN) based on customer input and backend validation.
+  - Emit audit log entries for manual confirmations and uncertainty reports.
 - **Error Handling:**
-  - HTTP 500/502/503: Retry up to 3 times with exponential backoff
-  - HTTP 400: Invalid request, log and display user-friendly error
-  - Timeout after 30 seconds: Display timeout message
-- **Security:** HTTPS/TLS 1.2+, API credentials in environment variables
+  - HTTP 500/502/503: Display confirmation unavailable message and retry up to 3 times with exponential backoff.
+  - Validation errors (HTTP 400): show user guidance to reattempt confirmation or contact admin.
+  - Timeout after 30 seconds: Indicate that confirmation was not recorded and prompt retry or admin assistance.
+- **Security:** HTTPS/TLS 1.2+, signed kiosk session tokens, confirmation data stored with integrity checks.
 
 #### 5.3.3 Email Service
 
@@ -905,7 +902,7 @@ The admin portal SHALL provide the following pages:
   - Low stock alerts
   - System errors
   - Payment failures
-  - MobilePay API downtime
+  - Manual confirmation persistence failures
   - Backup failures
   - Storage capacity warnings
 - **Delivery Requirements:**
@@ -943,7 +940,7 @@ The admin portal SHALL provide the following pages:
 
 - Product display and browsing with category filtering
 - Shopping cart functionality with 5-minute timeout
-- MobilePay payment integration with QR code
+- Manual payment confirmation flow with QR code guidance
 - Basic inventory management (with enable/disable option)
 - Negative stock tracking for discrepancy management
 - Admin authentication (username/password)
@@ -996,9 +993,9 @@ The admin portal SHALL provide the following pages:
 9. Customer reviews cart, edits quantities if needed
 10. Customer taps "Checkout" button
 11. System displays order summary and generates QR code (< 1 second)
-12. Customer opens MobilePay app and scans QR code
-13. Customer confirms payment in MobilePay
-14. System receives payment confirmation (< 5 seconds)
+12. Customer scans QR code with preferred banking/payment app
+13. Customer confirms payment in the app and taps "I have paid" on the kiosk
+14. System records manual confirmation (< 1 second) and validates persistence
 15. System displays success message with green checkmark
 16. System deducts inventory and logs transaction
 17. Customer retrieves items from cabinet
@@ -1008,14 +1005,14 @@ The admin portal SHALL provide the following pages:
 
 ---
 
-### 7.2 Alternate Flow - Payment Failure
+### 7.2 Alternate Flow - Payment Failure or No Confirmation
 
 **Divergence Point:** Step 13 in main flow
 
-13a. Payment fails or times out in MobilePay  
-13b. System displays error message: "❌ Payment Failed. Please try again."  
+13a. Customer cannot complete payment or does not tap "I have paid" within 60 seconds  
+13b. System displays error message: "❌ Payment not confirmed. Please try again or ask for assistance."  
 13c. Cart contents retained  
-13d. Transaction logged as "FAILED"  
+13d. Transaction logged as "FAILED" (no confirmation recorded)  
 13e. Customer can:
 
 - Tap "Try Again" → Returns to step 11 (new QR code generated)
@@ -1054,7 +1051,7 @@ The admin portal SHALL provide the following pages:
 
 **Divergence Point:** Step 14 in main flow
 
-14a. System does not receive confirmation from MobilePay within 60 seconds  
+14a. Customer reports completing payment but the kiosk cannot record confirmation  
 14b. System displays message: "⚠️ Payment processor error. If you were charged, you may take your items. Contact [email] if charged incorrectly."  
 14c. Transaction logged as "PAYMENT_UNCERTAIN"  
 14d. Inventory NOT deducted automatically  
@@ -1087,7 +1084,7 @@ The admin portal SHALL provide the following pages:
 3. Admin clicks "Uncertain Payments" report
 4. System displays list of "PAYMENT_UNCERTAIN" transactions
 5. Admin reviews transaction details (items, amount, timestamp)
-6. Admin checks MobilePay merchant portal to verify if payment actually succeeded
+6. Admin reviews confirmation audit log and verifies supporting evidence (e.g., payment receipt provided by customer or bank statement)
 7. Admin selects transaction and clicks "Mark as Confirmed" OR "Mark as Refunded"
 8. If confirmed:
    - System deducts inventory retroactively
@@ -1203,7 +1200,9 @@ TransactionID: UUID PRIMARY KEY DEFAULT uuid_generate_v4()
 Timestamp: TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
 TotalAmount: DECIMAL(6,2) NOT NULL
 PaymentStatus: payment_status_enum NOT NULL  -- ENUM type defined below
-MobilePayTransactionID: VARCHAR(100) NULL UNIQUE
+ConfirmationSessionId: VARCHAR(64) NULL
+ConfirmationMethod: VARCHAR(32) DEFAULT 'manual' NOT NULL
+ConfirmedAt: TIMESTAMP WITH TIME ZONE NULL
 ReconciledBy: UUID REFERENCES Admin(AdminID) ON DELETE SET NULL
 ReconciledAt: TIMESTAMP WITH TIME ZONE NULL
 CreatedAt: TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
@@ -1296,7 +1295,7 @@ INDEX idx_audit_log_entity ON AuditLog(EntityType, EntityID)
 ErrorLogID: UUID PRIMARY KEY DEFAULT uuid_generate_v4()
 Timestamp: TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
 LogLevel: log_level_enum NOT NULL  -- ENUM type defined below
-Component: VARCHAR(100) NOT NULL  -- e.g., 'MobilePayAPI', 'EmailService'
+Component: VARCHAR(100) NOT NULL  -- e.g., 'PaymentConfirmationService', 'EmailService'
 Message: TEXT NOT NULL
 StackTrace: TEXT NULL
 RequestID: VARCHAR(100) NULL  -- For request tracing
@@ -1346,7 +1345,7 @@ INDEX idx_error_log_component ON ErrorLog(Component)
 
 ### 9.1 Assumptions
 
-- MobilePay merchant account and API access are already available and configured
+- Manual payment confirmation instructions are clearly displayed alongside the kiosk and communicated to students
 - Students will act honestly in the trust-based system (occasional discrepancies expected and acceptable)
 - Network connectivity is reliable during operating hours (5 Mbps minimum, 10 Mbps recommended)
 - A single administrator is sufficient for day-to-day management (up to 10 admin accounts supported)
@@ -1361,7 +1360,6 @@ INDEX idx_error_log_component ON ErrorLog(Component)
 
 #### 9.2.1 External Services
 
-- **MobilePay API:** Availability and reliability (SLA not specified by vendor)
 - **Email service:** SMTP server or API (SendGrid, AWS SES, Mailgun, etc.)
 - **Internet connectivity:** ISP uptime and bandwidth
 - **DNS and network infrastructure:** Organization's network availability
@@ -1375,7 +1373,7 @@ INDEX idx_error_log_component ON ErrorLog(Component)
 #### 9.2.3 Organizational
 
 - **Admin availability:** Someone must monitor notifications and restock inventory
-- **MobilePay merchant account:** Must remain active with sufficient balance/credit
+- **Cashless payment method availability:** Students retain access to personal banking or mobile payment apps capable of scanning the kiosk QR code
 - **Email account:** Admin email address for notifications must be monitored
 
 ---
@@ -1384,11 +1382,11 @@ INDEX idx_error_log_component ON ErrorLog(Component)
 
 | Risk | Impact | Probability | Mitigation Strategy | Residual Risk |
 |------|--------|-------------|---------------------|---------------|
-| **MobilePay API downtime** | High | Low | Display clear error messages; log incidents; email admin if down > 15 min; consider fallback payment in v1.1+ | Medium |
+| **Confirmation service outage** | High | Low | Display clear error messages; log incidents; email admin if confirmation unavailable > 15 min; document manual receipt procedure | Medium |
 | **Internet connectivity loss** | High | Medium | Display "service unavailable" message; document offline procedures; consider local caching for browsing in v1.1+ | Medium |
 | **Inventory discrepancy (theft/honor system)** | Medium | Medium | Negative stock tracking; manual adjustment tools; regular admin audits; trust-based messaging | Low |
 | **Cart timeout too short/long** | Low | Medium | Fixed at 5 minutes in v1.0 (well-tested default); configurable in v1.1+ | Very Low |
-| **Payment charged but system doesn't record** | High | Low | Transaction logging before inventory update; PAYMENT_UNCERTAIN status; manual reconciliation process; MobilePay handles duplicate prevention | Low |
+| **Payment charged but system doesn't record** | High | Low | Transaction logging before inventory update; PAYMENT_UNCERTAIN status; manual confirmation audit trail; reconciliation checklist | Low |
 | **Low stock not noticed by admin** | Medium | Low | Automatic email notifications; configurable thresholds (default 5); visual alerts in admin portal | Very Low |
 | **Database storage capacity exceeded** | Medium | Low | 80% capacity alerts; 3-year retention policy with archival; CSV export before deletion | Very Low |
 | **Admin password forgotten** | Low | Medium | Password reset via email; primary admin can reset other admins; document recovery procedure | Very Low |
@@ -1410,7 +1408,7 @@ INDEX idx_error_log_component ON ErrorLog(Component)
 
 ### Planned for v1.2+
 
-- Card payment integration (fallback for MobilePay issues)
+- Automated payment provider integration (fallback for manual confirmation)
 - Multi-kiosk support (central inventory management)
 - Mobile app for admins (iOS/Android)
 - Real-time sales dashboard with auto-refresh
@@ -1434,7 +1432,7 @@ The system will be considered complete and ready for production when:
 
 1. ✅ Customers can browse products by category on the kiosk with response time < 300ms
 2. ✅ Customers can add multiple items to a cart with running total displayed
-3. ✅ Customers can complete purchases using MobilePay via QR code
+3. ✅ Customers can complete purchases by scanning the QR code and confirming payment manually on the kiosk
 4. ✅ Payment confirmations are clearly displayed (green, 3+ seconds) with success message
 5. ✅ Payment failures are clearly displayed (red, 5+ seconds) with error message and retry option
 6. ✅ Admins can log in securely to the web portal with username/password
@@ -1486,7 +1484,7 @@ The system will be considered complete and ready for production when:
 ### Edge Case Acceptance
 
 1. ✅ Payment uncertainty is handled (PAYMENT_UNCERTAIN status, admin reconciliation)
-2. ✅ MobilePay API unavailability displays appropriate error message
+2. ✅ Manual confirmation service unavailability displays appropriate error message
 3. ✅ Multiple admin accounts supported (up to 10) with audit trail
 4. ✅ Maintenance mode overrides operating hours
 
@@ -1498,7 +1496,7 @@ The system will be considered complete and ready for production when:
 - **Kiosk:** A self-service terminal for customer interaction
 - **Admin Portal:** Web-based interface for system administration
 - **QR Code:** Quick Response code for payment initiation (2D barcode)
-- **MobilePay:** Nordic mobile payment solution by Danske Bank
+- **Manual payment confirmation:** Customer acknowledgement step recorded by the kiosk after scanning the QR code with a personal payment app
 - **NFC:** Near Field Communication for contactless payments
 - **Inventory tracking:** Optional system feature to monitor stock quantities
 - **Low stock threshold:** Configurable quantity that triggers admin notification (default: 5 units)
@@ -1523,7 +1521,7 @@ The system will be considered complete and ready for production when:
 
 ### 14.2 Integration Testing
 
-- MobilePay API integration (use test/sandbox environment)
+- Manual payment confirmation API (simulate kiosk-to-server confirmation requests)
 - Email service integration (verify email delivery)
 - Database operations (CRUD for all entities)
 
@@ -1616,10 +1614,9 @@ The system will be considered complete and ready for production when:
   POOL_MIN=2
   POOL_MAX=10
   
-  # MobilePay API
-  MOBILEPAY_API_KEY=<api_key>
-  MOBILEPAY_MERCHANT_ID=<merchant_id>
-  MOBILEPAY_WEBHOOK_SECRET=<webhook_secret>
+  # Payment Confirmation
+  CONFIRMATION_AUDIT_SALT=<random_string_for_hashing>
+  KIOSK_DEVICE_ID=<kiosk-identifier>
   
   # Email Service (SMTP)
   SMTP_HOST=smtp.example.com

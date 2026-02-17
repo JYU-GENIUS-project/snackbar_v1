@@ -806,7 +806,7 @@ Pass Criteria: Feature is optional; absence does not cause errors
 Test ID: TC-FR-3.1-P01
 Preconditions: 
   - Cart contains 2 items totaling 5.00€
-  - MobilePay API is online and responsive
+  - Manual confirmation service reachable (API latency <100ms)
   - Network latency is normal (<100ms)
 Steps:
   1. Add items to cart (total: 5.00€)
@@ -815,11 +815,11 @@ Steps:
   4. Tap "Checkout" or "Pay Now" button
   5. Stop timer when QR code is fully visible and rendered
   6. Record elapsed time
-  7. Scan QR code with test MobilePay app to verify validity
+  7. Scan QR code with standard payment app simulator to verify validity
 Expected Result:
   - QR code appears within 1 second (1000ms or less)
   - QR code is unique (different from previous transactions)
-  - QR code is scannable with MobilePay app
+  - QR code is scannable with standard payment app simulator
   - QR code contains correct payment amount (5.00€)
   - Loading indicator shown during generation (optional)
   - QR code dimensions ≥200x200px (FR-5.3 external interfaces)
@@ -830,7 +830,7 @@ Pass Criteria: QR code generated in ≤1 second and is valid
 ```
 Test ID: TC-FR-3.1-N01
 Preconditions: 
-  - MobilePay API is slow (simulated 3-second response time)
+  - Manual confirmation service latency artificially increased to 3 seconds
   - Cart contains items
 Steps:
   1. Configure network throttling or mock API to delay 3 seconds
@@ -840,7 +840,7 @@ Steps:
   5. Observe user feedback during wait
 Expected Result:
   - Loading indicator displayed immediately
-  - QR code appears after ~3 seconds (API delay)
+  - QR code appears after ~3 seconds (simulated service delay)
   - User sees "Generating payment..." or similar message
   - No timeout error until 30 seconds (FR-3.6)
   - Once QR appears, it is valid and functional
@@ -850,114 +850,94 @@ Pass Criteria: Graceful handling of slow API response
 
 ---
 
-### FR-3.2: MobilePay API Integration
+### FR-3.2: Manual Payment Confirmation Control
 
-**Given/When/Then:**
-- **Given** the system is configured with valid MobilePay credentials
-- **When** a payment is initiated
-- **Then** the system SHALL integrate with MobilePay API for payment processing
+- **Then** the system SHALL mark the transaction as confirmed and proceed to completion
 
 **Positive Test Case:**
 ```
 Test ID: TC-FR-3.2-P01
 Preconditions: 
-  - Valid MobilePay API credentials configured in environment
-  - MobilePay test/sandbox environment available
   - Cart total: 3.50€
+  - Manual confirmation service available
 Steps:
-  1. Configure valid MobilePay merchant API key
-  2. Add items to cart (total: 3.50€)
-  3. Proceed to checkout
-  4. Observe QR code generation (API call #1)
-  5. Scan QR code with MobilePay test app
-  6. Complete payment in MobilePay app
-  7. Observe kiosk response (API call #2: status check)
-  8. Check transaction log in database
+  1. Add items to cart (total: 3.50€)
+  2. Proceed to checkout
+  3. Observe payment instructions and disabled "Done"/"I have paid" button until QR displayed
+  4. Wait for QR code to render
+  5. Simulate payment in external app (no integration required)
+  6. Tap "I have paid"
+  7. Observe success message
+  8. Verify transaction stored as COMPLETED with confirmation metadata (timestamp, session, method)
 Expected Result:
-  - QR code generated via MobilePay API POST /payments
-  - MobilePay app recognizes QR code as valid payment request
-  - Payment amount in MobilePay matches cart total (3.50€)
-  - Transaction ID returned from MobilePay and stored
-  - Webhook or polling receives payment confirmation
-  - Kiosk displays success message
-  - Transaction logged with MobilePay transaction ID
-Pass Criteria: Full integration works end-to-end
+  - Confirmation button available only after QR is visible
+  - Tapping button triggers immediate confirmation request to backend
+  - Kiosk transitions to success state within 1 second (FR-3.4)
+  - Transaction record contains confirmation timestamp, method "manual", and kiosk session ID
+Pass Criteria: Manual confirmation path completes end-to-end
 ```
 
 **Negative/Edge Case Test:**
 ```
 Test ID: TC-FR-3.2-N01
 Preconditions: 
-  - MobilePay API credentials are invalid/expired
+  - Backend confirmation endpoint returns HTTP 503 (simulated outage)
   - Cart contains items
 Steps:
-  1. Configure invalid API key in environment variables
-  2. Attempt to checkout
-  3. Observe error handling
-  4. Check error logs
+  1. Add items to cart and open checkout screen
+  2. Tap "I have paid"
+  3. Observe kiosk handling of failed confirmation request
+  4. Check error logs and notification queue
 Expected Result:
-  - API authentication fails (HTTP 401 or 403)
-  - Error logged: "MobilePay API authentication failed"
-  - User sees message: "🚫 Payment system temporarily unavailable. Please try again later or contact [admin email]." (FR-3.6)
-  - Transaction logged as FAILED
-  - Admin receives email notification (FR-11.2)
-  - User can cancel and retry
-  - Inventory NOT deducted
-Pass Criteria: Invalid credentials handled gracefully
+  - Kiosk displays message: "🚫 Payment confirmation unavailable. Please contact support." (FR-3.6)
+  - Transaction remains PENDING (no inventory deduction)
+  - Retry option presented or guidance to try again after issue resolved
+  - Failure logged with timestamp and kiosk session metadata
+  - Admin notification queued after 15 minutes of continued failure (FR-3.6, FR-11.2)
+Pass Criteria: Confirmation outage handled gracefully without data loss
 ```
 
 ---
 
-### FR-3.3: NFC Payment Support (Where Applicable)
+### FR-3.3: Manual Confirmation Audit Trail
 
 **Given/When/Then:**
-- **Given** the kiosk hardware supports NFC
-- **When** NFC is applicable for payment
-- **Then** the system SHALL support NFC payment options
+- **Given** a customer confirms payment on the kiosk
+- **When** the confirmation request is processed
+- **Then** the system SHALL persist audit metadata for the confirmation event
 
 **Positive Test Case:**
 ```
 Test ID: TC-FR-3.3-P01
 Preconditions: 
-  - Kiosk has NFC reader hardware installed
-  - MobilePay supports NFC payments
-  - Cart total: 2.50€
+  - Cart total: 4.20€
+  - Audit logging enabled
 Steps:
-  1. Add items to cart (total: 2.50€)
-  2. Proceed to checkout
-  3. Look for NFC payment option on screen
-  4. Hold NFC-enabled phone with MobilePay near reader
-  5. Complete payment via NFC
-  6. Observe confirmation
+  1. Complete steps from TC-FR-3.2-P01 through confirmation
+  2. Query transaction record for confirmation fields (session ID, method, confirmedAt)
+  3. Query audit log for matching entry
 Expected Result:
-  - NFC option displayed on checkout screen ("Tap to Pay" or NFC icon)
-  - NFC reader activates and detects phone
-  - Payment processed via NFC (no QR code needed)
-  - Payment amount: 2.50€
-  - Confirmation received within 5 seconds
-  - Success message displayed
-  - Transaction logged as COMPLETED
-Pass Criteria: NFC payment completes successfully
+  - Transaction row populated with confirmationSessionId, confirmationMethod='manual', confirmedAt timestamp
+  - Audit log entry captured with action 'TRANSACTION_CONFIRMED' (or equivalent)
+  - Audit log includes kiosk session identifier and total amount snapshot
+Pass Criteria: Confirmation metadata persisted and auditable
 ```
 
 **Negative/Edge Case Test:**
 ```
 Test ID: TC-FR-3.3-N01
 Preconditions: 
-  - Kiosk does NOT have NFC hardware installed
-  - System detects no NFC reader
+  - Database temporarily read-only (simulate failure to persist confirmation metadata)
 Steps:
-  1. Boot kiosk without NFC hardware
-  2. Add items to cart
-  3. Proceed to checkout
-  4. Check available payment options
+  1. Attempt manual confirmation while database in read-only mode
+  2. Observe kiosk response
+  3. Inspect logs for failure details
 Expected Result:
-  - NFC option NOT displayed
-  - Only QR code payment option available
-  - No errors or warnings about missing NFC
-  - System functions normally with QR code only
-  - Checkout completes successfully via QR
-Pass Criteria: Missing NFC hardware handled gracefully
+  - Kiosk informs user that confirmation could not be saved and prompts retry or admin assistance
+  - Transaction remains PENDING
+  - Error logged with reason "confirmation_persist_failed"
+  - Audit entry created noting failure event (without duplicating transaction status)
+Pass Criteria: Persistence failure handled without data corruption
 ```
 
 ---
@@ -965,8 +945,8 @@ Pass Criteria: Missing NFC hardware handled gracefully
 ### FR-3.4: Successful Payment Actions
 
 **Given/When/Then:**
-- **Given** a customer has completed payment via MobilePay
-- **When** the system receives payment confirmation
+- **Given** a customer has completed payment and tapped "I have paid"
+- **When** the system records the manual confirmation
 - **Then** the system SHALL: display success message (≥3 seconds, green, WCAG AA), show purchased items/total, deduct inventory (allowing negative stock), clear cart, log transaction as "COMPLETED"
 
 **Positive Test Case:**
@@ -976,11 +956,11 @@ Preconditions:
   - Cart contains: 2x "Coca-Cola" @ 2.50€ each = 5.00€ total
   - Inventory tracking is enabled
   - "Coca-Cola" current stock: 10 units
-  - MobilePay API is functional
+  - Manual confirmation service available
 Steps:
   1. Verify initial stock: Coca-Cola = 10
-  2. Complete checkout and payment via MobilePay
-  3. Wait for payment confirmation from MobilePay API
+  2. Complete checkout and payment via personal app
+  3. Tap "I have paid" and wait for confirmation response
   4. Observe kiosk screen immediately
   5. Measure success message display duration
   6. Check color contrast (dev tools)
@@ -996,7 +976,7 @@ Expected Result:
   - Stock updated in database: Coca-Cola = 10 → 8
   - Cart is empty (badge shows 0)
   - Transaction logged with status "COMPLETED"
-  - Transaction includes MobilePay transaction ID
+  - Transaction includes confirmation metadata (session, method, timestamp)
   - Screen returns to home after 5 seconds (auto-reset)
 Pass Criteria: All success actions execute correctly
 ```
@@ -1181,13 +1161,13 @@ Pass Criteria: Confirms need for high-contrast green
 Test ID: TC-FR-3.5-P01
 Preconditions: 
   - Cart contains items (total: 4.50€)
-  - MobilePay API will return payment failure
+  - Manual confirmation service configured to reject confirmation (HTTP 409)
   - Initial stock values recorded
 Steps:
   1. Record initial stock for all cart items
   2. Proceed to checkout
-  3. Scan QR code with MobilePay
-  4. Simulate payment failure in MobilePay (decline/cancel)
+  3. Customer uses personal payment app but chooses not to finalize
+  4. Tap "I have paid" to trigger confirmation failure response
   5. Observe kiosk response
   6. Measure message display duration
   7. Check stock values in database
@@ -1199,7 +1179,7 @@ Expected Result:
   - Stock quantities UNCHANGED (no deduction)
   - Cart still contains all original items
   - Transaction logged with status "FAILED"
-  - MobilePay transaction ID recorded (if available)
+  - Confirmation failure reason logged (e.g., "declined", "not_confirmed")
   - "Try Again" button available
   - "Cancel" button available
   - User can retry checkout
@@ -1211,16 +1191,16 @@ Pass Criteria: Failure handled correctly without inventory deduction
 Test ID: TC-FR-3.5-N01
 Preconditions: 
   - Customer initiates payment but abandons it
-  - No explicit success or failure from MobilePay
+  - No manual confirmation submitted within 60 seconds
 Steps:
   1. Proceed to checkout
   2. Display QR code
-  3. Do NOT scan QR code with MobilePay
+   3. Do NOT complete payment in external app or tap "I have paid"
   4. Wait (no customer action)
   5. Observe after 60 seconds (timeout)
 Expected Result:
   - After 60 seconds, timeout message appears (FR-3.5.1)
-  - Message: "⏱️ Payment timed out. Please try again."
+  - Message: "⏱️ Payment not confirmed. Please try again."
   - Cart maintained
   - Stock NOT deducted
   - Transaction logged as "FAILED" or "TIMEOUT"
@@ -1234,24 +1214,24 @@ Pass Criteria: Timeout treated as failure
 
 **Given/When/Then:**
 - **Given** payment QR code is displayed
-- **When** 60 seconds pass with no response from MobilePay
-- **Then** the system SHALL display timeout message: "⏱️ Payment timed out. Please try again."
+- **When** 60 seconds pass without customer confirmation
+- **Then** the system SHALL display timeout message: "⏱️ Payment not confirmed. Please try again."
 
 **Positive Test Case:**
 ```
 Test ID: TC-FR-3.5.1-P01
 Preconditions: 
   - QR code displayed for payment
-  - MobilePay does not respond (simulated)
+  - Customer does not tap "I have paid"
 Steps:
   1. Display QR code for payment
   2. Start timer
-  3. Do NOT complete payment in MobilePay
+   3. Do NOT complete payment in external app or tap "I have paid"
   4. Wait exactly 60 seconds
   5. Observe kiosk screen at 60-second mark
 Expected Result:
   - At 60 seconds, timeout message appears
-  - Message: "⏱️ Payment timed out. Please try again."
+  - Message: "⏱️ Payment not confirmed. Please try again."
   - QR code is removed/hidden
   - "Try Again" button available
   - "Cancel" button available
