@@ -10,14 +10,14 @@
 | Phase 4 – Inventory & Alerting Backbone | Implement stock tracking and notifications | Add inventory tables, toggle, and discrepancy handling; build reconciliation views and adjustments; integrate SMTP client, notification routing, and retry policy; publish inventory events for UI banners | `admin_inventory_management.robot` (US-032–US-038); `system_integration_communication.robot` (US-067) | Phases 1–3 |
 | Phase 5 – Customer Catalog & Status UX | Launch kiosk browsing & status surfaces | Build kiosk React UI (grid, filters, allergen modal); consume inventory flags for out-of-stock flows and warnings; implement operating hours & maintenance APIs with kiosk messaging; enforce accessibility sizing/contrast | `customer_product_browsing.robot` (US-001–US-005); `customer_system_status.robot` (US-016–US-018) | Phases 2–4 |
 | Phase 6 – Shopping Cart Experience | Finalize cart behaviour & guardrails | Implement cart state service with session persistence; enforce purchase limits and quantity controls; compute real-time totals with currency safety; add inactivity timer warnings and auto-clear hooks | `customer_shopping_cart.robot` (US-006–US-010) | Phase 5 |
-| Phase 7 – Payments & Transaction Logging | Complete MobilePay checkout and persistence | Integrate MobilePay QR flow, webhooks, and retries; ensure <1s transaction persistence; atomically update inventory with uncertain-state handling; surface failure paths; trigger downtime alerts and payment logging | `customer_payment_checkout.robot` (US-011–US-015); `system_technical_security.robot` (US-059); `system_integration_communication.robot` (US-065, US-066, US-068) | Phases 4–6 |
+| Phase 7 – Manual Confirmation & Transaction Logging | Finalize kiosk confirmation flow and resilient transaction logging | Implement manual confirmation prompt and backend endpoints; persist confirmation metadata and audit logs; handle uncertain confirmations with admin workflows; surface timeout/error messaging; trigger alerts for confirmation service degradation | `customer_payment_checkout.robot` (US-011–US-015); `system_technical_security.robot` (US-059); `system_integration_communication.robot` (US-065, US-066, US-068) | Phases 4–6 |
 | Phase 8 – Reporting & Analytics | Provide admin insights and exports | Implement transaction history search/filter; deliver uncertain payment resolution tooling; build analytics aggregations (popular products, revenue periods) with indexes; generate CSV exports within SLA | `admin_transactions_statistics.robot` (US-039–US-047) | Phases 2, 7 |
 | Phase 9 – Configuration & Monitoring Suite | Operational controls and observability | Build operating hours scheduler, maintenance toggle, notification recipients; surface real-time kiosk status; implement log viewer, storage threshold alerts, backup confirmations, email test trigger | `admin_system_configuration.robot` (US-048–US-052); `admin_monitoring_troubleshooting.robot` (US-053–US-056) | Phases 1, 4, 7–8 |
 | Phase 10 – Performance Hardening & Release Readiness | Certify performance, resilience, compliance | Execute load/performance tuning (QR <1s, UI <300 ms); finalize log rotation & retention; validate backup restore drills and DR plan; perform security pen test; lock deployment automation and observability dashboards | `admin_monitoring_troubleshooting.robot` (US-057–US-058); `system_technical_security.robot` (US-060–US-063 regression); `system_integration_communication.robot` (US-064–US-068 regression) | Phases 1–9 |
 
 ## Sequenced Technical Checklist
 
-1. Phase 1 – Create secure secrets management setup by adding `.env.example`, Git-ignored `.env`, and documenting required environment variables for Docker, PostgreSQL, MobilePay, and SMTP.
+1. Phase 1 – Create secure secrets management setup by adding `.env.example`, Git-ignored `.env`, and documenting required environment variables for Docker, PostgreSQL, confirmation audit settings, and SMTP.
 2. Phase 1 – Author `docker-compose.yml` with Nginx, Express API, PostgreSQL, and PM2 services, including health checks, persistent volumes, and bridge network defined in `C4_Architecture.md`.
 3. Phase 1 – Scaffold infrastructure directories (`server/`, `client/`, `nginx/`, `init-db/`) and add baseline Dockerfiles plus PM2 ecosystem file for the API container.
 4. Phase 1 – Configure Nginx TLS termination by generating local dev certificates, mapping `/api` proxy rules, static asset serving, and security headers per architecture spec.
@@ -55,11 +55,11 @@
 36. Phase 6 – Implement running total calculations with currency-safe decimal handling and UI updates.
 37. Phase 6 – Add clear cart and remove item operations, ensuring audit logging for session events.
 38. Phase 6 – Execute `customer_shopping_cart.robot` suite (US-006–US-010) to validate cart flows.
-39. Phase 7 – Integrate MobilePay API for payment creation, QR code retrieval, and webhook signature validation.
-40. Phase 7 – Implement transaction persistence workflow with ACID guarantees, idempotent webhook handling, and <=1s writes.
-41. Phase 7 – Build payment status polling/subscribe mechanism in kiosk UI to display success/failure states.
-42. Phase 7 – Implement payment failure and uncertain status handling with admin reconciliation hooks and email alerts.
-43. Phase 7 – Add exponential backoff for payment retries and downtime detection alerts.
+39. Phase 7 – Implement kiosk “I have paid” confirmation control that calls new backend confirmation endpoints and locks the button until QR display completes.
+40. Phase 7 – Persist confirmation metadata with ACID guarantees (session ID, timestamp, declared method) and ensure transactions move atomically from PENDING to COMPLETED.
+41. Phase 7 – Surface confirmation state updates in the kiosk UI (success, failure, timeout) with optimistic UX and retry guidance.
+42. Phase 7 – Build uncertain confirmation handling: PAYMENT_UNCERTAIN status pathway, admin reconciliation views, and audit log entries.
+43. Phase 7 – Instrument confirmation failure alerts (exponential backoff retries, notification to admins after sustained outages) and dashboard metrics.
 44. Phase 7 – Execute `customer_payment_checkout.robot` (US-011–US-015), `system_technical_security.robot` (US-059), and `system_integration_communication.robot` (US-065, US-066, US-068) suites.
 45. Phase 8 – Create transaction history API with pagination, filters, and authorization controls.
 46. Phase 8 – Build uncertain payment resolution endpoints allowing confirm/refund actions with audit trail.

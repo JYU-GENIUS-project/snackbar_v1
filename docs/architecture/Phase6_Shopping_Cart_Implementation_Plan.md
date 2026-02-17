@@ -60,6 +60,14 @@
    - Ensure cart badge and cart view update within 200ms for add/remove/edit operations.
    - **Acceptance linkage:** US-006, US-007, NFR-1.2.
 
+### Manual Payment Confirmation UX Prerequisites *(Phase 6 dependency for Phase 7)*
+
+- Draft kiosk checkout copy that instructs customers to scan with their preferred payment app and tap "I have paid" to confirm.
+- Add UI gate logic so the confirmation control only enables after the QR code renders and cart data is synchronized.
+- Capture provisional confirmation payload on the client (session ID, basket hash) to send atomically once the button is pressed.
+- Provide immediate visual feedback states (waiting, success, failure) that comply with FR-3.4/3.5 timing and accessibility rules.
+- **Acceptance linkage:** Sets preconditions for US-011–US-014 and the forthcoming manual confirmation robot steps.
+
 4. **Quantity Controls and Purchase Limits**
    - Add +/- controls per cart item with disabled state when limit is reached (FR-2.4).
    - Display the exact limit message: “Maximum [X] of this item per purchase.”

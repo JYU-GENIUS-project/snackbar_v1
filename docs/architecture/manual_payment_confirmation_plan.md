@@ -6,8 +6,8 @@ Align all planning artefacts with Issue [#22](https://github.com/JYU-GENIUS-proj
 
 ## Status Tracker
 
-- [ ] Phase 1 – Requirements and Story Realignment *(SRS + user stories updated; test case sweeps continuing)*
-- [ ] Phase 2 – Roadmap and Phase Plan Updates
+- [x] Phase 1 – Requirements and Story Realignment *(SRS, user stories, initial test case conversion complete)*
+- [x] Phase 2 – Roadmap and Phase Plan Updates *(Implementation roadmap + Phase 6 plan adjusted for manual confirmation)*
 - [ ] Phase 3 – Architecture and ADR Revisions
 - [ ] Phase 4 – Operational and Configuration Documentation
 - [ ] Phase 5 – Frontend/Backend Planning Notes
