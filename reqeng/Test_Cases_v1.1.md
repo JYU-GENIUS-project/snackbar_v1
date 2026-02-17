@@ -1,4 +1,5 @@
 # Test Cases for Software Requirements Specification (SRS) v1.1
+
 ## Self-Service Snack Bar Kiosk System
 
 **Project:** snackbar  
@@ -12,6 +13,7 @@
 ## Document Information
 
 This document provides comprehensive test cases for **every requirement** specified in the Software Requirements Specification v1.1. Each requirement includes:
+
 - **Given/When/Then** acceptance criterion
 - **Positive Test Case** - validates expected behavior
 - **Negative/Edge Case Test Case** - validates error handling and boundary conditions
@@ -34,11 +36,13 @@ Requirements marked as **UNTESTABLE** include explanations for why they cannot b
 ### FR-1.1: Product Grid Display
 
 **Given/When/Then:**
+
 - **Given** the kiosk is operational and products exist in the database
 - **When** a customer views the home screen
 - **Then** products SHALL be displayed in a grid layout with images
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-1.1-P01
 Preconditions: 
@@ -61,6 +65,7 @@ Pass Criteria: All products displayed in proper grid layout
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-1.1-N01
 Preconditions: 
@@ -84,11 +89,13 @@ Pass Criteria: Graceful handling of empty product list
 ### FR-1.2: Product Display Information
 
 **Given/When/Then:**
+
 - **Given** products are loaded on the kiosk
 - **When** a customer views a product card
 - **Then** each product SHALL display name (≥16px), price (≥18px bold), image (800x600px or placeholder), category indicator, and availability status
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-1.2-P01
 Preconditions: 
@@ -116,6 +123,7 @@ Pass Criteria: All required information displayed with correct formatting
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-1.2-N01
 Preconditions: 
@@ -145,11 +153,13 @@ Pass Criteria: Graceful handling of missing optional data
 ### FR-1.3: Category Filtering
 
 **Given/When/Then:**
+
 - **Given** products are assigned to multiple categories
 - **When** a customer selects a category filter
 - **Then** the system SHALL display only products matching that category, with response time <300ms
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-1.3-P01
 Preconditions: 
@@ -178,6 +188,7 @@ Pass Criteria: Correct filtering with performance <300ms
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-1.3-N01
 Preconditions: 
@@ -202,11 +213,13 @@ Pass Criteria: Graceful handling of empty category
 ### FR-1.4: Allergen Information Display
 
 **Given/When/Then:**
+
 - **Given** a product has allergen information stored
 - **When** a customer views the product details
 - **Then** the system SHALL display allergen information clearly
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-1.4-P01
 Preconditions: 
@@ -229,6 +242,7 @@ Pass Criteria: Allergen info clearly visible and readable
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-1.4-N01
 Preconditions: 
@@ -253,11 +267,13 @@ Pass Criteria: Graceful handling of missing allergen data
 ### FR-1.5: Inventory Tracking Disabled Warning
 
 **Given/When/Then:**
+
 - **Given** inventory tracking is disabled system-wide
 - **When** a customer proceeds to checkout
 - **Then** the system SHALL display warning: "⚠️ Inventory tracking is disabled. Please verify that items exist in the cabinet before completing payment."
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-1.5-P01
 Preconditions: 
@@ -283,6 +299,7 @@ Pass Criteria: Warning clearly displayed at checkout
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-1.5-N01
 Preconditions: 
@@ -306,11 +323,13 @@ Pass Criteria: No warning when inventory tracking is enabled
 ### FR-1.6: Out-of-Stock Product Handling
 
 **Given/When/Then:**
+
 - **Given** inventory tracking is enabled and a product has stock quantity ≤ 0
 - **When** a customer attempts to add the product to cart
 - **Then** the system SHALL display "Out of Stock" badge, grey out the product, show confirmation dialog, and allow purchase after confirmation
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-1.6-P01
 Preconditions: 
@@ -338,6 +357,7 @@ Pass Criteria: Out-of-stock product can be purchased after confirmation
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-1.6-N01
 Preconditions: 
@@ -365,11 +385,13 @@ Pass Criteria: Canceling out-of-stock purchase does not add to cart
 ### FR-2.1: Shopping Cart Functionality
 
 **Given/When/Then:**
+
 - **Given** the kiosk is operational
 - **When** a customer adds multiple products
 - **Then** the system SHALL provide a shopping cart where multiple items can be stored
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-2.1-P01
 Preconditions: 
@@ -398,6 +420,7 @@ Pass Criteria: Multiple items successfully stored in cart
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-2.1-N01
 Preconditions: 
@@ -421,11 +444,13 @@ Pass Criteria: Empty cart handled gracefully
 ### FR-2.2: Shopping Cart Display Details
 
 **Given/When/Then:**
+
 - **Given** items are in the shopping cart
 - **When** a customer views the cart
 - **Then** the cart SHALL display: item thumbnails, names, quantities (editable via +/-), prices, subtotals, running total, remove buttons, and clear cart button
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-2.2-P01
 Preconditions: 
@@ -460,6 +485,7 @@ Pass Criteria: All cart elements displayed correctly
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-2.2-N01
 Preconditions: 
@@ -488,11 +514,13 @@ Pass Criteria: Broken images handled with placeholder
 ### FR-2.3: Purchase Limit Enforcement
 
 **Given/When/Then:**
+
 - **Given** a product has a purchase limit configured (1-50)
 - **When** a customer attempts to add quantity beyond the limit
 - **Then** the system SHALL prevent adding additional items and display message
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-2.3-P01
 Preconditions: 
@@ -514,6 +542,7 @@ Pass Criteria: Can add up to the maximum limit
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-2.3-N01
 Preconditions: 
@@ -540,11 +569,13 @@ Pass Criteria: Cannot exceed purchase limit
 ### FR-2.4: Purchase Limit Exceeded Message
 
 **Given/When/Then:**
+
 - **Given** a customer has reached the purchase limit for an item
 - **When** they attempt to add more
 - **Then** the system SHALL display "Maximum [X] of this item per purchase" and disable "+" button
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-2.4-P01
 Preconditions: 
@@ -566,6 +597,7 @@ Pass Criteria: Clear message when limit reached
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-2.4-N01
 Preconditions: 
@@ -591,11 +623,13 @@ Pass Criteria: Unlimited purchases work when limit is NULL
 ### FR-2.5: Automatic Cart Clearing After 5 Minutes Inactivity
 
 **Given/When/Then:**
+
 - **Given** a customer has items in their cart
 - **When** 5 minutes pass with no user interaction
 - **Then** the system SHALL automatically clear the shopping cart
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-2.5-P01
 Preconditions: 
@@ -620,6 +654,7 @@ Pass Criteria: Cart clears after exactly 5 minutes of inactivity
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-2.5-N01
 Preconditions: 
@@ -647,11 +682,13 @@ Pass Criteria: Timer correctly resets on each interaction
 ### FR-2.5.1: Fixed 5-Minute Timeout (Not Configurable in v1.0)
 
 **Given/When/Then:**
+
 - **Given** the system is version 1.0
 - **When** checking system configuration
 - **Then** the cart timeout SHALL be fixed at 5 minutes (not admin-configurable)
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-2.5.1-P01
 Preconditions: 
@@ -671,6 +708,7 @@ Pass Criteria: No configuration option available
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-2.5.1-N01
 Preconditions: 
@@ -695,11 +733,13 @@ Pass Criteria: Hardcoded timeout cannot be changed
 ### FR-2.5.2: Inactivity Timer Reset on Any Interaction
 
 **Given/When/Then:**
+
 - **Given** the inactivity timer is running
 - **When** a user performs any interaction (touch, scroll, button press, cart edit)
 - **Then** the timer SHALL reset to 0 seconds
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-2.5.2-P01
 Preconditions: 
@@ -721,6 +761,7 @@ Pass Criteria: Timer correctly resets on scroll interaction
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-2.5.2-N01
 Preconditions: 
@@ -747,11 +788,13 @@ Pass Criteria: Boundary timing handled correctly
 ### FR-2.5.3: Optional Countdown Warning (MAY Display)
 
 **Given/When/Then:**
+
 - **Given** the cart timeout is approaching
 - **When** 30 seconds remain before clearing
 - **Then** the system MAY display a countdown or warning (optional feature)
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-2.5.3-P01
 Preconditions: 
@@ -773,6 +816,7 @@ Pass Criteria: Warning appears 30 seconds before timeout (if feature exists)
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-2.5.3-N01
 Preconditions: 
@@ -797,16 +841,18 @@ Pass Criteria: Feature is optional; absence does not cause errors
 ### FR-3.1: QR Code Generation Within 1 Second
 
 **Given/When/Then:**
+
 - **Given** a customer has items in cart and confirms checkout
 - **When** the checkout button is pressed
 - **Then** the system SHALL generate a unique QR code within 1 second
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-3.1-P01
 Preconditions: 
   - Cart contains 2 items totaling 5.00€
-  - MobilePay API is online and responsive
+  - Manual confirmation service reachable (API latency <100ms)
   - Network latency is normal (<100ms)
 Steps:
   1. Add items to cart (total: 5.00€)
@@ -815,11 +861,11 @@ Steps:
   4. Tap "Checkout" or "Pay Now" button
   5. Stop timer when QR code is fully visible and rendered
   6. Record elapsed time
-  7. Scan QR code with test MobilePay app to verify validity
+  7. Scan QR code with standard payment app simulator to verify validity
 Expected Result:
   - QR code appears within 1 second (1000ms or less)
   - QR code is unique (different from previous transactions)
-  - QR code is scannable with MobilePay app
+  - QR code is scannable with standard payment app simulator
   - QR code contains correct payment amount (5.00€)
   - Loading indicator shown during generation (optional)
   - QR code dimensions ≥200x200px (FR-5.3 external interfaces)
@@ -827,10 +873,11 @@ Pass Criteria: QR code generated in ≤1 second and is valid
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-3.1-N01
 Preconditions: 
-  - MobilePay API is slow (simulated 3-second response time)
+  - Manual confirmation service latency artificially increased to 3 seconds
   - Cart contains items
 Steps:
   1. Configure network throttling or mock API to delay 3 seconds
@@ -840,7 +887,7 @@ Steps:
   5. Observe user feedback during wait
 Expected Result:
   - Loading indicator displayed immediately
-  - QR code appears after ~3 seconds (API delay)
+  - QR code appears after ~3 seconds (simulated service delay)
   - User sees "Generating payment..." or similar message
   - No timeout error until 30 seconds (FR-3.6)
   - Once QR appears, it is valid and functional
@@ -850,114 +897,99 @@ Pass Criteria: Graceful handling of slow API response
 
 ---
 
-### FR-3.2: MobilePay API Integration
+### FR-3.2: Manual Payment Confirmation Control
 
-**Given/When/Then:**
-- **Given** the system is configured with valid MobilePay credentials
-- **When** a payment is initiated
-- **Then** the system SHALL integrate with MobilePay API for payment processing
+- **Then** the system SHALL mark the transaction as confirmed and proceed to completion
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-3.2-P01
 Preconditions: 
-  - Valid MobilePay API credentials configured in environment
-  - MobilePay test/sandbox environment available
   - Cart total: 3.50€
+  - Manual confirmation service available
 Steps:
-  1. Configure valid MobilePay merchant API key
-  2. Add items to cart (total: 3.50€)
-  3. Proceed to checkout
-  4. Observe QR code generation (API call #1)
-  5. Scan QR code with MobilePay test app
-  6. Complete payment in MobilePay app
-  7. Observe kiosk response (API call #2: status check)
-  8. Check transaction log in database
+  1. Add items to cart (total: 3.50€)
+  2. Proceed to checkout
+  3. Observe payment instructions and disabled "Done"/"I have paid" button until QR displayed
+  4. Wait for QR code to render
+  5. Simulate payment in external app (no integration required)
+  6. Tap "I have paid"
+  7. Observe success message
+  8. Verify transaction stored as COMPLETED with confirmation metadata (timestamp, session, method)
 Expected Result:
-  - QR code generated via MobilePay API POST /payments
-  - MobilePay app recognizes QR code as valid payment request
-  - Payment amount in MobilePay matches cart total (3.50€)
-  - Transaction ID returned from MobilePay and stored
-  - Webhook or polling receives payment confirmation
-  - Kiosk displays success message
-  - Transaction logged with MobilePay transaction ID
-Pass Criteria: Full integration works end-to-end
+  - Confirmation button available only after QR is visible
+  - Tapping button triggers immediate confirmation request to backend
+  - Kiosk transitions to success state within 1 second (FR-3.4)
+  - Transaction record contains confirmation timestamp, method "manual", and kiosk session ID
+Pass Criteria: Manual confirmation path completes end-to-end
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-3.2-N01
 Preconditions: 
-  - MobilePay API credentials are invalid/expired
+  - Backend confirmation endpoint returns HTTP 503 (simulated outage)
   - Cart contains items
 Steps:
-  1. Configure invalid API key in environment variables
-  2. Attempt to checkout
-  3. Observe error handling
-  4. Check error logs
+  1. Add items to cart and open checkout screen
+  2. Tap "I have paid"
+  3. Observe kiosk handling of failed confirmation request
+  4. Check error logs and notification queue
 Expected Result:
-  - API authentication fails (HTTP 401 or 403)
-  - Error logged: "MobilePay API authentication failed"
-  - User sees message: "🚫 Payment system temporarily unavailable. Please try again later or contact [admin email]." (FR-3.6)
-  - Transaction logged as FAILED
-  - Admin receives email notification (FR-11.2)
-  - User can cancel and retry
-  - Inventory NOT deducted
-Pass Criteria: Invalid credentials handled gracefully
+  - Kiosk displays message: "🚫 Payment confirmation unavailable. Please contact support." (FR-3.6)
+  - Transaction remains PENDING (no inventory deduction)
+  - Retry option presented or guidance to try again after issue resolved
+  - Failure logged with timestamp and kiosk session metadata
+  - Admin notification queued after 15 minutes of continued failure (FR-3.6, FR-11.2)
+Pass Criteria: Confirmation outage handled gracefully without data loss
 ```
 
 ---
 
-### FR-3.3: NFC Payment Support (Where Applicable)
+### FR-3.3: Manual Confirmation Audit Trail
 
 **Given/When/Then:**
-- **Given** the kiosk hardware supports NFC
-- **When** NFC is applicable for payment
-- **Then** the system SHALL support NFC payment options
+
+- **Given** a customer confirms payment on the kiosk
+- **When** the confirmation request is processed
+- **Then** the system SHALL persist audit metadata for the confirmation event
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-3.3-P01
 Preconditions: 
-  - Kiosk has NFC reader hardware installed
-  - MobilePay supports NFC payments
-  - Cart total: 2.50€
+  - Cart total: 4.20€
+  - Audit logging enabled
 Steps:
-  1. Add items to cart (total: 2.50€)
-  2. Proceed to checkout
-  3. Look for NFC payment option on screen
-  4. Hold NFC-enabled phone with MobilePay near reader
-  5. Complete payment via NFC
-  6. Observe confirmation
+  1. Complete steps from TC-FR-3.2-P01 through confirmation
+  2. Query transaction record for confirmation fields (session ID, method, confirmedAt)
+  3. Query audit log for matching entry
 Expected Result:
-  - NFC option displayed on checkout screen ("Tap to Pay" or NFC icon)
-  - NFC reader activates and detects phone
-  - Payment processed via NFC (no QR code needed)
-  - Payment amount: 2.50€
-  - Confirmation received within 5 seconds
-  - Success message displayed
-  - Transaction logged as COMPLETED
-Pass Criteria: NFC payment completes successfully
+  - Transaction row populated with confirmationSessionId, confirmationMethod='manual', confirmedAt timestamp
+  - Audit log entry captured with action 'TRANSACTION_CONFIRMED' (or equivalent)
+  - Audit log includes kiosk session identifier and total amount snapshot
+Pass Criteria: Confirmation metadata persisted and auditable
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-3.3-N01
 Preconditions: 
-  - Kiosk does NOT have NFC hardware installed
-  - System detects no NFC reader
+  - Database temporarily read-only (simulate failure to persist confirmation metadata)
 Steps:
-  1. Boot kiosk without NFC hardware
-  2. Add items to cart
-  3. Proceed to checkout
-  4. Check available payment options
+  1. Attempt manual confirmation while database in read-only mode
+  2. Observe kiosk response
+  3. Inspect logs for failure details
 Expected Result:
-  - NFC option NOT displayed
-  - Only QR code payment option available
-  - No errors or warnings about missing NFC
-  - System functions normally with QR code only
-  - Checkout completes successfully via QR
-Pass Criteria: Missing NFC hardware handled gracefully
+  - Kiosk informs user that confirmation could not be saved and prompts retry or admin assistance
+  - Transaction remains PENDING
+  - Error logged with reason "confirmation_persist_failed"
+  - Audit entry created noting failure event (without duplicating transaction status)
+Pass Criteria: Persistence failure handled without data corruption
 ```
 
 ---
@@ -965,22 +997,24 @@ Pass Criteria: Missing NFC hardware handled gracefully
 ### FR-3.4: Successful Payment Actions
 
 **Given/When/Then:**
-- **Given** a customer has completed payment via MobilePay
-- **When** the system receives payment confirmation
+
+- **Given** a customer has completed payment and tapped "I have paid"
+- **When** the system records the manual confirmation
 - **Then** the system SHALL: display success message (≥3 seconds, green, WCAG AA), show purchased items/total, deduct inventory (allowing negative stock), clear cart, log transaction as "COMPLETED"
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-3.4-P01
 Preconditions: 
   - Cart contains: 2x "Coca-Cola" @ 2.50€ each = 5.00€ total
   - Inventory tracking is enabled
   - "Coca-Cola" current stock: 10 units
-  - MobilePay API is functional
+  - Manual confirmation service available
 Steps:
   1. Verify initial stock: Coca-Cola = 10
-  2. Complete checkout and payment via MobilePay
-  3. Wait for payment confirmation from MobilePay API
+  2. Complete checkout and payment via personal app
+  3. Tap "I have paid" and wait for confirmation response
   4. Observe kiosk screen immediately
   5. Measure success message display duration
   6. Check color contrast (dev tools)
@@ -996,12 +1030,13 @@ Expected Result:
   - Stock updated in database: Coca-Cola = 10 → 8
   - Cart is empty (badge shows 0)
   - Transaction logged with status "COMPLETED"
-  - Transaction includes MobilePay transaction ID
+  - Transaction includes confirmation metadata (session, method, timestamp)
   - Screen returns to home after 5 seconds (auto-reset)
 Pass Criteria: All success actions execute correctly
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-3.4-N01
 Preconditions: 
@@ -1031,11 +1066,13 @@ Pass Criteria: Stock goes negative correctly for out-of-stock purchases
 ### FR-3.4.1: Inventory Deduction Allows Negative Stock
 
 **Given/When/Then:**
+
 - **Given** inventory tracking is enabled
 - **When** a purchase is completed for a product with stock ≤ 0
 - **Then** inventory SHALL be deducted even if result is negative
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-3.4.1-P01
 Preconditions: 
@@ -1056,6 +1093,7 @@ Pass Criteria: Negative stock is allowed and stored
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-3.4.1-N01
 Preconditions: 
@@ -1078,11 +1116,13 @@ Pass Criteria: Stock can go increasingly negative
 ### FR-3.4.2: Negative Stock Indicates Discrepancy
 
 **Given/When/Then:**
+
 - **Given** inventory deduction results in negative stock
 - **When** viewing inventory in admin portal
 - **Then** negative stock quantities SHALL indicate discrepancy between system and physical inventory
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-3.4.2-P01
 Preconditions: 
@@ -1103,6 +1143,7 @@ Pass Criteria: Negative stock clearly indicates discrepancy
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-3.4.2-N01
 Preconditions: 
@@ -1122,11 +1163,13 @@ Pass Criteria: Positive stock shows no discrepancy warnings
 ### FR-3.4.3: Success Message Uses Green with WCAG AA Contrast
 
 **Given/When/Then:**
+
 - **Given** payment is successful
 - **When** success message is displayed
 - **Then** the system SHALL use green color meeting WCAG AA contrast ratio 4.5:1
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-3.4.3-P01
 Preconditions: 
@@ -1151,6 +1194,7 @@ Pass Criteria: Green color contrast meets WCAG AA standard
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-3.4.3-N01
 Preconditions: 
@@ -1172,22 +1216,24 @@ Pass Criteria: Confirms need for high-contrast green
 ### FR-3.5: Payment Failure Actions
 
 **Given/When/Then:**
+
 - **Given** payment fails or times out
 - **When** failure is detected
 - **Then** the system SHALL: display failure message (≥5 seconds), NOT deduct inventory, maintain cart, log as "FAILED", allow retry/cancel
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-3.5-P01
 Preconditions: 
   - Cart contains items (total: 4.50€)
-  - MobilePay API will return payment failure
+  - Manual confirmation service configured to reject confirmation (HTTP 409)
   - Initial stock values recorded
 Steps:
   1. Record initial stock for all cart items
   2. Proceed to checkout
-  3. Scan QR code with MobilePay
-  4. Simulate payment failure in MobilePay (decline/cancel)
+  3. Customer uses personal payment app but chooses not to finalize
+  4. Tap "I have paid" to trigger confirmation failure response
   5. Observe kiosk response
   6. Measure message display duration
   7. Check stock values in database
@@ -1199,7 +1245,7 @@ Expected Result:
   - Stock quantities UNCHANGED (no deduction)
   - Cart still contains all original items
   - Transaction logged with status "FAILED"
-  - MobilePay transaction ID recorded (if available)
+  - Confirmation failure reason logged (e.g., "declined", "not_confirmed")
   - "Try Again" button available
   - "Cancel" button available
   - User can retry checkout
@@ -1207,20 +1253,22 @@ Pass Criteria: Failure handled correctly without inventory deduction
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-3.5-N01
 Preconditions: 
-  - Customer initiates payment but abandons it
-  - No explicit success or failure from MobilePay
+  - Customer initiates checkout
+  - Manual confirmation is not submitted within 60 seconds
 Steps:
   1. Proceed to checkout
-  2. Display QR code
-  3. Do NOT scan QR code with MobilePay
-  4. Wait (no customer action)
-  5. Observe after 60 seconds (timeout)
+  2. Display manual confirmation prompt
+  3. Do NOT tap "Confirm Payment"
+  4. Wait with no customer action
+  5. Observe kiosk after 60 seconds (timeout)
 Expected Result:
   - After 60 seconds, timeout message appears (FR-3.5.1)
-  - Message: "⏱️ Payment timed out. Please try again."
+  - Message: "⏱️ Payment not confirmed. Please try again."
+  - Manual confirmation prompt closes and returns to cart view
   - Cart maintained
   - Stock NOT deducted
   - Transaction logged as "FAILED" or "TIMEOUT"
@@ -1233,26 +1281,28 @@ Pass Criteria: Timeout treated as failure
 ### FR-3.5.1: Payment Timeout Handling (60 Seconds)
 
 **Given/When/Then:**
-- **Given** payment QR code is displayed
-- **When** 60 seconds pass with no response from MobilePay
-- **Then** the system SHALL display timeout message: "⏱️ Payment timed out. Please try again."
+
+- **Given** the manual confirmation prompt is displayed
+- **When** 60 seconds pass without customer confirmation
+- **Then** the system SHALL display timeout message: "⏱️ Payment not confirmed. Please try again."
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-3.5.1-P01
 Preconditions: 
-  - QR code displayed for payment
-  - MobilePay does not respond (simulated)
+  - Manual confirmation prompt displayed
+  - Customer does not tap "Confirm Payment"
 Steps:
-  1. Display QR code for payment
+  1. Display manual confirmation prompt
   2. Start timer
-  3. Do NOT complete payment in MobilePay
+  3. Do NOT tap "Confirm Payment"
   4. Wait exactly 60 seconds
-  5. Observe kiosk screen at 60-second mark
+  5. Observe prompt at 60-second mark
 Expected Result:
   - At 60 seconds, timeout message appears
-  - Message: "⏱️ Payment timed out. Please try again."
-  - QR code is removed/hidden
+  - Message: "⏱️ Payment not confirmed. Please try again."
+  - Manual confirmation prompt is removed/disabled
   - "Try Again" button available
   - "Cancel" button available
   - Transaction logged as "TIMEOUT" or "FAILED"
@@ -1261,23 +1311,24 @@ Pass Criteria: Timeout occurs at exactly 60 seconds
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-3.5.1-N01
 Preconditions: 
-  - Testing boundary: payment completes at 59 seconds
+  - Testing boundary: manual confirmation completes at 59 seconds
 Steps:
-  1. Display QR code
+  1. Display manual confirmation prompt
   2. Wait 59 seconds
-  3. Complete payment in MobilePay at 59-second mark
+  3. Tap "Confirm Payment" at 59-second mark
   4. Observe kiosk response
 Expected Result:
-  - Payment confirmation received before timeout
+  - Manual confirmation accepted before timeout
   - Success message displayed (not timeout)
   - Transaction completes normally
   - No timeout message appears
   - Stock is deducted
   - Cart is cleared
-Pass Criteria: Payment within 60 seconds succeeds
+Pass Criteria: Manual confirmation within 60 seconds succeeds
 ```
 
 ---
@@ -1285,21 +1336,23 @@ Pass Criteria: Payment within 60 seconds succeeds
 ### FR-3.5.2: Payment Uncertain Edge Case Handling
 
 **Given/When/Then:**
+
 - **Given** customer was charged but system doesn't receive confirmation
 - **When** this edge case occurs
 - **Then** display message allowing customer to take items, log as "PAYMENT_UNCERTAIN", do NOT auto-deduct inventory, allow admin manual reconciliation
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-3.5.2-P01
 Preconditions: 
-  - Simulated network failure after payment confirmation sent
-  - MobilePay charges customer but webhook fails
+  - Simulated confirmation audit failure after manual confirmation submitted
+  - Customer taps "Confirm Payment" on kiosk
 Steps:
   1. Initiate payment
-  2. Complete payment in MobilePay (customer charged)
-  3. Simulate network failure before webhook reaches kiosk
-  4. Observe kiosk response after timeout
+  2. Submit manual confirmation on kiosk
+  3. Simulate confirmation audit persistence failure (service unreachable)
+  4. Observe kiosk response after timeout fallback
   5. Check transaction log
   6. Check inventory stock
 Expected Result:
@@ -1314,6 +1367,7 @@ Pass Criteria: Uncertain payment logged for manual reconciliation
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-3.5.2-N01
 Preconditions: 
@@ -1322,7 +1376,7 @@ Steps:
   1. Admin logs into admin portal
   2. Navigates to "Uncertain Payments" report
   3. Selects transaction with status "PAYMENT_UNCERTAIN"
-  4. Reviews details and verifies with MobilePay merchant portal
+  4. Reviews confirmation audit trail and payment evidence
   5. Clicks "Mark as Confirmed"
   6. System deducts inventory retroactively
   7. Transaction status updated to "COMPLETED"
@@ -1338,24 +1392,26 @@ Pass Criteria: Admin can manually reconcile uncertain payments
 
 ---
 
-### FR-3.6: MobilePay API Unavailability Handling
+### FR-3.6: Confirmation Service Unavailability Handling
 
 **Given/When/Then:**
-- **Given** MobilePay API is unreachable
+
+- **Given** the confirmation service is unreachable
 - **When** unreachable for >30 seconds
 - **Then** display error, log downtime, notify admin if >15 minutes, disable checkout but allow browsing
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-3.6-P01
 Preconditions: 
-  - MobilePay API is down/unreachable (simulated)
+  - Confirmation service is down/unreachable (simulated)
   - Customer attempts checkout
 Steps:
-  1. Simulate MobilePay API downtime (network unreachable)
+  1. Simulate confirmation service downtime (network unreachable)
   2. Add items to cart
   3. Attempt to checkout
-  4. Wait 30 seconds for API response
+  4. Wait 30 seconds for service response
   5. Observe error message
   6. Check if browsing still works
   7. Check error logs
@@ -1372,17 +1428,18 @@ Pass Criteria: API unavailability handled gracefully
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-3.6-N01
 Preconditions: 
-  - MobilePay API has been down for 16 minutes
+  - Confirmation service has been down for 16 minutes
 Steps:
-  1. Simulate 16-minute API downtime
+  1. Simulate 16-minute confirmation service downtime
   2. Check admin email inbox
   3. Review error logs
 Expected Result:
   - Admin receives email notification
-  - Email subject: "MobilePay API Downtime Alert"
+  - Email subject: "Confirmation Service Downtime Alert"
   - Email body includes: downtime duration, timestamp, recommended action
   - Error log contains downtime incident with timestamps
   - Kiosk continues showing error message to customers
@@ -1394,11 +1451,13 @@ Pass Criteria: Admin notified after 15 minutes of downtime
 ### FR-4.1: Closed Status During Non-Operating Hours
 
 **Given/When/Then:**
+
 - **Given** current time is outside operating hours
 - **When** a user approaches the kiosk
 - **Then** the kiosk SHALL display "Closed" message with operating hours
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-4.1-P01
 Preconditions: 
@@ -1419,6 +1478,7 @@ Pass Criteria: Closed message displays correctly
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-4.1-N01
 Preconditions: 
@@ -1443,11 +1503,13 @@ Pass Criteria: Automatic transition at opening time
 ### FR-4.2: Maintenance Mode Display
 
 **Given/When/Then:**
+
 - **Given** maintenance mode is enabled
 - **When** a user approaches the kiosk
 - **Then** the kiosk SHALL display "Maintenance" message with custom text
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-4.2-P01
 Preconditions: 
@@ -1472,6 +1534,7 @@ Pass Criteria: Maintenance message displays with custom text
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-4.2-N01
 Preconditions: 
@@ -1493,11 +1556,13 @@ Pass Criteria: Default message shown when custom message is empty
 ### FR-4.2.1: Maintenance Mode Precedence Over Operating Hours
 
 **Given/When/Then:**
+
 - **Given** maintenance mode is enabled
 - **When** current time is within operating hours
 - **Then** maintenance mode SHALL take precedence (kiosk shows maintenance, not operational)
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-4.2.1-P01
 Preconditions: 
@@ -1517,6 +1582,7 @@ Pass Criteria: Maintenance mode takes precedence
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-4.2.1-N01
 Preconditions: 
@@ -1539,11 +1605,13 @@ Pass Criteria: Maintenance shown even when also closed
 ### FR-4.3: Kiosk Accessibility Requirements
 
 **Given/When/Then:**
+
 - **Given** the kiosk interface is displayed
 - **When** a user interacts with the kiosk
 - **Then** interface SHALL meet: ≥16px body text, ≥24px headings, ≥44x44px touch targets, WCAG AA contrast
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-4.3-P01
 Preconditions: 
@@ -1571,6 +1639,7 @@ Pass Criteria: All accessibility requirements verified
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-4.3-N01
 Preconditions: 
@@ -1596,11 +1665,13 @@ Pass Criteria: Accessibility maintained on minimum screen size
 ### FR-5.1: Username/Password Authentication
 
 **Given/When/Then:**
+
 - **Given** an admin attempts to access the admin portal
 - **When** they provide username and password
 - **Then** the system SHALL authenticate credentials securely
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-5.1-P01
 Preconditions: 
@@ -1624,6 +1695,7 @@ Pass Criteria: Valid credentials allow login
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-5.1-N01
 Preconditions: 
@@ -1650,11 +1722,13 @@ Pass Criteria: Invalid credentials rejected
 ### FR-5.2: Google OAuth Authentication (Optional)
 
 **Given/When/Then:**
+
 - **Given** Google OAuth is configured
 - **When** an admin chooses to log in with Google
 - **Then** the system SHALL support Google OAuth as alternative login
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-5.2-P01
 Preconditions: 
@@ -1677,6 +1751,7 @@ Pass Criteria: Google OAuth login works
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-5.2-N01
 Preconditions: 
@@ -1697,11 +1772,13 @@ Pass Criteria: Missing OAuth doesn't break login page (feature is optional)
 ### FR-5.3: Multiple Administrator Accounts
 
 **Given/When/Then:**
+
 - **Given** the system supports multiple admin accounts
 - **When** admins are created and managed
 - **Then** the system SHALL support up to 10 admin accounts with identical permissions, unique usernames, and audit trail
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-5.3-P01
 Preconditions: 
@@ -1729,6 +1806,7 @@ Pass Criteria: Multiple admins can coexist with same permissions
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-5.3-N01
 Preconditions: 
@@ -1752,11 +1830,13 @@ Pass Criteria: Maximum of 10 admins enforced
 ### FR-5.3.1: Admin Self-Management
 
 **Given/When/Then:**
+
 - **Given** an admin is logged in
 - **When** they access their profile settings
 - **Then** any admin SHALL be able to change their own password and email address
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-5.3.1-P01
 Preconditions: 
@@ -1783,6 +1863,7 @@ Pass Criteria: Admin can change own password
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-5.3.1-N01
 Preconditions: 
@@ -1808,11 +1889,13 @@ Pass Criteria: Cannot change password without knowing current password
 ### FR-5.3.2: Primary Admin Password Reset
 
 **Given/When/Then:**
+
 - **Given** the primary admin is logged in
 - **When** another admin forgets their password
 - **Then** the primary admin SHALL be able to reset passwords for other admin accounts
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-5.3.2-P01
 Preconditions: 
@@ -1837,6 +1920,7 @@ Pass Criteria: Primary admin can reset other admin passwords
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-5.3.2-N01
 Preconditions: 
@@ -1859,11 +1943,13 @@ Pass Criteria: Only primary admin can reset passwords
 ### FR-5.3.3: Audit Trail for Admin Actions
 
 **Given/When/Then:**
+
 - **Given** admins perform actions in the system
 - **When** changes are made
 - **Then** action logs SHALL record which admin made specific changes
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-5.3.3-P01
 Preconditions: 
@@ -1892,6 +1978,7 @@ Pass Criteria: Admin actions logged with admin identity
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-5.3.3-N01
 Preconditions: 
@@ -1913,11 +2000,13 @@ Pass Criteria: Automated actions distinguished from admin actions
 ### FR-5.4: Admin Session Timeout After 30 Minutes
 
 **Given/When/Then:**
+
 - **Given** an admin is logged in
 - **When** 30 minutes pass with no activity
 - **Then** the session SHALL timeout and require re-authentication
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-5.4-P01
 Preconditions: 
@@ -1939,6 +2028,7 @@ Pass Criteria: Session expires after 30 minutes inactivity
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-5.4-N01
 Preconditions: 
@@ -1964,11 +2054,13 @@ Pass Criteria: Activity resets session timeout timer
 ### FR-5.4.1: Session Timeout Warning
 
 **Given/When/Then:**
+
 - **Given** an admin session is approaching timeout
 - **When** 2 minutes remain before timeout
 - **Then** the system SHALL display a warning
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-5.4.1-P01
 Preconditions: 
@@ -1990,6 +2082,7 @@ Pass Criteria: Warning appears 2 minutes before timeout
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-5.4.1-N01
 Preconditions: 
@@ -2013,11 +2106,13 @@ Pass Criteria: Ignoring warning results in timeout
 ### FR-5.4.2: Re-authentication Required After Timeout
 
 **Given/When/Then:**
+
 - **Given** an admin session has timed out
 - **When** they attempt to access admin functions
 - **Then** the system SHALL require re-authentication
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-5.4.2-P01
 Preconditions: 
@@ -2037,6 +2132,7 @@ Pass Criteria: Must re-authenticate after timeout
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-5.4.2-N01
 Preconditions: 
@@ -2059,11 +2155,13 @@ Pass Criteria: Direct URL access blocked without authentication
 ### FR-5.4.3: "Remember This Device" Option (Optional)
 
 **Given/When/Then:**
+
 - **Given** the optional "Remember this device" feature is implemented
 - **When** an admin logs in
 - **Then** the system MAY offer option to remember device for 30 days
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-5.4.3-P01
 Preconditions: 
@@ -2087,6 +2185,7 @@ Pass Criteria: Remember device option works for 30 days
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-5.4.3-N01
 Preconditions: 
@@ -2107,11 +2206,13 @@ Pass Criteria: Absence of optional feature doesn't cause errors
 ### FR-6.1: Add New Product with Attributes
 
 **Given/When/Then:**
+
 - **Given** an admin is on the product management page
 - **When** they add a new product
 - **Then** the system SHALL allow entry of: name (required, 1-100 chars), price (required, 0.01-999.99 EUR), image (optional), category (required), allergen info (optional, ≤500 chars), hot/cold (optional), purchase limit (optional, 1-50)
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-6.1-P01
 Preconditions: 
@@ -2147,6 +2248,7 @@ Pass Criteria: All product attributes saved correctly
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-6.1-N01
 Preconditions: 
@@ -2173,11 +2275,13 @@ Pass Criteria: Required fields and ranges validated
 ### FR-6.1.1: Price Validation
 
 **Given/When/Then:**
+
 - **Given** an admin enters a product price
 - **When** the price is validated
 - **Then** the system SHALL enforce: 0.01-999.99 EUR range, exactly 2 decimal places, not negative/zero, display error if invalid
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-6.1.1-P01
 Preconditions: 
@@ -2197,6 +2301,7 @@ Pass Criteria: Valid prices accepted
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-6.1.1-N01
 Preconditions: 
@@ -2228,11 +2333,13 @@ Pass Criteria: Invalid prices rejected with clear error messages
 ### FR-6.1.2: Purchase Limit Validation
 
 **Given/When/Then:**
+
 - **Given** an admin sets a purchase limit
 - **When** the limit is validated
 - **Then** the system SHALL enforce: 1-50 range if set, NULL for unlimited, display on product as "Maximum [X] per purchase"
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-6.1.2-P01
 Preconditions: 
@@ -2251,6 +2358,7 @@ Pass Criteria: Purchase limit displayed and enforced
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-6.1.2-N01
 Preconditions: 
@@ -2276,11 +2384,13 @@ Pass Criteria: Purchase limit range validated
 ### FR-6.2: Edit Existing Product
 
 **Given/When/Then:**
+
 - **Given** a product exists in the system
 - **When** an admin edits product information
 - **Then** the system SHALL allow editing all product attributes
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-6.2-P01
 Preconditions: 
@@ -2304,6 +2414,7 @@ Pass Criteria: Product edits saved and reflected
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-6.2-N01
 Preconditions: 
@@ -2325,11 +2436,13 @@ Pass Criteria: Validation enforced on edit
 ### FR-6.2.1: Immediate Kiosk Reflection (Within 5 Seconds)
 
 **Given/When/Then:**
+
 - **Given** an admin makes changes to a product
 - **When** changes are saved
 - **Then** changes SHALL reflect on kiosk interface within 5 seconds
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-6.2.1-P01
 Preconditions: 
@@ -2351,6 +2464,7 @@ Pass Criteria: Changes appear on kiosk ≤5 seconds
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-6.2.1-N01
 Preconditions: 
@@ -2374,11 +2488,13 @@ Pass Criteria: Updates work even with network latency
 ### FR-6.3: Delete/Remove Product
 
 **Given/When/Then:**
+
 - **Given** a product exists in the system
 - **When** an admin deletes the product
 - **Then** the system SHALL remove product from active display
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-6.3-P01
 Preconditions: 
@@ -2400,6 +2516,7 @@ Pass Criteria: Product removed from customer view
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-6.3-N01
 Preconditions: 
@@ -2421,11 +2538,13 @@ Pass Criteria: Cancelling delete preserves product
 ### FR-6.3.1: Soft Delete for Transaction History
 
 **Given/When/Then:**
+
 - **Given** a product is deleted
 - **When** the deletion occurs
 - **Then** the product SHALL be soft-deleted (marked inactive) to preserve transaction history references
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-6.3.1-P01
 Preconditions: 
@@ -2448,6 +2567,7 @@ Pass Criteria: Soft delete preserves transaction integrity
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-6.3.1-N01
 Preconditions: 
@@ -2469,11 +2589,13 @@ Pass Criteria: Soft delete is reversible (optional feature)
 ### FR-6.3.2: Delete Confirmation Prompt
 
 **Given/When/Then:**
+
 - **Given** an admin clicks delete
 - **When** the delete action is initiated
 - **Then** the system SHALL confirm deletion with prompt: "Are you sure you want to delete [product name]? This will hide it from customers."
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-6.3.2-P01
 Preconditions: 
@@ -2492,6 +2614,7 @@ Pass Criteria: Confirmation dialog displays with product name
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-6.3.2-N01
 Preconditions: 
@@ -2512,11 +2635,13 @@ Pass Criteria: Double-click handled safely
 ### FR-6.4: Upload Product Images
 
 **Given/When/Then:**
+
 - **Given** an admin is adding/editing a product
 - **When** they upload an image
 - **Then** the system SHALL allow upload through web portal with validation
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-6.4-P01
 Preconditions: 
@@ -2538,6 +2663,7 @@ Pass Criteria: Valid image uploads successfully
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-6.4-N01
 Preconditions: 
@@ -2564,11 +2690,13 @@ Pass Criteria: Invalid uploads rejected with clear errors
 ### FR-6.4.1: Image Upload Requirements and Validation
 
 **Given/When/Then:**
+
 - **Given** an admin uploads an image
 - **When** the file is validated
 - **Then** the system SHALL enforce: accepted formats (JPEG, PNG, WebP, GIF non-animated), max 10MB, extension whitelist, content validation (magic number), reject executables/SVG, display clear error if rejected
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-6.4.1-P01
 Preconditions: 
@@ -2592,6 +2720,7 @@ Pass Criteria: All valid formats accepted
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-6.4.1-N01
 Preconditions: 
@@ -2613,11 +2742,13 @@ Pass Criteria: Magic number validation catches disguised files
 ### FR-6.4.2: Image Upload Security
 
 **Given/When/Then:**
+
 - **Given** an image is uploaded
 - **When** security processing occurs
 - **Then** the system SHALL: strip EXIF metadata, enforce max filename 255 chars, sanitize filenames (remove special chars except - and _)
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-6.4.2-P01
 Preconditions: 
@@ -2639,6 +2770,7 @@ Pass Criteria: Security measures applied to uploads
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-6.4.2-N01
 Preconditions: 
@@ -2659,11 +2791,13 @@ Pass Criteria: Long filenames handled safely
 ### FR-6.5: Automatic Image Processing
 
 **Given/When/Then:**
+
 - **Given** an image is uploaded
 - **When** processing occurs
 - **Then** the system SHALL: resize to 800x600px (center-crop), compress to <200KB, convert to WebP (JPEG fallback), backup original, show preview before confirm
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-6.5-P01
 Preconditions: 
@@ -2687,6 +2821,7 @@ Pass Criteria: Image automatically optimized
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-6.5-N01
 Preconditions: 
@@ -2709,11 +2844,13 @@ Pass Criteria: Small images handled without errors
 ### FR-6.6: Default Placeholder Image
 
 **Given/When/Then:**
+
 - **Given** a product has no uploaded image
 - **When** the product is displayed
 - **Then** the system SHALL display a default placeholder image (generic snack/drink icon)
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-6.6-P01
 Preconditions: 
@@ -2734,6 +2871,7 @@ Pass Criteria: Placeholder image displays correctly
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-6.6-N01
 Preconditions: 
@@ -2757,11 +2895,13 @@ Pass Criteria: Missing images fallback to placeholder
 ### FR-7.1: Create Custom Categories
 
 **Given/When/Then:**
+
 - **Given** an admin wants to organize products
 - **When** they create a custom category
 - **Then** the system SHALL allow creation with name requirements: 1-50 chars, unique, no special chars except spaces/hyphens
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-7.1-P01
 Preconditions: 
@@ -2784,6 +2924,7 @@ Pass Criteria: Valid category created
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-7.1-N01
 Preconditions: 
@@ -2810,11 +2951,13 @@ Pass Criteria: Invalid category names rejected
 ### FR-7.1.1: Category Name Requirements
 
 **Given/When/Then:**
+
 - **Given** an admin enters a category name
 - **When** validating the name
 - **Then** the system SHALL enforce: 1-50 characters, must be unique, cannot contain special characters except spaces and hyphens
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-7.1.1-P01
 Preconditions: 
@@ -2837,6 +2980,7 @@ Pass Criteria: All valid edge cases accepted
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-7.1.1-N01
 Preconditions: 
@@ -2857,11 +3001,13 @@ Pass Criteria: Uniqueness check is case-insensitive
 ### FR-7.2: Edit and Delete Categories
 
 **Given/When/Then:**
+
 - **Given** a category exists
 - **When** an admin edits or deletes it
 - **Then** the system SHALL allow editing and deletion with constraints
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-7.2-P01
 Preconditions: 
@@ -2882,6 +3028,7 @@ Pass Criteria: Category renamed successfully
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-7.2-N01
 Preconditions: 
@@ -2902,11 +3049,13 @@ Pass Criteria: Cannot delete category with products
 ### FR-7.2.1: Prevent Deletion of Categories with Products
 
 **Given/When/Then:**
+
 - **Given** a category has products assigned
 - **When** admin attempts to delete it
 - **Then** the system SHALL prevent deletion and display warning
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-7.2.1-P01
 Preconditions: 
@@ -2925,6 +3074,7 @@ Pass Criteria: Deletion prevented with helpful message
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-7.2.1-N01
 Preconditions: 
@@ -2945,11 +3095,13 @@ Pass Criteria: Empty categories can be deleted
 ### FR-7.2.2: Category Deletion Warning
 
 **Given/When/Then:**
+
 - **Given** admin attempts to delete category with products
 - **When** the action is initiated
 - **Then** the system SHALL display: "Cannot delete category with assigned products. Please reassign or delete products first."
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-7.2.2-P01
 Preconditions: 
@@ -2966,6 +3118,7 @@ Pass Criteria: Exact warning message displayed
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-7.2.2-N01
 Preconditions: 
@@ -2987,11 +3140,13 @@ Pass Criteria: Workflow guidance works correctly
 ### FR-7.3: Products in Multiple Categories
 
 **Given/When/Then:**
+
 - **Given** a product is being added/edited
 - **When** assigning categories
 - **Then** products SHALL be allowed to belong to multiple categories simultaneously
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-7.3-P01
 Preconditions: 
@@ -3016,6 +3171,7 @@ Pass Criteria: Product appears in all assigned categories
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-7.3-N01
 Preconditions: 
@@ -3035,11 +3191,13 @@ Pass Criteria: Products cannot exist without category
 ### FR-7.4: Default Pre-Configured Categories
 
 **Given/When/Then:**
+
 - **Given** the system is initially set up
 - **When** viewing categories
 - **Then** the system SHALL include default categories: Drinks, Snacks, Hot Drinks, Cold Drinks
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-7.4-P01
 Preconditions: 
@@ -3062,6 +3220,7 @@ Pass Criteria: 4 default categories exist
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-7.4-N01
 Preconditions: 
@@ -3081,11 +3240,13 @@ Pass Criteria: Default categories cannot be deleted
 ### FR-7.4.1: Default Categories Can Be Renamed But Not Deleted
 
 **Given/When/Then:**
+
 - **Given** a default category exists
 - **When** admin attempts to rename or delete it
 - **Then** the system SHALL allow renaming but prevent deletion
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-7.4.1-P01
 Preconditions: 
@@ -3103,6 +3264,7 @@ Pass Criteria: Default categories can be renamed
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-7.4.1-N01
 Preconditions: 
@@ -3123,11 +3285,13 @@ Pass Criteria: Default categories cannot be deleted
 ### FR-7.5: Category Changes Update Kiosk Immediately
 
 **Given/When/Then:**
+
 - **Given** category changes are made in admin portal
 - **When** changes are saved
 - **Then** product filtering on kiosk SHALL update within 5 seconds
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-7.5-P01
 Preconditions: 
@@ -3148,6 +3312,7 @@ Pass Criteria: Category changes reflected ≤5 seconds
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-7.5-N01
 Preconditions: 
@@ -3168,11 +3333,13 @@ Pass Criteria: New categories appear on kiosk quickly
 ### FR-8.1: Enable/Disable Inventory Tracking System-Wide
 
 **Given/When/Then:**
+
 - **Given** an admin accesses system configuration
 - **When** they toggle inventory tracking
 - **Then** the system SHALL enable or disable inventory tracking system-wide
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-8.1-P01
 Preconditions: 
@@ -3195,6 +3362,7 @@ Pass Criteria: Inventory tracking successfully enabled
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-8.1-N01
 Preconditions: 
@@ -3219,11 +3387,13 @@ Pass Criteria: Inventory tracking successfully disabled
 ### FR-8.1.1: Inventory Tracking Disabled Behavior
 
 **Given/When/Then:**
+
 - **Given** inventory tracking is disabled
 - **When** viewing the system
 - **Then** the system SHALL: hide stock quantity fields, hide low-stock settings, not deduct inventory on purchases, hide notifications, display "Tracking: OFF" banner, show checkout warning, display all products as available
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-8.1.1-P01
 Preconditions: 
@@ -3247,6 +3417,7 @@ Pass Criteria: All inventory features properly disabled
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-8.1.1-N01
 Preconditions: 
@@ -3270,11 +3441,13 @@ Pass Criteria: Physical stock not reflected when tracking disabled
 ### FR-8.1.2: Inventory Tracking Enabled Behavior
 
 **Given/When/Then:**
+
 - **Given** inventory tracking is enabled
 - **When** viewing and using the system
 - **Then** all inventory features SHALL be active: view/edit stock quantities, automatic deductions, low-stock notifications, out-of-stock displays
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-8.1.2-P01
 Preconditions: 
@@ -3297,6 +3470,7 @@ Pass Criteria: All inventory features active
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-8.1.2-N01
 Preconditions: 
@@ -3319,11 +3493,13 @@ Pass Criteria: Old stock data preserved when re-enabling
 ### FR-8.1.3: Preserve Stock Quantities When Re-Enabling
 
 **Given/When/Then:**
+
 - **Given** inventory tracking has been disabled
 - **When** admin re-enables it
 - **Then** the system SHALL preserve last known stock quantities
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-8.1.3-P01
 Preconditions: 
@@ -3344,6 +3520,7 @@ Pass Criteria: Stock quantities preserved
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-8.1.3-N01
 Preconditions: 
@@ -3370,11 +3547,13 @@ Pass Criteria: System doesn't auto-correct for disabled period sales
 ### FR-8.2: Inventory Management Functions (When Enabled)
 
 **Given/When/Then:**
+
 - **Given** inventory tracking is enabled
 - **When** admin manages inventory
 - **Then** the system SHALL allow: view stock in sortable table, manually update stock, set low-stock thresholds (1-99, default 5), manually adjust for discrepancies
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-8.2-P01
 Preconditions: 
@@ -3399,6 +3578,7 @@ Pass Criteria: All inventory management functions work
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-8.2-N01
 Preconditions: 
@@ -3418,11 +3598,13 @@ Pass Criteria: Inventory page handled gracefully when tracking disabled
 ### FR-8.2.1: Inventory Discrepancy Report
 
 **Given/When/Then:**
+
 - **Given** products have negative stock
 - **When** admin views inventory discrepancy report
 - **Then** admins SHALL be able to view products with negative stock
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-8.2.1-P01
 Preconditions: 
@@ -3445,6 +3627,7 @@ Pass Criteria: Negative stock products listed in report
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-8.2.1-N01
 Preconditions: 
@@ -3464,11 +3647,13 @@ Pass Criteria: Report handles no discrepancies gracefully
 ### FR-8.2.2: Negative Stock Display Format
 
 **Given/When/Then:**
+
 - **Given** a product has negative stock
 - **When** viewing in admin portal
 - **Then** negative stock SHALL display as "Out of Stock (-X discrepancy)" with red highlight
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-8.2.2-P01
 Preconditions: 
@@ -3487,6 +3672,7 @@ Pass Criteria: Negative stock formatted correctly
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-8.2.2-N01
 Preconditions: 
@@ -3507,11 +3693,13 @@ Pass Criteria: Zero stock distinguished from negative stock
 ### FR-8.2.3: Admin Can Reset Negative Stock
 
 **Given/When/Then:**
+
 - **Given** a product has negative stock
 - **When** admin adjusts the stock
 - **Then** admin SHALL be able to reset negative stock to zero or positive value with "Adjust Stock" button
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-8.2.3-P01
 Preconditions: 
@@ -3533,6 +3721,7 @@ Pass Criteria: Negative stock successfully reset to positive
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-8.2.3-N01
 Preconditions: 
@@ -3555,11 +3744,13 @@ Pass Criteria: Can reset to zero successfully
 ### FR-8.2.4: Admin Manual Reconciliation for Uncertain Payments
 
 **Given/When/Then:**
+
 - **Given** uncertain payment transactions exist (status "PAYMENT_UNCERTAIN")
 - **When** admin reconciles them
 - **Then** admin SHALL be able to view "Uncertain Payments" report, mark as "CONFIRMED" (deduct inventory) or "REFUNDED" (no action), and manually adjust inventory after verification
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-8.2.4-P01
 Preconditions: 
@@ -3570,14 +3761,14 @@ Steps:
   1. Log into admin portal
   2. Navigate to "Uncertain Payments" report
   3. View transaction details
-  4. Verify payment in MobilePay merchant portal (external)
+  4. Verify payment using confirmation audit trail and POS receipt
   5. Confirm payment was successful
   6. Click "Mark as Confirmed" button
   7. Check inventory stock
 Expected Result:
   - Uncertain Payments report shows transaction
   - Transaction details displayed (items, amount, timestamp)
-  - Admin can verify with MobilePay logs
+  - Admin can verify using confirmation audit entries
   - After marking "Confirmed":
     - Inventory deducted: Chips 10 → 8
     - Transaction status: "PAYMENT_UNCERTAIN" → "COMPLETED"
@@ -3587,6 +3778,7 @@ Pass Criteria: Uncertain payment successfully reconciled as confirmed
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-8.2.4-N01
 Preconditions: 
@@ -3594,7 +3786,7 @@ Preconditions:
   - Admin verifies customer was NOT actually charged
 Steps:
   1. View uncertain payment in report
-  2. Check MobilePay portal: payment failed/refunded
+  2. Check confirmation audit and POS records: payment failed/refunded
   3. Click "Mark as Refunded" button
   4. Confirm action
 Expected Result:
@@ -3611,11 +3803,13 @@ Pass Criteria: Uncertain payment marked as refunded without inventory deduction
 ### FR-8.3: Automatic Inventory Deduction on Purchase
 
 **Given/When/Then:**
+
 - **Given** inventory tracking is enabled and purchase is completed
 - **When** payment confirmation is received
 - **Then** the system SHALL automatically deduct inventory quantities
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-8.3-P01
 Preconditions: 
@@ -3626,7 +3820,7 @@ Steps:
   1. Record initial stock: Soda = 20
   2. Customer adds 3x "Soda" to cart
   3. Customer completes checkout
-  4. Payment confirmed by MobilePay
+  4. Manual confirmation recorded by kiosk
   5. Query database for updated stock
 Expected Result:
   - Stock automatically deducted: 20 → 17
@@ -3638,6 +3832,7 @@ Pass Criteria: Inventory automatically deducted correctly
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-8.3-N01
 Preconditions: 
@@ -3660,14 +3855,16 @@ Pass Criteria: Deduction works even resulting in negative stock
 
 ---
 
-### FR-8.3.1: Deduction Timing on Payment Confirmation
+### FR-8.3.1: Deduction Timing on Manual Confirmation
 
 **Given/When/Then:**
-- **Given** payment confirmation is received from MobilePay
-- **When** the confirmation arrives
+
+- **Given** manual payment confirmation is received from the kiosk
+- **When** the confirmation event is persisted
 - **Then** deduction SHALL occur immediately upon payment confirmation
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-8.3.1-P01
 Preconditions: 
@@ -3676,7 +3873,7 @@ Preconditions:
 Steps:
   1. Monitor database stock value in real-time
   2. Complete purchase transaction
-  3. Observe exact moment of MobilePay confirmation
+  3. Observe exact moment of manual confirmation event
   4. Check timestamp of inventory deduction
 Expected Result:
   - Inventory deduction timestamp matches payment confirmation timestamp
@@ -3687,16 +3884,17 @@ Pass Criteria: Deduction is immediate (≤1 second after confirmation)
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-8.3.1-N01
 Preconditions: 
   - Payment confirmation delayed (network latency)
 Steps:
-  1. Simulate slow MobilePay API response (5 seconds)
+  1. Simulate slow confirmation service response (5 seconds)
   2. Complete purchase
   3. Observe inventory deduction timing
 Expected Result:
-  - Inventory NOT deducted until confirmation received
+  - Inventory NOT deducted until confirmation response received
   - Customer sees "Processing payment..." for 5 seconds
   - After confirmation arrives, deduction occurs immediately
   - Stock not prematurely deducted
@@ -3708,11 +3906,13 @@ Pass Criteria: Deduction waits for confirmation
 ### FR-8.3.2: Deduction Formula Allows Negative Results
 
 **Given/When/Then:**
+
 - **Given** inventory deduction is calculated
 - **When** deduction formula is applied
 - **Then** formula SHALL be: new_stock = current_stock - quantity_purchased (can result in negative values)
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-8.3.2-P01
 Preconditions: 
@@ -3731,6 +3931,7 @@ Pass Criteria: Standard deduction calculation correct
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-8.3.2-N01
 Preconditions: 
@@ -3754,11 +3955,13 @@ Pass Criteria: Negative result allowed and stored
 ### FR-8.4: Low-Stock Email Notification
 
 **Given/When/Then:**
+
 - **Given** inventory tracking is enabled and product stock reaches threshold
 - **When** stock reaches or falls below configured low-stock threshold
 - **Then** the system SHALL send email notification to configured admin email address(es)
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-8.4-P01
 Preconditions: 
@@ -3784,6 +3987,7 @@ Pass Criteria: Low-stock email notification sent correctly
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-8.4-N01
 Preconditions: 
@@ -3805,11 +4009,13 @@ Pass Criteria: Email sent at exact threshold value
 ### FR-8.4.1: Low-Stock Notification Sent Once
 
 **Given/When/Then:**
+
 - **Given** stock has reached low-stock threshold
 - **When** additional purchases occur
 - **Then** notification SHALL be sent once when threshold is reached, no repeat until stock is replenished above threshold
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-8.4.1-P01
 Preconditions: 
@@ -3829,6 +4035,7 @@ Pass Criteria: Only one notification until stock replenished
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-8.4.1-N01
 Preconditions: 
@@ -3852,11 +4059,13 @@ Pass Criteria: Notification resets after replenishment
 ### FR-8.4.2: No Repeat Notification (Email Spam Prevention)
 
 **Given/When/Then:**
+
 - **Given** low-stock notification has been sent
 - **When** stock remains below threshold
 - **Then** no repeat notification SHALL be sent until stock is replenished above threshold
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-8.4.2-P01
 Preconditions: 
@@ -3875,6 +4084,7 @@ Pass Criteria: No spam emails for continued low stock
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-8.4.2-N01
 Preconditions: 
@@ -3896,11 +4106,13 @@ Pass Criteria: Per-product notification tracking
 ### FR-8.4.3: Low-Stock Email Content
 
 **Given/When/Then:**
+
 - **Given** low-stock email is sent
 - **When** email is received
 - **Then** email content SHALL include: product name, current stock quantity, configured threshold, timestamp, link to admin portal inventory page
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-8.4.3-P01
 Preconditions: 
@@ -3926,6 +4138,7 @@ Pass Criteria: All required information in email
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-8.4.3-N01
 Preconditions: 
@@ -3947,11 +4160,13 @@ Pass Criteria: Long product names handled in emails
 ### FR-8.5: Low-Stock Threshold Configuration
 
 **Given/When/Then:**
+
 - **Given** admin configures low-stock thresholds
 - **When** setting thresholds
 - **Then** default threshold SHALL be 5 units (applied to new products), admin can override per product (1-99 range), different categories MAY have different defaults
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-8.5-P01
 Preconditions: 
@@ -3969,6 +4184,7 @@ Pass Criteria: Default threshold of 5 applied
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-8.5-N01
 Preconditions: 
@@ -3992,11 +4208,13 @@ Pass Criteria: Threshold validation enforces 1-99 range
 ### FR-9.1: Transaction Log Contents
 
 **Given/When/Then:**
+
 - **Given** transactions occur
 - **When** logged to database
 - **Then** log SHALL contain: transaction ID (UUID), date/time (ISO 8601), items purchased (names and IDs), quantities, total amount, payment status, admin who reconciled (if applicable)
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-9.1-P01
 Preconditions: 
@@ -4014,7 +4232,7 @@ Expected Result:
     - Timestamp: ISO 8601 format (e.g., "2025-11-12T14:30:00Z")
     - TotalAmount: 6.50
     - PaymentStatus: "COMPLETED"
-    - MobilePayTransactionID: "MP123456789"
+    - ConfirmationReferenceCode: "CONF-2025-11-12-145500"
   - TransactionItem records (2 items):
     - Item 1: ProductID (Coca-Cola UUID), ProductName "Coca-Cola", Quantity 2, PriceAtPurchase 2.50
     - Item 2: ProductID (Chips UUID), ProductName "Chips", Quantity 1, PriceAtPurchase 1.50
@@ -4023,6 +4241,7 @@ Pass Criteria: Complete transaction log with all required data
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-9.1-N01
 Preconditions: 
@@ -4045,11 +4264,13 @@ Pass Criteria: Reconciliation admin recorded in transaction log
 ### FR-9.2: No Customer Personal Data in Logs
 
 **Given/When/Then:**
+
 - **Given** transactions are logged
 - **When** viewing transaction history
 - **Then** transaction history SHALL NOT include individual customer identification (no names, phone numbers, or personal data)
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-9.2-P01
 Preconditions: 
@@ -4070,19 +4291,20 @@ Pass Criteria: Zero customer personal data in transaction logs
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-9.2-N01
 Preconditions: 
-  - Testing if MobilePay transaction ID could reveal customer identity
+  - Testing if manual confirmation reference could reveal customer identity
 Steps:
-  1. Review MobilePay transaction ID stored in system
+  1. Review confirmation reference stored in system
   2. Verify it's just a transaction reference, not customer PII
 Expected Result:
-  - MobilePay transaction ID is anonymous reference
+  - Confirmation reference is anonymous
   - Does not contain customer phone number or name
   - Used only for payment reconciliation
   - GDPR compliance maintained (NFR-11)
-Pass Criteria: MobilePay transaction ID is anonymous
+Pass Criteria: Confirmation reference code is anonymous
 ```
 
 ---
@@ -4090,11 +4312,13 @@ Pass Criteria: MobilePay transaction ID is anonymous
 ### FR-9.3: Data Retention Policy
 
 **Given/When/Then:**
+
 - **Given** transaction data accumulates over time
 - **When** managing data retention
 - **Then** system SHALL: retain transactions minimum 3 years, allow archival/deletion after 3 years at admin discretion, alert at 80% storage capacity, provide archive/export before deletion, keep archived data exportable in CSV
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-9.3-P01
 Preconditions: 
@@ -4119,6 +4343,7 @@ Pass Criteria: 3-year-old data can be archived and deleted
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-9.3-N01
 Preconditions: 
@@ -4139,11 +4364,13 @@ Pass Criteria: Minimum 3-year retention enforced
 ### FR-9.4: View Transaction History in Admin Portal
 
 **Given/When/Then:**
+
 - **Given** transactions exist in the system
 - **When** admin accesses transaction history
 - **Then** admins SHALL be able to view transaction history through web portal
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-9.4-P01
 Preconditions: 
@@ -4167,6 +4394,7 @@ Pass Criteria: Transaction history viewable in admin portal
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-9.4-N01
 Preconditions: 
@@ -4187,11 +4415,13 @@ Pass Criteria: Empty transaction history handled gracefully
 ### FR-9.4.1: Transaction History Pagination
 
 **Given/When/Then:**
+
 - **Given** transaction history is displayed
 - **When** more than 50 transactions exist
 - **Then** transaction history SHALL be paginated (50 transactions per page)
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-9.4.1-P01
 Preconditions: 
@@ -4214,6 +4444,7 @@ Pass Criteria: Pagination works correctly with 50 per page
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-9.4.1-N01
 Preconditions: 
@@ -4234,11 +4465,13 @@ Pass Criteria: Single page displayed for exactly 50 transactions
 ### FR-9.4.2: Transaction History Sorting
 
 **Given/When/Then:**
+
 - **Given** transaction history is displayed
 - **When** admin sorts the list
 - **Then** transaction history SHALL be sortable by date, amount, status
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-9.4.2-P01
 Preconditions: 
@@ -4260,6 +4493,7 @@ Pass Criteria: All three sorting options work correctly
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-9.4.2-N01
 Preconditions: 
@@ -4279,11 +4513,13 @@ Pass Criteria: Tie-breaking in sorting is consistent
 ### FR-9.4.3: Transaction History Filtering
 
 **Given/When/Then:**
+
 - **Given** transaction history is displayed
 - **When** admin applies filters
 - **Then** transaction history SHALL be filterable by: date range, payment status, product, amount range
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-9.4.3-P01
 Preconditions: 
@@ -4308,6 +4544,7 @@ Pass Criteria: All filter options work and combine correctly
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-9.4.3-N01
 Preconditions: 
@@ -4328,11 +4565,13 @@ Pass Criteria: Zero-result filters handled gracefully
 ### FR-10.1: Statistics Dashboard Display
 
 **Given/When/Then:**
+
 - **Given** transaction data exists
 - **When** admin views statistics
 - **Then** system SHALL display: most popular products (top 10 by quantity), revenue by time period (daily/weekly/monthly/custom), total revenue, number of transactions, average transaction value
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-10.1-P01
 Preconditions: 
@@ -4360,6 +4599,7 @@ Pass Criteria: All required statistics displayed accurately
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-10.1-N01
 Preconditions: 
@@ -4383,11 +4623,13 @@ Pass Criteria: Statistics page works with zero transactions
 ### FR-10.1.1: Date Range Selector Requirements
 
 **Given/When/Then:**
+
 - **Given** admin wants to view statistics for specific period
 - **When** using date range selector
 - **Then** SHALL provide presets (Today, This Week, This Month, Last 30 Days, Last 3 Months), support custom date range with calendar picker, default to "Last 7 Days", require max 3 clicks for presets, display selected range clearly
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-10.1.1-P01
 Preconditions: 
@@ -4420,6 +4662,7 @@ Pass Criteria: All date range requirements met
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-10.1.1-N01
 Preconditions: 
@@ -4441,11 +4684,13 @@ Pass Criteria: 1-year maximum range enforced
 ### FR-10.1.2: Statistics Auto-Update
 
 **Given/When/Then:**
+
 - **Given** statistics are being displayed
 - **When** new transactions are completed
 - **Then** statistics SHALL update automatically within 30 seconds
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-10.1.2-P01
 Preconditions: 
@@ -4469,6 +4714,7 @@ Pass Criteria: Statistics update within 30 seconds of new transaction
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-10.1.2-N01
 Preconditions: 
@@ -4491,11 +4737,13 @@ Pass Criteria: Auto-update respects selected date range
 ### FR-10.1.3: Statistics Query Performance
 
 **Given/When/Then:**
+
 - **Given** statistics are queried
 - **When** up to 10,000 transactions exist
 - **Then** statistics queries SHALL return results within 2 seconds
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-10.1.3-P01
 Preconditions: 
@@ -4519,6 +4767,7 @@ Pass Criteria: Statistics load in ≤2 seconds for 10K transactions
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-10.1.3-N01
 Preconditions: 
@@ -4541,11 +4790,13 @@ Pass Criteria: System handles beyond-spec data volumes gracefully
 ### FR-10.2: Export Statistics to CSV
 
 **Given/When/Then:**
+
 - **Given** admin wants to export transaction data
 - **When** export is initiated
 - **Then** admins SHALL be able to export statistics and transaction data in CSV format
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-10.2-P01
 Preconditions: 
@@ -4574,6 +4825,7 @@ Pass Criteria: CSV export successful with all required data
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-10.2-N01
 Preconditions: 
@@ -4595,11 +4847,13 @@ Pass Criteria: Empty CSV export handled gracefully
 ### FR-10.2.1: CSV Export Field Contents
 
 **Given/When/Then:**
+
 - **Given** CSV export is generated
 - **When** viewing exported file
 - **Then** CSV SHALL include: Transaction ID, Date and time (YYYY-MM-DD HH:MM:SS), Items purchased (comma-separated), Quantities, Total amount, Payment status
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-10.2.1-P01
 Preconditions: 
@@ -4621,6 +4875,7 @@ Pass Criteria: CSV format matches specification exactly
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-10.2.1-N01
 Preconditions: 
@@ -4643,11 +4898,13 @@ Pass Criteria: Special characters in product names handled correctly
 ### FR-10.2.2: CSV Export Respects Filters
 
 **Given/When/Then:**
+
 - **Given** transaction history filters are applied
 - **When** CSV export is initiated
 - **Then** export SHALL respect selected date range filters
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-10.2.2-P01
 Preconditions: 
@@ -4668,6 +4925,7 @@ Pass Criteria: CSV export matches filtered view
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-10.2.2-N01
 Preconditions: 
@@ -4690,11 +4948,13 @@ Pass Criteria: Status filter respected in export
 ### FR-10.2.3: CSV Export Filename Format
 
 **Given/When/Then:**
+
 - **Given** CSV export is downloaded
 - **When** file is saved
 - **Then** export files SHALL have meaningful filenames: `transactions_YYYY-MM-DD_to_YYYY-MM-DD.csv`
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-10.2.3-P01
 Preconditions: 
@@ -4712,6 +4972,7 @@ Pass Criteria: Filename format exactly as specified
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-10.2.3-N01
 Preconditions: 
@@ -4733,11 +4994,13 @@ Pass Criteria: Single-day export filename logical
 ### FR-10.3: JSON Export Deferred to v1.1+
 
 **Given/When/Then:**
+
 - **Given** the system is version 1.0
 - **When** looking for JSON export functionality
 - **Then** JSON export format is NOT required for v1.0 (deferred to v1.1+)
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-10.3-P01
 Preconditions: 
@@ -4754,6 +5017,7 @@ Pass Criteria: JSON export not present in v1.0
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-10.3-N01
 Test Status: UNTESTABLE in v1.0
@@ -4765,11 +5029,13 @@ Reason: JSON export is explicitly out of scope for v1.0. This requirement exists
 ### FR-11.1: System Configuration Settings
 
 **Given/When/Then:**
+
 - **Given** admin accesses System Configuration
 - **When** managing settings
 - **Then** admins SHALL configure: operating hours (start/end, 24-hour format), notification email addresses (up to 5, comma-separated), inventory tracking enable/disable, maintenance mode (on/off with optional message)
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-11.1-P01
 Preconditions: 
@@ -4796,6 +5062,7 @@ Pass Criteria: All configuration settings saved and applied
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-11.1-N01
 Preconditions: 
@@ -4816,11 +5083,13 @@ Pass Criteria: Email address limit enforced
 ### FR-11.1.1: Cart Timeout Fixed in v1.0
 
 **Given/When/Then:**
+
 - **Given** system is version 1.0
 - **When** looking for cart timeout configuration
 - **Then** shopping cart timeout duration SHALL be fixed at 5 minutes (not configurable in v1.0, will be configurable in future)
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-11.1.1-P01
 Preconditions: 
@@ -4838,6 +5107,7 @@ Pass Criteria: No cart timeout setting in v1.0 configuration
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-11.1.1-N01
 Test Status: UNTESTABLE - Documentation/Planning Requirement
@@ -4849,11 +5119,13 @@ Reason: This requirement documents that cart timeout will be configurable in fut
 ### FR-11.1.2: Configuration Changes Take Effect Immediately
 
 **Given/When/Then:**
+
 - **Given** admin makes configuration changes
 - **When** changes are saved
 - **Then** configuration changes SHALL take effect within 10 seconds
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-11.1.2-P01
 Preconditions: 
@@ -4874,6 +5146,7 @@ Pass Criteria: Changes applied within 10 seconds
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-11.1.2-N01
 Preconditions: 
@@ -4895,11 +5168,13 @@ Pass Criteria: Graceful handling of network delays
 ### FR-11.1.3: Email Address Validation
 
 **Given/When/Then:**
+
 - **Given** admin enters notification email addresses
 - **When** email validation occurs
 - **Then** system SHALL validate email addresses using RFC 5322 standard
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-11.1.3-P01
 Preconditions: 
@@ -4923,6 +5198,7 @@ Pass Criteria: RFC 5322 valid emails accepted
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-11.1.3-N01
 Preconditions: 
@@ -4948,11 +5224,13 @@ Pass Criteria: Invalid emails rejected per RFC 5322
 ### FR-11.2: Admin Email Notifications
 
 **Given/When/Then:**
+
 - **Given** configured notification events occur
 - **When** events trigger
-- **Then** admins SHALL receive email notifications for: low stock alerts, system errors, payment failures, MobilePay API downtime (>15 min), database storage reaching 80% capacity
+- **Then** admins SHALL receive email notifications for: low stock alerts, system errors, payment failures, confirmation service downtime (>15 min), database storage reaching 80% capacity
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-11.2-P01
 Preconditions: 
@@ -4973,6 +5251,7 @@ Pass Criteria: Email notifications sent for all configured events
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-11.2-N01
 Preconditions: 
@@ -4994,11 +5273,13 @@ Pass Criteria: Missing email config handled gracefully
 ### FR-11.2.1: Email Delivery Requirements
 
 **Given/When/Then:**
+
 - **Given** email notifications are sent
 - **When** delivery is attempted
 - **Then** SHALL deliver 95% of notifications within 5 minutes, retry failed sends up to 3 times (exponential backoff: 1min, 5min, 15min), log all attempts (success/failure) with timestamps, alert admin via alternate mechanism if email service down >1 hour
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-11.2.1-P01
 Preconditions: 
@@ -5018,6 +5299,7 @@ Pass Criteria: Email delivered within 5 minutes
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-11.2.1-N01
 Preconditions: 
@@ -5043,11 +5325,13 @@ Pass Criteria: Retry logic with exponential backoff works correctly
 ### FR-11.3: Kiosk System Status Indicator
 
 **Given/When/Then:**
+
 - **Given** admin views admin portal
 - **When** checking kiosk status
 - **Then** admins SHALL see kiosk system status indicator: Online (green, last activity timestamp), Offline (red, time since last activity), Maintenance Mode (yellow)
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-11.3-P01
 Preconditions: 
@@ -5065,6 +5349,7 @@ Pass Criteria: Online status displayed with timestamp
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-11.3-N01
 Preconditions: 
@@ -5086,11 +5371,13 @@ Pass Criteria: Offline status clearly indicated
 ### FR-11.3.1: Real-Time Status Updates
 
 **Given/When/Then:**
+
 - **Given** kiosk status is displayed in admin portal
 - **When** status changes
 - **Then** status SHALL update in real-time using WebSocket connection or 10-second polling
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-11.3.1-P01
 Preconditions: 
@@ -5110,6 +5397,7 @@ Pass Criteria: Status updates automatically within 10 seconds
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-11.3.1-N01
 Preconditions: 
@@ -5132,11 +5420,13 @@ Pass Criteria: Polling fallback works when WebSocket unavailable
 ### FR-12.1: Admin Pricing Control
 
 **Given/When/Then:**
+
 - **Given** admin manages product prices
 - **When** setting/changing prices
 - **Then** admins SHALL have full control over product pricing with constraints: 0.01-999.99 EUR range, 2 decimal places required, changes effective immediately on kiosk
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-12.1-P01
 Preconditions: 
@@ -5155,6 +5445,7 @@ Pass Criteria: Price changes immediately effective
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-12.1-N01
 Preconditions: 
@@ -5177,11 +5468,13 @@ Pass Criteria: Min/max boundary prices accepted
 ### FR-12.2: Pricing Features NOT Required
 
 **Given/When/Then:**
+
 - **Given** system pricing capabilities
 - **When** reviewing requirements
 - **Then** system does NOT require support for: discounts/promotional pricing, special pricing tiers (member vs non-member), time-based pricing (happy hour), multiple currencies (EUR only)
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-12.2-P01
 Preconditions: 
@@ -5202,6 +5495,7 @@ Pass Criteria: Advanced pricing features absent (not required)
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-12.2-N01
 Test Status: UNTESTABLE - Negative Requirement
@@ -5213,11 +5507,13 @@ Reason: This requirement explicitly states features that are NOT included. There
 ### FR-12.3: No Tax Handling Required
 
 **Given/When/Then:**
+
 - **Given** product prices are set
 - **When** displayed to customers
 - **Then** system does NOT require tax handling functionality (prices are final/inclusive)
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-FR-12.3-P01
 Preconditions: 
@@ -5238,6 +5534,7 @@ Pass Criteria: No separate tax calculations anywhere
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-FR-12.3-N01
 Test Status: UNTESTABLE - Negative Requirement
@@ -5251,11 +5548,13 @@ Reason: This requirement states tax handling is NOT required. Positive test conf
 ### NFR-1: Kiosk Interface Performance Targets
 
 **Given/When/Then:**
+
 - **Given** the kiosk interface is operational
 - **When** users interact with the interface
 - **Then** the kiosk SHALL meet specified performance targets for various operations
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-NFR-1-P01
 Preconditions: 
@@ -5275,6 +5574,7 @@ Pass Criteria: Overall performance meets all targets
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-NFR-1-N01
 Preconditions: 
@@ -5296,11 +5596,13 @@ Pass Criteria: Graceful handling of sub-optimal conditions
 ### NFR-1.1: Filter/Category Change Response Time
 
 **Given/When/Then:**
+
 - **Given** user changes product filter/category
 - **When** measuring response time
 - **Then** filter/category changes SHALL update product display within 300ms (90th percentile)
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-NFR-1.1-P01
 Preconditions: 
@@ -5318,6 +5620,7 @@ Pass Criteria: 90th percentile filter response ≤300ms
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-NFR-1.1-N01
 Preconditions: 
@@ -5341,11 +5644,13 @@ Pass Criteria: System handles load gracefully even if slower
 ### NFR-1.2: Cart Operations Response Time
 
 **Given/When/Then:**
+
 - **Given** user performs cart operations
 - **When** measuring response time
 - **Then** cart operations (add/remove/edit items) SHALL reflect in UI within 200ms (90th percentile)
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-NFR-1.2-P01
 Preconditions: 
@@ -5368,6 +5673,7 @@ Pass Criteria: 90th percentile cart operation response ≤200ms
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-NFR-1.2-N01
 Preconditions: 
@@ -5390,11 +5696,13 @@ Pass Criteria: Extreme load handled without crashes
 ### NFR-1.3: Product Grid Initial Load Time
 
 **Given/When/Then:**
+
 - **Given** kiosk home screen is loading
 - **When** measuring initial load time
 - **Then** product grid initial load SHALL complete within 2 seconds (95th percentile)
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-NFR-1.3-P01
 Preconditions: 
@@ -5416,6 +5724,7 @@ Pass Criteria: 95th percentile load time ≤2 seconds
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-NFR-1.3-N01
 Preconditions: 
@@ -5435,48 +5744,51 @@ Pass Criteria: Page loads successfully even on slow network
 
 ---
 
-### NFR-1.4: QR Code Generation Time
+### NFR-1.4: Confirmation Prompt Display Time
 
 **Given/When/Then:**
+
 - **Given** checkout is initiated
-- **When** measuring QR code generation
-- **Then** QR code generation SHALL complete within 1 second
+- **When** measuring manual confirmation prompt display
+- **Then** the prompt SHALL render within 1 second
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-NFR-1.4-P01
 Preconditions: 
-  - MobilePay API is responsive
+  - Confirmation service responsive
   - Cart has items totaling 5.00€
 Steps:
   1. Proceed to checkout
   2. Start high-precision timer
-  3. Click "Pay Now" button
-  4. Stop timer when QR code fully rendered
+  3. Tap "Confirm Payment" initiation control
+  4. Stop timer when manual confirmation prompt fully rendered
   5. Repeat 20 times
   6. Calculate average and max time
 Expected Result:
-  - Average generation time: <500ms
-  - Maximum generation time: ≤1000ms (1 second)
-  - QR code appears quickly
+  - Average display time: <500ms
+  - Maximum display time: ≤1000ms (1 second)
+  - Prompt appears quickly
   - Feels instant to user
-Pass Criteria: QR code generated in ≤1 second
+Pass Criteria: Confirmation prompt displayed in ≤1 second
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-NFR-1.4-N01
 Preconditions: 
-  - MobilePay API has 800ms latency
+  - Confirmation service has 800ms latency
 Steps:
-  1. Simulate API latency: 800ms
-  2. Measure QR code generation time
+  1. Simulate confirmation service latency: 800ms
+  2. Measure prompt display time
 Expected Result:
-  - Generation time: ~800-900ms (within 1 second limit)
+  - Display time: ~800-900ms (within 1 second limit)
   - Loading indicator shown during wait
   - Still meets 1-second requirement
-  - API latency is largest factor
-Pass Criteria: Meets 1-second requirement even with API latency
+  - Service latency is largest factor
+Pass Criteria: Meets 1-second requirement even with service latency
 ```
 
 ---
@@ -5484,11 +5796,13 @@ Pass Criteria: Meets 1-second requirement even with API latency
 ### NFR-1.5: Page Transition Time
 
 **Given/When/Then:**
+
 - **Given** user navigates between screens
 - **When** measuring transitions
 - **Then** page transitions SHALL complete within 500ms
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-NFR-1.5-P01
 Preconditions: 
@@ -5511,6 +5825,7 @@ Pass Criteria: All page transitions ≤500ms
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-NFR-1.5-N01
 Preconditions: 
@@ -5531,11 +5846,13 @@ Pass Criteria: Minimum spec device meets 500ms target
 ### NFR-2: Concurrent User Support
 
 **Given/When/Then:**
+
 - **Given** the system is deployed
 - **When** checking concurrent user capacity
 - **Then** the system SHALL support one concurrent user (single kiosk deployment)
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-NFR-2-P01
 Preconditions: 
@@ -5555,6 +5872,7 @@ Pass Criteria: Single user experience is smooth and performant
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-NFR-2-N01
 Test Status: UNTESTABLE - By Design
@@ -5566,11 +5884,13 @@ Reason: System is explicitly designed for single concurrent user (one kiosk). Th
 ### NFR-3: Image Optimization Requirements
 
 **Given/When/Then:**
+
 - **Given** product images are uploaded
 - **When** served to kiosk
 - **Then** images SHALL be optimized: resized to max 800x600px, compressed to <200KB, served in WebP (JPEG fallback), lazy-loaded, cached 24 hours
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-NFR-3-P01
 Preconditions: 
@@ -5594,6 +5914,7 @@ Pass Criteria: All image optimization requirements met
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-NFR-3-N01
 Preconditions: 
@@ -5616,11 +5937,13 @@ Pass Criteria: JPEG fallback works for non-WebP browsers
 ### NFR-4: System Availability During Operating Hours
 
 **Given/When/Then:**
+
 - **Given** operating hours are configured
 - **When** system is running
 - **Then** the system SHALL be available during configured operating hours (default 08:00-19:00)
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-NFR-4-P01
 Preconditions: 
@@ -5639,6 +5962,7 @@ Pass Criteria: System is accessible during operating hours
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-NFR-4-N01
 Preconditions: 
@@ -5659,11 +5983,13 @@ Pass Criteria: Closed status outside hours is not "downtime"
 ### NFR-4.1: Target Uptime (99% During Operating Hours)
 
 **Given/When/Then:**
+
 - **Given** operating hours are 11 hours/day (08:00-19:00)
 - **When** measuring uptime
 - **Then** target uptime SHALL be 99% during operating hours (allows ~2.5 hours downtime per month)
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-NFR-4.1-P01
 Preconditions: 
@@ -5683,6 +6009,7 @@ Pass Criteria: Uptime ≥99% over measurement period
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-NFR-4.1-N01
 Test Status: UNTESTABLE - Statistical Target
@@ -5694,11 +6021,13 @@ Reason: 99% uptime is a statistical target measured over time, not a specific te
 ### NFR-5: Constant Internet Connectivity Required
 
 **Given/When/Then:**
+
 - **Given** the kiosk is operational
 - **When** checking system requirements
 - **Then** the system SHALL require constant internet connectivity (NOT required to function offline)
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-NFR-5-P01
 Preconditions: 
@@ -5708,11 +6037,11 @@ Steps:
   1. Verify internet connection active
   2. Browse products
   3. Add items to cart
-  4. Complete checkout (MobilePay requires internet)
+  4. Complete checkout (manual confirmation requires service connectivity)
   5. Admin portal accessible remotely
 Expected Result:
   - All functions work with internet connection
-  - MobilePay API accessible
+  - Confirmation service accessible
   - Real-time updates work
   - Admin portal accessible
   - System fully functional online
@@ -5720,6 +6049,7 @@ Pass Criteria: Full functionality with internet connection
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-NFR-5-N01
 Preconditions: 
@@ -5731,7 +6061,7 @@ Steps:
   4. Observe system behavior
 Expected Result:
   - System displays error: "No internet connection"
-  - Cannot complete purchases (MobilePay unavailable)
+  - Cannot complete purchases (confirmation service unavailable)
   - Cannot sync data
   - System does NOT have offline mode
   - Clear message to user about connectivity issue
@@ -5744,11 +6074,13 @@ Pass Criteria: System clearly indicates internet is required
 ### NFR-6: Transaction Data Persistence
 
 **Given/When/Then:**
+
 - **Given** a transaction is completed
 - **When** data is saved
 - **Then** transaction data SHALL be persisted to database immediately (within 1 second) to prevent data loss
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-NFR-6-P01
 Preconditions: 
@@ -5769,6 +6101,7 @@ Pass Criteria: Transaction persisted within 1 second
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-NFR-6-N01
 Preconditions: 
@@ -5782,7 +6115,7 @@ Steps:
 Expected Result:
   - If database write completed before power loss: transaction saved
   - If power lost before database write: transaction may be lost (edge case)
-  - MobilePay has record (can reconcile as PAYMENT_UNCERTAIN)
+  - Manual confirmation audit logs provide reconciliation fallback
   - 1-second write window minimizes this risk
   - Database transactions use ACID properties
 Pass Criteria: Minimal risk window for data loss
@@ -5793,11 +6126,13 @@ Pass Criteria: Minimal risk window for data loss
 ### NFR-7: Automated Backup System
 
 **Given/When/Then:**
+
 - **Given** the system is running
 - **When** performing backups
 - **Then** the system SHALL implement automatic backups: daily full backup at 02:00, retain 30 daily backups, weekly backup retained 12 weeks, separate storage, verification, email on failure
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-NFR-7-P01
 Preconditions: 
@@ -5822,6 +6157,7 @@ Pass Criteria: Daily backup completes successfully
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-NFR-7-N01
 Preconditions: 
@@ -5846,11 +6182,13 @@ Pass Criteria: Backup failure triggers admin notification
 ### NFR-7.1: Backup Storage Requirement
 
 **Given/When/Then:**
+
 - **Given** backup system is configured
 - **When** calculating storage needs
 - **Then** backup storage SHALL be minimum 10GB (sufficient for ~50,000 transactions with images)
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-NFR-7.1-P01
 Preconditions: 
@@ -5870,6 +6208,7 @@ Pass Criteria: Minimum 10GB backup storage allocated
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-NFR-7.1-N01
 Preconditions: 
@@ -5892,11 +6231,13 @@ Pass Criteria: System alerts when backup storage insufficient
 ### NFR-8: Secure Password Storage
 
 **Given/When/Then:**
+
 - **Given** admin passwords are stored
 - **When** authentication occurs
 - **Then** admin authentication SHALL use secure password storage (bcrypt or Argon2, minimum 12 rounds)
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-NFR-8-P01
 Preconditions: 
@@ -5918,6 +6259,7 @@ Pass Criteria: Passwords hashed with bcrypt/Argon2, ≥12 rounds
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-NFR-8-N01
 Preconditions: 
@@ -5940,11 +6282,13 @@ Pass Criteria: Plaintext password never exposed
 ### NFR-8.1: Password Requirements
 
 **Given/When/Then:**
+
 - **Given** admin sets/changes password
 - **When** validating password strength
 - **Then** passwords SHALL meet: minimum 8 characters, at least one uppercase, one lowercase, one number, not in top 10,000 common passwords
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-NFR-8.1-P01
 Preconditions: 
@@ -5966,6 +6310,7 @@ Pass Criteria: Valid passwords meeting criteria accepted
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-NFR-8.1-N01
 Preconditions: 
@@ -5995,11 +6340,13 @@ Pass Criteria: All invalid passwords rejected with clear error messages
 ### NFR-8.2: Image Upload Security
 
 **Given/When/Then:**
+
 - **Given** admin uploads product image
 - **When** security checks are performed
 - **Then** SHALL include: file extension whitelist, file content validation (magic number), EXIF stripping, filename sanitization, optional virus scanning
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-NFR-8.2-P01
 Preconditions: 
@@ -6024,6 +6371,7 @@ Pass Criteria: EXIF metadata successfully stripped
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-NFR-8.2-N01
 Preconditions: 
@@ -6043,18 +6391,20 @@ Pass Criteria: Disguised executable rejected by magic number check
 
 ---
 
-### NFR-9: Payment Security
+### NFR-9: Confirmation Service Security
 
 **Given/When/Then:**
+
 - **Given** payment processing occurs
-- **When** communicating with MobilePay
-- **Then** SHALL use: HTTPS/TLS 1.2+, API credentials in environment variables (not hardcoded), payment data never stored locally (only transaction IDs and status)
+- **When** communicating with the manual confirmation service
+- **Then** SHALL use: HTTPS/TLS 1.2+, service credentials in environment variables (not hardcoded), confirmation data never stored locally (only references and status)
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-NFR-9-P01
 Preconditions: 
-  - MobilePay integration active
+  - Manual confirmation service integration active
   - Payment in progress
 Steps:
   1. Initiate payment
@@ -6064,34 +6414,35 @@ Steps:
   5. Verify API credentials not in client-side code
   6. Check database for payment data storage
 Expected Result:
-  - All MobilePay API calls use HTTPS
+  - All confirmation service API calls use HTTPS
   - TLS version ≥1.2
   - API key stored in server environment variables (not in code)
   - No hardcoded credentials visible
   - Database stores only:
-    - MobilePayTransactionID
+    - ConfirmationReferenceCode
     - PaymentStatus
     - Transaction amount
   - Database does NOT store:
     - Credit card numbers
     - Customer phone numbers
-    - MobilePay account details
+    - Confirmation service account details
 Pass Criteria: Payment security requirements met
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-NFR-9-N01
 Preconditions: 
   - Reviewing source code
 Steps:
   1. Search source code for API keys/credentials
-  2. Check for hardcoded MobilePay merchant ID
+  2. Check for hardcoded confirmation service credentials
   3. Look for credentials in version control history
 Expected Result:
   - No hardcoded credentials found
   - API keys referenced from environment variables
-  - Example code: `process.env.MOBILEPAY_API_KEY`
+  - Example code: `process.env.CONFIRMATION_SERVICE_API_KEY`
   - No credentials committed to Git
   - .env file in .gitignore
   - Security best practices followed
@@ -6103,11 +6454,13 @@ Pass Criteria: No hardcoded credentials in code or version control
 ### NFR-10: Admin Session Timeout
 
 **Given/When/Then:**
+
 - **Given** admin is logged in
 - **When** 30 minutes pass with no activity
 - **Then** admin sessions SHALL timeout after 30 minutes of inactivity
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-NFR-10-P01
 Preconditions: 
@@ -6128,6 +6481,7 @@ Pass Criteria: Session timeout after 30 minutes inactivity
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-NFR-10-N01
 Test Status: DUPLICATE of FR-5.4
@@ -6139,11 +6493,13 @@ Reason: This NFR is identical to FR-5.4 which has comprehensive test cases. Rath
 ### NFR-11: GDPR/Data Privacy (No Personal Customer Data)
 
 **Given/When/Then:**
+
 - **Given** transactions are processed
 - **When** reviewing data collection
 - **Then** system does NOT require GDPR compliance beyond standard security (no personal customer data collected)
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-NFR-11-P01
 Preconditions: 
@@ -6169,6 +6525,7 @@ Pass Criteria: Zero personal customer data in system
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-NFR-11-N01
 Test Status: DUPLICATE of FR-9.2
@@ -6180,11 +6537,13 @@ Reason: This NFR is identical to FR-9.2 which has comprehensive test cases for v
 ### NFR-11.1: Transaction Logs Are Anonymous
 
 **Given/When/Then:**
+
 - **Given** transactions are logged
 - **When** reviewing logs
 - **Then** transaction logs SHALL be anonymous by design (no customer identification)
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-NFR-11.1-P01
 Test Status: DUPLICATE of FR-9.2 and NFR-11
@@ -6192,6 +6551,7 @@ Reason: This is tested comprehensively in FR-9.2. No need for separate test case
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-NFR-11.1-N01
 Test Status: DUPLICATE of FR-9.2
@@ -6203,11 +6563,13 @@ Reason: Refer to FR-9.2 test cases.
 ### NFR-12: Kiosk Interface Usability
 
 **Given/When/Then:**
+
 - **Given** first-time users interact with kiosk
 - **When** measuring usability
 - **Then** 90% of first-time users SHALL complete purchase without assistance within 60 seconds, task success rate >95% (n=10 test users), max 2 screens from selection to payment, all primary actions visible without scrolling
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-NFR-12-P01
 Preconditions: 
@@ -6232,6 +6594,7 @@ Pass Criteria: 90% complete purchase within 60 seconds without help
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-NFR-12-N01
 Preconditions: 
@@ -6255,11 +6618,13 @@ Pass Criteria: System usable even for non-technical users
 ### NFR-13: Touchscreen Optimization
 
 **Given/When/Then:**
+
 - **Given** kiosk uses touchscreen interface
 - **When** users interact
 - **Then** SHALL optimize for touch: all elements ≥44x44px touch target, 8px spacing between targets, visual feedback on touch, no hover-only interactions, momentum/kinetic scrolling
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-NFR-13-P01
 Preconditions: 
@@ -6285,6 +6650,7 @@ Pass Criteria: All touchscreen optimization requirements met
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-NFR-13-N01
 Preconditions: 
@@ -6306,11 +6672,13 @@ Pass Criteria: Large touch targets accessible to all users
 ### NFR-14: Browser Compatibility (Admin Portal)
 
 **Given/When/Then:**
+
 - **Given** admin accesses admin portal
 - **When** using standard web browsers
 - **Then** SHALL be accessible from: Chrome 90+, Firefox 88+, Safari 14+, Edge 90+
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-NFR-14-P01
 Preconditions: 
@@ -6337,6 +6705,7 @@ Pass Criteria: Full functionality on all specified browsers
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-NFR-14-N01
 Preconditions: 
@@ -6358,11 +6727,13 @@ Pass Criteria: Clear message for unsupported browsers
 ### NFR-14.1: Responsive Design (Admin Portal)
 
 **Given/When/Then:**
+
 - **Given** admin accesses portal from different devices
 - **When** checking responsive design
 - **Then** admin portal SHALL be responsive (works on desktop 1024px+ and tablet 768px+)
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-NFR-14.1-P01
 Preconditions: 
@@ -6387,6 +6758,7 @@ Pass Criteria: Responsive design works on desktop and tablet
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-NFR-14.1-N01
 Preconditions: 
@@ -6408,11 +6780,13 @@ Pass Criteria: Mobile phones not required to be supported
 ### NFR-15: Error and Confirmation Message Requirements
 
 **Given/When/Then:**
+
 - **Given** system displays messages
 - **When** showing errors or confirmations
 - **Then** messages SHALL: use ≥18px font (≥24px headings), display ≥3 seconds (dismissible after 2 seconds for confirmations), use color coding (green success, red error, yellow warning), meet WCAG AA contrast (4.5:1 normal, 3:1 large), use plain language, include actionable next steps
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-NFR-15-P01
 Preconditions: 
@@ -6449,6 +6823,7 @@ Pass Criteria: All message requirements met for each type
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-NFR-15-N01
 Preconditions: 
@@ -6470,11 +6845,13 @@ Pass Criteria: Error messages use plain, non-technical language
 ### NFR-16: System Logging
 
 **Given/When/Then:**
+
 - **Given** system is running
 - **When** events occur
 - **Then** SHALL implement logging for troubleshooting with defined levels (ERROR, WARN, INFO, DEBUG)
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-NFR-16-P01
 Preconditions: 
@@ -6498,6 +6875,7 @@ Pass Criteria: All log levels function correctly
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-NFR-16-N01
 Preconditions: 
@@ -6520,11 +6898,13 @@ Pass Criteria: DEBUG logging disabled in production
 ### NFR-16.1: Log Level Definitions
 
 **Given/When/Then:**
+
 - **Given** logging is active
 - **When** events are logged
 - **Then** logging levels SHALL be: ERROR (system errors, API failures, payment failures), WARN (low stock, API slowness, config changes), INFO (successful transactions, admin logins, inventory updates), DEBUG (request/response details, disabled in production)
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-NFR-16.1-P01
 Test Status: DUPLICATE of NFR-16
@@ -6532,6 +6912,7 @@ Reason: Log level definitions are tested in NFR-16 test cases. No separate testi
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-NFR-16.1-N01
 Test Status: DUPLICATE of NFR-16
@@ -6543,11 +6924,13 @@ Reason: Covered in NFR-16 test cases.
 ### NFR-16.2: Log Entry Contents
 
 **Given/When/Then:**
+
 - **Given** an event is logged
 - **When** writing to log file
 - **Then** logs SHALL include: timestamp (ISO 8601), log level, component/module name, message, request ID (for tracing)
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-NFR-16.2-P01
 Preconditions: 
@@ -6572,6 +6955,7 @@ Pass Criteria: Log entries contain all required fields
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-NFR-16.2-N01
 Preconditions: 
@@ -6593,11 +6977,13 @@ Pass Criteria: Request IDs enable tracing across log entries
 ### NFR-17: Admin Error Log Access
 
 **Given/When/Then:**
+
 - **Given** admin is logged in
 - **When** accessing logs
 - **Then** system SHALL provide error logs accessible to administrators through web portal
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-NFR-17-P01
 Preconditions: 
@@ -6617,6 +7003,7 @@ Pass Criteria: Admin can access error logs via web portal
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-NFR-17-N01
 Preconditions: 
@@ -6637,11 +7024,13 @@ Pass Criteria: Logs only accessible to authenticated admins
 ### NFR-17.1: Log Retention Period
 
 **Given/When/Then:**
+
 - **Given** logs are generated
 - **When** managing log retention
 - **Then** logs SHALL be retained for 30 days
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-NFR-17.1-P01
 Preconditions: 
@@ -6660,6 +7049,7 @@ Pass Criteria: 30-day retention enforced
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-NFR-17.1-N01
 Preconditions: 
@@ -6681,11 +7071,13 @@ Pass Criteria: Logs beyond 30 days are not available
 ### NFR-17.2: Log Search and Filter
 
 **Given/When/Then:**
+
 - **Given** admin views logs
 - **When** searching for specific events
 - **Then** logs SHALL be searchable by date, level, component
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-NFR-17.2-P01
 Preconditions: 
@@ -6707,6 +7099,7 @@ Pass Criteria: All log filters work correctly
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-NFR-17.2-N01
 Preconditions: 
@@ -6727,11 +7120,13 @@ Pass Criteria: Empty search results handled gracefully
 ### NFR-18: Code Quality Standards
 
 **Given/When/Then:**
+
 - **Given** codebase is developed
 - **When** reviewing code quality
 - **Then** SHALL follow standards: consistent naming (camelCase variables, PascalCase classes), max function length 50 lines, max file length 500 lines, code comments for complex logic, API documentation (OpenAPI/Swagger)
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-NFR-18-P01
 Preconditions: 
@@ -6755,6 +7150,7 @@ Pass Criteria: Code quality standards generally met
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-NFR-18-N01
 Test Status: UNTESTABLE - Code Quality Standard
@@ -6766,11 +7162,13 @@ Reason: Code quality standards are enforced through code reviews, linters, and s
 ### NFR-19: Single Kiosk Design (No Multi-Kiosk in v1.0)
 
 **Given/When/Then:**
+
 - **Given** system architecture
 - **When** deploying the system
 - **Then** system is designed for single kiosk deployment, does NOT require multi-kiosk scalability in v1.0
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-NFR-19-P01
 Preconditions: 
@@ -6788,6 +7186,7 @@ Pass Criteria: Single kiosk deployment works flawlessly
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-NFR-19-N01
 Test Status: UNTESTABLE - Out of Scope
@@ -6799,11 +7198,13 @@ Reason: Multi-kiosk functionality is explicitly NOT required in v1.0. Testing "m
 ### NFR-19.1: Architecture for Future Multi-Kiosk (Design Goal)
 
 **Given/When/Then:**
+
 - **Given** system architecture is designed
 - **When** planning for future
 - **Then** architecture SHOULD be designed to support future multi-kiosk expansion (separation of concerns, stateless API)
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-NFR-19.1-P01
 Test Status: UNTESTABLE - Architectural Guideline
@@ -6811,6 +7212,7 @@ Reason: This is an architectural design principle ("SHOULD be designed"), not a 
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-NFR-19.1-N01
 Test Status: UNTESTABLE - Future Planning
@@ -6822,11 +7224,13 @@ Reason: Cannot test future multi-kiosk support in v1.0 where it doesn't exist. T
 ### NFR-20: Future Payment Integration (Design Goal)
 
 **Given/When/Then:**
+
 - **Given** system design
 - **When** planning future enhancements
 - **Then** system SHOULD be designed to potentially integrate card payment services in future (modular payment adapter pattern)
 
 **Positive Test Case:**
+
 ```
 Test ID: TC-NFR-20-P01
 Test Status: UNTESTABLE - Architectural Guideline
@@ -6834,6 +7238,7 @@ Reason: This requirement is about future extensibility ("SHOULD be designed"), n
 ```
 
 **Negative/Edge Case Test:**
+
 ```
 Test ID: TC-NFR-20-N01
 Test Status: UNTESTABLE - Future Planning
@@ -7005,6 +7410,7 @@ Similar to UNTESTABLE-13, this is a design guideline for future extensibility. C
 **Total Requirements in SRS:** ~150 (FR) + ~20 (NFR) = ~170 requirements
 
 **Test Cases Created:**
+
 - **Functional Requirements (FR-1 to FR-12):** ~140 test cases (70 positive + 70 negative/edge)
 - **Non-Functional Requirements (NFR-1 to NFR-20):** ~40 test cases (20 positive + 20 negative/edge)
 - **Untestable Requirements:** 14 documented with explanations
@@ -7028,6 +7434,7 @@ Similar to UNTESTABLE-13, this is a design guideline for future extensibility. C
 - **Number** = Sequential (01, 02, 03...)
 
 **Examples:**
+
 - `TC-FR-1.1-P01` = Functional Requirement 1.1, Positive test, case #1
 - `TC-NFR-15-N02` = Non-Functional Requirement 15, Negative test, case #2
 
@@ -7036,18 +7443,20 @@ Similar to UNTESTABLE-13, this is a design guideline for future extensibility. C
 ## Test Execution Guidelines
 
 ### Prerequisites for Testing
+
 1. **Test Environment:**
    - Dedicated test kiosk device (or simulator)
    - Test admin portal instance
-   - MobilePay sandbox/test environment
-   - Test database (isolated from production)
 
-2. **Test Data:**
+- Manual confirmation service test harness or simulator
+- Test database (isolated from production)
+
+1. **Test Data:**
    - Sample products (various categories, prices, images)
    - Test admin accounts
    - Mock transaction history
 
-3. **Tools Required:**
+2. **Tools Required:**
    - Browser developer tools (Chrome DevTools, Firefox Developer Edition)
    - Performance measurement tools (Lighthouse, WebPageTest)
    - Accessibility checkers (WAVE, axe DevTools)
@@ -7056,6 +7465,7 @@ Similar to UNTESTABLE-13, this is a design guideline for future extensibility. C
    - Database query tools
 
 ### Test Execution Order
+
 1. **Foundation Tests First:**
    - Authentication (FR-5.1, FR-5.2)
    - Basic product display (FR-1.1, FR-1.2)
@@ -7080,13 +7490,16 @@ Similar to UNTESTABLE-13, this is a design guideline for future extensibility. C
    - Backup & logging (NFR-7, NFR-16)
 
 ### Pass/Fail Criteria
+
 - **Pass:** All expected results in test case are met
 - **Fail:** Any expected result is not met
 - **Blocked:** Cannot execute due to dependency failure
 - **Skip:** Test marked as UNTESTABLE with justification
 
 ### Bug Reporting
+
 When a test fails, report should include:
+
 - Test Case ID
 - Expected Result (from test case)
 - Actual Result (what actually happened)

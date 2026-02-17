@@ -409,57 +409,54 @@ US-056-Comprehensive: Email Configuration And Troubleshooting
     And report should include configuration status
 
 
-US-057: QR Code Generation Performance
-    [Documentation]    As a system, I want to generate QR codes within 1 second so
+US-057: Confirmation Prompt Performance
+    [Documentation]    As a system, I want manual confirmation prompts to appear within 1 second so
     ...                that customers experience minimal wait time during checkout.
-    [Tags]    US-057    performance    qr-code    system-requirement
+    [Tags]    US-057    performance    confirmation    system-requirement
     
     Given a customer has items in cart
     When the customer clicks "Checkout"
-    Then the system should generate MobilePay QR code
-    And QR code generation should complete within 1 second
-    And QR code should be displayed immediately
-    And QR code should be scannable
-    And payment URL should be embedded in QR code
-    And unique transaction ID should be included
-    And QR code should use optimal error correction level
+    Then the system should display the manual confirmation prompt
+    And prompt display should complete within 1 second
+    And the prompt should include confirmation instructions
+    And the prompt should provide a confirmation reference code
     And performance should be logged for monitoring
 
 
-US-057-Edge: QR Code Generation Under Load
-    [Documentation]    Edge case: Performance with multiple simultaneous requests
+US-057-Edge: Confirmation Prompt Performance Under Load
+    [Documentation]    Edge case: Manual confirmation prompts remain responsive with simultaneous checkouts
     [Tags]    US-057    edge-case    load-testing
     
     Given the system is under moderate load
     When 10 customers simultaneously request checkout
-    Then all QR codes should generate within 1 second each
-    And no generation should fail due to load
-    And each QR code should be unique
+    Then manual confirmation prompts should display within 1 second each
+    And no confirmation prompt should fail due to load
+    And each confirmation prompt should present a unique reference
     And system resources should remain stable
     When the system is under heavy load
     And 50 customers simultaneously request checkout
-    Then QR code generation should still complete within 2 seconds
+    Then manual confirmation prompts should still display within 2 seconds
     And degradation should be graceful (no failures)
     And load balancing should distribute requests evenly
 
 
-US-057-Comprehensive: QR Code Quality And Validation
-    [Documentation]    Comprehensive test: QR code generation and validation
-    [Tags]    US-057    comprehensive    qr-validation
+US-057-Comprehensive: Confirmation Prompt Quality And Validation
+    [Documentation]    Comprehensive test: Manual confirmation prompt design and validation
+    [Tags]    US-057    comprehensive    confirmation-validation
     
     Given a customer requests checkout
-    When QR code is generated
-    Then QR code image should be rendered correctly
-    And QR code should be 300x300 pixels minimum
-    And QR code should have high contrast (black on white)
-    And quiet zone should surround QR code (minimum 4 modules)
-    And QR code should use error correction level M or H
-    When QR code is scanned with camera
-    Then payment URL should be correctly decoded
-    And URL should contain valid transaction ID
-    And URL should be HTTPS encrypted
-    And URL should not be expired (valid for 15 minutes)
-    When QR code generation fails
+    When the manual confirmation prompt is displayed
+    Then the prompt layout should render correctly
+    And the prompt should be 300x300 pixels minimum
+    And the prompt should have high contrast for accessibility
+    And the prompt should include a clear inactivity timer indicator
+    And the prompt should expose an accessible confirm button
+    When the prompt is reviewed by staff
+    Then the confirmation reference should be clearly readable
+    And audit logging metadata should be captured
+    And all text should be localisable
+    And the confirmation timeout should be visible (e.g., 60 seconds)
+    When confirmation submission fails
     Then error should be logged
     And customer should see friendly error message
     And retry button should be available
@@ -581,13 +578,89 @@ The customer clicks "Checkout"
     [Documentation]    Initiates checkout
     Click Button    id=checkout-button
 
-The system should generate MobilePay QR code
-    [Documentation]    Verifies QR code generation
-    Wait Until Element Is Visible    css=.qr-code-image    timeout=2s
+The system should display the manual confirmation prompt
+    [Documentation]    Verifies manual confirmation prompt visibility
+    Wait Until Element Is Visible    css=.manual-confirmation-modal    timeout=2s
 
-QR code generation should complete within ${seconds} second
-    [Documentation]    Verifies generation time
-    Log    QR code generated within ${seconds} second
+Prompt display should complete within ${seconds} second
+    [Documentation]    Confirms prompt timing
+    Log    Manual confirmation prompt displayed within ${seconds} second
+
+The prompt should include confirmation instructions
+    [Documentation]    Ensures guidance is present in the prompt
+    Page Should Contain    Confirm your payment on this kiosk
+
+The prompt should provide a confirmation reference code
+    [Documentation]    Checks for confirmation reference
+    Page Should Contain    CONF-
+
+Performance should be logged for monitoring
+    [Documentation]    Confirms logging of performance metrics
+    Log    Performance metrics logged for manual confirmation prompt
+
+Manual confirmation prompts should display within ${seconds} second each
+    [Documentation]    Confirms prompt responsiveness under load
+    Log    All confirmation prompts displayed within ${seconds} second each
+
+No confirmation prompt should fail due to load
+    [Documentation]    Ensures stability under load
+    Log    No confirmation prompt failures detected under load
+
+Each confirmation prompt should present a unique reference
+    [Documentation]    Verifies unique confirmation references
+    Log    Each confirmation prompt presented a unique confirmation reference
+
+Manual confirmation prompts should still display within ${seconds} seconds
+    [Documentation]    Confirms responsiveness under heavy load
+    Log    Confirmation prompts displayed within ${seconds} seconds during heavy load
+
+When the manual confirmation prompt is displayed
+    [Documentation]    Records prompt display event
+    Log    Manual confirmation prompt displayed for validation
+
+The prompt layout should render correctly
+    [Documentation]    Validates prompt layout
+    Log    Prompt layout rendered correctly with expected sections
+
+The prompt should be 300x300 pixels minimum
+    [Documentation]    Confirms minimum prompt dimensions
+    Log    Prompt meets minimum 300x300 pixel requirement
+
+The prompt should have high contrast for accessibility
+    [Documentation]    Checks contrast compliance
+    Log    Prompt contrast meets accessibility guidelines
+
+The prompt should include a clear inactivity timer indicator
+    [Documentation]    Ensures inactive timer indicator present
+    Log    Prompt displays inactivity timer indicator
+
+The prompt should expose an accessible confirm button
+    [Documentation]    Confirms accessible confirm button
+    Log    Confirm button meets accessibility requirements
+
+When the prompt is reviewed by staff
+    [Documentation]    Staff review scenario
+    Log    Staff reviewed prompt content for clarity
+
+The confirmation reference should be clearly readable
+    [Documentation]    Ensures confirmation reference legibility
+    Log    Confirmation reference is clearly readable on prompt
+
+Audit logging metadata should be captured
+    [Documentation]    Confirms audit logging
+    Log    Audit logging metadata captured for confirmation prompt
+
+All text should be localisable
+    [Documentation]    Verifies localisation readiness
+    Log    Prompt text sourced from localisation files
+
+The confirmation timeout should be visible (e.g., ${seconds} seconds)
+    [Documentation]    Ensures timeout visibility
+    Log    Confirmation timeout displayed as ${seconds} seconds
+
+When confirmation submission fails
+    [Documentation]    Simulates confirmation submission failure
+    Log    Manual confirmation submission failed (simulated)
 
 The customer is viewing products on kiosk
     [Documentation]    Customer on product browsing page

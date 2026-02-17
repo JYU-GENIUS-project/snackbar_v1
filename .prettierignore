@@ -1,0 +1,15 @@
+# Exclude generated and third-party artifacts from formatting checks
+.venv/
+node_modules/
+**/node_modules/
+coverage/
+**/coverage/
+dist/
+server/dist/
+client/dist/
+logs/
+**/.pytest_cache/
+**/__pycache__/
+tests/log.html
+tests/output.xml
+tests/report.html

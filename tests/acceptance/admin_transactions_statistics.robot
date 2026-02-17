@@ -105,7 +105,7 @@ US-041: Manually Mark Uncertain Payments As Confirmed Or Refunded
     Given an uncertain payment transaction exists
     When the admin clicks "Reconcile" for that transaction
     And selects "Confirmed" as the resolution
-    And enters reconciliation notes "Verified with MobilePay support"
+    And enters reconciliation notes "Verified against confirmation audit log"
     And clicks "Save Reconciliation"
     Then the transaction status should be updated to "COMPLETED"
     And the reconciliation should be logged in audit trail
@@ -635,8 +635,8 @@ The transaction should show total amount
 
 Contact information for customer should be shown
     [Documentation]    Verifies contact info available
-    # Note: No personal data, but payment ID for MobilePay support
-    Page Should Contain    MobilePay Transaction ID
+    # Note: No personal data, confirmation reference only for audit support
+    Page Should Contain    Manual Confirmation Reference
 
 Troubleshooting guidance should be provided
     [Documentation]    Verifies help text shown

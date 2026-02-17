@@ -37,7 +37,7 @@
 
 **US-011:** As a customer, I want to see a QR code generated within 1 second after clicking checkout so that I can complete my purchase quickly.
 
-**US-012:** As a customer, I want to pay using MobilePay by scanning the QR code so that I can complete the transaction using my preferred mobile payment method.
+**US-012:** As a customer, I want to tap an "I have paid" confirmation button after scanning the QR code with my own payment app so that my purchase is recorded immediately.
 
 **US-013:** As a customer, I want to see a clear success message with a green checkmark when my payment is complete so that I know I can take my items.
 
@@ -169,15 +169,15 @@
 
 **US-062:** As a system, I want to validate and sanitize uploaded images so that malicious files cannot be uploaded to the system.
 
-**US-063:** As a system, I want to communicate with MobilePay API over HTTPS/TLS 1.2+ so that payment data is encrypted in transit.
+**US-063:** As a system, I want to expose the manual payment confirmation API over HTTPS/TLS 1.2+ so that confirmation data is encrypted in transit.
 
 **US-064:** As a system, I want to strip EXIF metadata from uploaded images so that sensitive location and device data is not stored.
 
 ### Integration & Communication
 
-**US-065:** As a system, I want to retry failed MobilePay API calls up to 3 times with exponential backoff so that temporary network issues don't cause payment failures.
+**US-065:** As a system, I want to retry failed confirmation persistence attempts up to 3 times with exponential backoff so that temporary network issues don't cause payment records to be lost.
 
-**US-066:** As a system, I want to handle MobilePay API unavailability gracefully so that customers receive clear error messages rather than system crashes.
+**US-066:** As a system, I want to handle confirmation service unavailability gracefully so that customers receive clear guidance rather than system crashes.
 
 **US-067:** As a system, I want to retry failed email notifications up to 3 times so that important alerts reach administrators despite temporary email service issues.
 
@@ -190,28 +190,35 @@
 ### High Priority (Must Have for v1.0)
 
 **Customer Flow:**
+
 - US-001, US-002, US-006, US-007, US-008, US-009, US-010, US-011, US-012, US-013, US-014, US-016, US-018
 
 **Admin Core Features:**
+
 - US-019, US-020, US-023, US-024, US-025, US-027, US-028, US-032, US-033, US-034, US-036, US-039, US-046, US-048, US-049, US-050, US-051
 
 **System Requirements:**
+
 - US-057, US-058, US-059, US-060, US-061, US-062, US-063, US-065, US-066, US-067, US-068
 
 ### Medium Priority (Should Have)
 
 **Customer Enhancement:**
+
 - US-003, US-004, US-005, US-015, US-017
 
 **Admin Enhancement:**
+
 - US-021, US-022, US-026, US-029, US-030, US-031, US-035, US-037, US-038, US-040, US-041, US-042, US-043, US-044, US-045, US-047, US-052, US-053, US-054, US-055
 
 **System Enhancement:**
+
 - US-064
 
 ### Low Priority (Nice to Have for v1.1+)
 
 **Admin Advanced Features:**
+
 - US-056
 
 ---

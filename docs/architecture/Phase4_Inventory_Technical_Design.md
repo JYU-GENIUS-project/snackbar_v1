@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD013 -->
 # Phase 4 Inventory & Alerting Backbone - Technical Design Note
 
 ## Purpose
@@ -27,7 +28,7 @@ This note captures architectural decisions required before implementing Phase 4 
    - Pros: immutable history for discrepancies, supports adjustments and purchases uniformly, enables analytics; summary view can be indexed for fast UI queries
    - Cons: requires additional aggregation logic and migration effort
 
-### Decision
+### Decision: Inventory Model
 
 Adopt **Inventory Ledger + Summary** approach.
 
@@ -51,7 +52,7 @@ Adopt **Inventory Ledger + Summary** approach.
    - Pros: bi-directional; scalable for future interactive features.
    - Cons: Higher complexity, requires additional infrastructure for PM2 clustering (sticky sessions) and fallback logic.
 
-### Decision
+### Decision: Transport Strategy
 
 Use **SSE** for Phase 4 inventory events.
 

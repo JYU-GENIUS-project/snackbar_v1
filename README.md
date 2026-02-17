@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD013 -->
 # snackbar
 
 Self-Service Snack Bar Kiosk System
@@ -39,7 +40,7 @@ This repository contains requirements engineering documentation and automated ac
 - **Frontend**: React 19.2
 - **Language**: TypeScript 5.4 (client + server)
 - **Database**: PostgreSQL 18
-- **Payment**: MobilePay API integration
+- **Payment**: Manual confirmation workflow (on-kiosk, audit logged)
 - **Testing**: Robot Framework with SeleniumLibrary
 
 ## Getting Started

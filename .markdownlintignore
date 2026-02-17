@@ -1,0 +1,4 @@
+# Temporarily exclude long-form requirements documents until reformatted
+
+reqeng/Test_Cases_v1.1.md
+reqeng/user_stories.md

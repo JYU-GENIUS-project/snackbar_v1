@@ -11,8 +11,9 @@ type TransactionPayload = {
     items: TransactionItemInput[];
     paymentStatus?: string;
     paymentMethod?: string;
-    mobilepayPaymentId?: string | null;
-    mobilepayQrCode?: string | null;
+    confirmationChannel?: string | null;
+    confirmationReference?: string | null;
+    confirmationMetadata?: Record<string, unknown> | null;
 };
 
 type ProductRow = {
@@ -53,7 +54,12 @@ type TransactionResult = {
     inventoryApplied: boolean;
 };
 
-const PAYMENT_STATUSES = new Set(['PENDING', 'COMPLETED', 'FAILED', 'PAYMENT_UNCERTAIN']);
+const PAYMENT_STATUSES = new Set([
+    'PENDING',
+    'COMPLETED',
+    'FAILED',
+    'PAYMENT_UNCERTAIN',
+]);
 
 type DbQueryResult<T = unknown> = {
     rows: T[];
@@ -80,14 +86,17 @@ const normalizeQuantity = (value: number | string) => {
     return quantity;
 };
 
-const fetchProductsForItems = async (client: DbClient, items: TransactionItemInput[]) => {
+const fetchProductsForItems = async (
+    client: DbClient,
+    items: TransactionItemInput[],
+) => {
     const productIds = [...new Set(items.map((item) => item.productId))];
     const { rows } = (await client.query(
         `SELECT id, name, price, currency, stock_quantity, purchase_limit, is_active, deleted_at
          FROM products
          WHERE id = ANY($1::uuid[])
          FOR UPDATE`,
-        [productIds]
+        [productIds],
     )) as DbQueryResult<ProductRow>;
 
     const productMap = new Map(rows.map((row) => [row.id, row]));
@@ -101,7 +110,10 @@ const fetchProductsForItems = async (client: DbClient, items: TransactionItemInp
     return productMap;
 };
 
-const calculateTotals = (items: TransactionItemInput[], productMap: Map<string, ProductRow>) => {
+const calculateTotals = (
+    items: TransactionItemInput[],
+    productMap: Map<string, ProductRow>,
+) => {
     let total = 0;
     const lineItems = items.map((item) => {
         const product = productMap.get(item.productId);
@@ -112,7 +124,10 @@ const calculateTotals = (items: TransactionItemInput[], productMap: Map<string, 
         const quantity = normalizeQuantity(item.quantity);
 
         if (product.purchase_limit && quantity > product.purchase_limit) {
-            throw new ApiError(400, `Quantity exceeds purchase limit for ${product.name}`);
+            throw new ApiError(
+                400,
+                `Quantity exceeds purchase limit for ${product.name}`,
+            );
         }
 
         const unitPrice = Number(product.price ?? 0);
@@ -125,13 +140,13 @@ const calculateTotals = (items: TransactionItemInput[], productMap: Map<string, 
             quantity,
             unitPrice,
             subtotal,
-            currency: product.currency || 'EUR'
+            currency: product.currency || 'EUR',
         };
     });
 
     return {
         lineItems,
-        totalAmount: Number(total.toFixed(2))
+        totalAmount: Number(total.toFixed(2)),
     };
 };
 
@@ -141,28 +156,38 @@ const insertTransaction = async (
         totalAmount,
         paymentMethod,
         paymentStatus,
-        mobilepayPaymentId = null,
-        mobilepayQrCode = null
+        confirmationChannel = null,
+        confirmationReference = null,
+        confirmationMetadata = null,
     }: {
         totalAmount: number;
         paymentMethod: string;
         paymentStatus: string;
-        mobilepayPaymentId?: string | null;
-        mobilepayQrCode?: string | null;
-    }
+        confirmationChannel?: string | null;
+        confirmationReference?: string | null;
+        confirmationMetadata?: Record<string, unknown> | null;
+    },
 ) => {
     const { rows } = (await client.query(
         `INSERT INTO transactions (
             total_amount,
             payment_method,
             payment_status,
-            mobilepay_payment_id,
-            mobilepay_qr_code,
+            confirmation_channel,
+            confirmation_reference,
+            confirmation_metadata,
             completed_at
-        ) VALUES ($1, $2, $3, $4, $5, CASE WHEN $3 = 'COMPLETED' THEN CURRENT_TIMESTAMP ELSE NULL END)
-        RETURNING id, transaction_number, total_amount, payment_method, payment_status, mobilepay_payment_id,
-                  mobilepay_qr_code, completed_at, created_at, updated_at`,
-        [totalAmount, paymentMethod, paymentStatus, mobilepayPaymentId, mobilepayQrCode]
+        ) VALUES ($1, $2, $3, $4, $5, $6, CASE WHEN $3 = 'COMPLETED' THEN CURRENT_TIMESTAMP ELSE NULL END)
+        RETURNING id, transaction_number, total_amount, payment_method, payment_status, confirmation_channel,
+                  confirmation_reference, confirmation_metadata, completed_at, created_at, updated_at`,
+        [
+            totalAmount,
+            paymentMethod,
+            paymentStatus,
+            confirmationChannel,
+            confirmationReference,
+            confirmationMetadata,
+        ],
     )) as DbQueryResult<TransactionRecord>;
 
     return rows[0];
@@ -170,7 +195,10 @@ const insertTransaction = async (
 
 const insertTransactionItems = async (
     client: DbClient,
-    { transactionId, lineItems }: { transactionId: string; lineItems: Array<Record<string, unknown>> }
+    {
+        transactionId,
+        lineItems,
+    }: { transactionId: string; lineItems: Array<Record<string, unknown>> },
 ) => {
     for (const item of lineItems) {
         const record = item as {
@@ -189,7 +217,14 @@ const insertTransactionItems = async (
                 unit_price,
                 subtotal
             ) VALUES ($1, $2, $3, $4, $5, $6)`,
-            [transactionId, record.productId, record.productName, record.quantity, record.unitPrice, record.subtotal]
+            [
+                transactionId,
+                record.productId,
+                record.productName,
+                record.quantity,
+                record.unitPrice,
+                record.subtotal,
+            ],
         );
     }
 };
@@ -197,16 +232,20 @@ const insertTransactionItems = async (
 const createTransaction = async ({
     items,
     paymentStatus,
-    paymentMethod = 'mobilepay',
-    mobilepayPaymentId = null,
-    mobilepayQrCode = null
+    paymentMethod = 'manual',
+    confirmationChannel = 'kiosk',
+    confirmationReference = null,
+    confirmationMetadata = null,
 }: TransactionPayload): Promise<TransactionResult> => {
     if (!Array.isArray(items) || items.length === 0) {
         throw new ApiError(400, 'At least one item is required');
     }
 
     const normalizedStatus = normalizeStatus(paymentStatus);
-    const normalizedMethod = (paymentMethod || 'mobilepay').toString().trim().toLowerCase();
+    const normalizedMethod = (paymentMethod || 'manual')
+        .toString()
+        .trim()
+        .toLowerCase();
     const shouldDeductInventory = normalizedStatus === 'COMPLETED';
 
     const inventory = inventoryService as unknown as {
@@ -225,59 +264,78 @@ const createTransaction = async ({
     };
 
     const dbWithTransaction = db as unknown as {
-        transaction: <T>(handler: (client: DbClient) => Promise<T>) => Promise<T>;
+        transaction: <T>(
+            handler: (client: DbClient) => Promise<T>,
+        ) => Promise<T>;
     };
 
-    const result = await dbWithTransaction.transaction(async (client: DbClient) => {
-        const productMap = await fetchProductsForItems(client, items);
-        const { lineItems, totalAmount } = calculateTotals(items, productMap);
+    const result = await dbWithTransaction.transaction(
+        async (client: DbClient) => {
+            const productMap = await fetchProductsForItems(client, items);
+            const { lineItems, totalAmount } = calculateTotals(
+                items,
+                productMap,
+            );
 
-        const transaction = await insertTransaction(client, {
-            totalAmount,
-            paymentMethod: normalizedMethod,
-            paymentStatus: normalizedStatus,
-            mobilepayPaymentId,
-            mobilepayQrCode
-        });
+            const transaction = await insertTransaction(client, {
+                totalAmount,
+                paymentMethod: normalizedMethod,
+                paymentStatus: normalizedStatus,
+                confirmationChannel,
+                confirmationReference,
+                confirmationMetadata,
+            });
 
-        if (!transaction) {
-            throw new ApiError(500, 'Failed to record transaction');
-        }
-
-        await insertTransactionItems(client, { transactionId: transaction.id, lineItems });
-
-        const deductions: InventoryDeduction[] = [];
-        if (shouldDeductInventory) {
-            for (const item of lineItems) {
-                const record = item as { productId: string; quantity: number; subtotal: number; currency: string };
-                const deduction = await inventory.recordPurchaseDeduction({
-                    productId: record.productId,
-                    quantity: record.quantity,
-                    transactionId: transaction.id,
-                    metadata: {
-                        transactionNumber: transaction.transaction_number,
-                        subtotal: record.subtotal,
-                        currency: record.currency
-                    },
-                    client,
-                    deferPostProcessing: true
-                });
-                deductions.push({ ...(deduction as InventoryDeduction), productId: record.productId });
+            if (!transaction) {
+                throw new ApiError(500, 'Failed to record transaction');
             }
-        }
 
-        return {
-            transaction,
-            lineItems,
-            deductions,
-            shouldDeductInventory
-        } as {
-            transaction: TransactionRecord;
-            lineItems: Array<Record<string, unknown>>;
-            deductions: InventoryDeduction[];
-            shouldDeductInventory: boolean;
-        };
-    });
+            await insertTransactionItems(client, {
+                transactionId: transaction.id,
+                lineItems,
+            });
+
+            const deductions: InventoryDeduction[] = [];
+            if (shouldDeductInventory) {
+                for (const item of lineItems) {
+                    const record = item as {
+                        productId: string;
+                        quantity: number;
+                        subtotal: number;
+                        currency: string;
+                    };
+                    const deduction = await inventory.recordPurchaseDeduction({
+                        productId: record.productId,
+                        quantity: record.quantity,
+                        transactionId: transaction.id,
+                        metadata: {
+                            transactionNumber: transaction.transaction_number,
+                            subtotal: record.subtotal,
+                            currency: record.currency,
+                        },
+                        client,
+                        deferPostProcessing: true,
+                    });
+                    deductions.push({
+                        ...(deduction as InventoryDeduction),
+                        productId: record.productId,
+                    });
+                }
+            }
+
+            return {
+                transaction,
+                lineItems,
+                deductions,
+                shouldDeductInventory,
+            } as {
+                transaction: TransactionRecord;
+                lineItems: Array<Record<string, unknown>>;
+                deductions: InventoryDeduction[];
+                shouldDeductInventory: boolean;
+            };
+        },
+    );
 
     const postCommitSnapshots: InventoryPostCommitSnapshot[] = [];
     if (result.shouldDeductInventory) {
@@ -293,13 +351,13 @@ const createTransaction = async ({
                     transactionId: result.transaction.id,
                     transactionNumber: result.transaction.transaction_number,
                     shortfall: deduction.shortfall,
-                    delta: deduction.delta
-                }
+                    delta: deduction.delta,
+                },
             });
 
             const postCommit: InventoryPostCommitSnapshot = {
                 productId: deduction.productId,
-                snapshot
+                snapshot,
             };
             if (deduction.shortfall !== undefined) {
                 postCommit.shortfall = deduction.shortfall;
@@ -315,13 +373,15 @@ const createTransaction = async ({
         transaction: result.transaction,
         items: result.lineItems,
         inventory: postCommitSnapshots,
-        inventoryTracking: result.deductions.every((entry) => entry.trackingEnabled !== false),
-        inventoryApplied: result.shouldDeductInventory
+        inventoryTracking: result.deductions.every(
+            (entry) => entry.trackingEnabled !== false,
+        ),
+        inventoryApplied: result.shouldDeductInventory,
     };
 };
 
 const transactionService = {
-    createTransaction
+    createTransaction,
 };
 
 export { createTransaction };

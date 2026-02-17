@@ -163,9 +163,9 @@ US-051: Email Notifications For Critical Events
     When a payment failure occurs
     Then an email should be sent to finance team
     And include transaction ID, customer info, and error details
-    When MobilePay API goes down
+    When the manual confirmation service goes down
     Then an immediate alert email should be sent
-    And include API status, last successful call, and retry attempts
+    And include service status, last successful call, and retry attempts
 
 
 US-051-Edge: Alert Rate Limiting And Grouping
@@ -235,7 +235,7 @@ US-052-Comprehensive: Multi-Metric System Health Dashboard
     
     Given the admin is on the system monitoring dashboard
     Then kiosk status should be visible
-    And MobilePay API status should be visible
+    And manual confirmation service status should be visible
     And last transaction time should be visible
     And database connection status should be visible
     And disk space usage should be visible
@@ -616,17 +616,17 @@ Include transaction ID, customer info, and error details
     [Documentation]    Payment alert content
     Log    Alert includes transaction details
 
-When MobilePay API goes down
-    [Documentation]    API downtime trigger
-    Log    MobilePay API downtime detected
+When the manual confirmation service goes down
+    [Documentation]    Confirmation service downtime trigger
+    Log    Confirmation service outage detected
 
 An immediate alert email should be sent
     [Documentation]    Immediate alert
     Log    Immediate alert sent for API downtime
 
-Include API status, last successful call, and retry attempts
-    [Documentation]    API alert content
-    Log    Alert includes API diagnostic information
+Include service status, last successful call, and retry attempts
+    [Documentation]    Confirmation alert content
+    Log    Alert includes confirmation service diagnostic information
 
 Notifications are configured
     [Documentation]    Notifications ready
@@ -783,9 +783,9 @@ Kiosk status should be visible
     [Documentation]    Kiosk status metric
     Element Should Be Visible    css=.metric-kiosk-status
 
-MobilePay API status should be visible
-    [Documentation]    API status metric
-    Element Should Be Visible    css=.metric-api-status
+Manual confirmation service status should be visible
+    [Documentation]    Confirmation service status metric
+    Element Should Be Visible    css=.metric-confirmation-status
 
 Last transaction time should be visible
     [Documentation]    Transaction time metric

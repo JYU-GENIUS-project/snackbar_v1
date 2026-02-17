@@ -18,12 +18,12 @@
 
 | Workstream | Acceptance Tests | Related Requirements |
 | --- | --- | --- |
-| Catalog grid, filtering, and empty states | customer_product_browsing.robot – US-001, US-002, US-002-Edge | FR-1.1, FR-1.2, FR-1.3, NFR-2 (sub-300 ms response)
-| Product details and allergen surfacing | customer_product_browsing.robot – US-003, US-003-Edge | FR-1.4, WCAG compliance from FR-4.3
-| Inventory availability and out-of-stock confirmations | customer_product_browsing.robot – US-004, US-005, US-005-Edge | FR-1.5, FR-1.6, Implementation_Roadmap step 30
-| Operating hours and maintenance overlays | customer_system_status.robot – US-016, variants | FR-4.1, FR-4.2, FR-4.2.1, NFR-4
-| Trust-mode inventory warning banner | customer_system_status.robot – US-017, variants | FR-1.5, FR-11.1.2 (10 s propagation requirement)
-| Accessibility, touch targets, and contrast | customer_system_status.robot – US-018 suites; customer_product_browsing.robot – touch target checks | FR-4.3, SRS accessibility baseline
+| Catalog grid, filtering, and empty states | customer_product_browsing.robot – US-001, US-002, US-002-Edge | FR-1.1, FR-1.2, FR-1.3, NFR-2 (sub-300 ms response) |
+| Product details and allergen surfacing | customer_product_browsing.robot – US-003, US-003-Edge | FR-1.4, WCAG compliance from FR-4.3 |
+| Inventory availability and out-of-stock confirmations | customer_product_browsing.robot – US-004, US-005, US-005-Edge | FR-1.5, FR-1.6, Implementation_Roadmap step 30 |
+| Operating hours and maintenance overlays | customer_system_status.robot – US-016, variants | FR-4.1, FR-4.2, FR-4.2.1, NFR-4 |
+| Trust-mode inventory warning banner | customer_system_status.robot – US-017, variants | FR-1.5, FR-11.1.2 (10 s propagation requirement) |
+| Accessibility, touch targets, and contrast | customer_system_status.robot – US-018 suites; customer_product_browsing.robot – touch target checks | FR-4.3, SRS accessibility baseline |
 
 ## Constraints and Assumptions
 
@@ -79,14 +79,14 @@
    - Ensure overlay toggles checkout disabled state and product visibility as asserted in customer_system_status.robot – US-016 cases.
 
 9. **Accessibility, Styling, and Performance Hardening**
-   - Audit typography tokens and button components to guarantee 16/24 px minimums and WCAG AA contrast ratios; add CSS variables or clases as needed in [client/src/styles.css](client/src/styles.css).
-   - Introduce automated linting via `eslint-plugin-jsx-a11y` rules or axe integration in CI for kiosk bundle to catch regressions targeted by US-018 suites.
-   - Optimize image loading (lazy loading, aspect-ratio boxes) and reduce layout shifts to maintain <300 ms perceived responsiveness during filter interactions.
+      - Audit typography tokens and button components to guarantee 16/24 px minimums and WCAG AA contrast ratios; add CSS variables or clases as needed in [client/src/styles.css](client/src/styles.css).
+      - Introduce automated linting via `eslint-plugin-jsx-a11y` rules or axe integration in CI for kiosk bundle to catch regressions targeted by US-018 suites.
+      - Optimize image loading (lazy loading, aspect-ratio boxes) and reduce layout shifts to maintain <300 ms perceived responsiveness during filter interactions.
 
 10. **Testing, QA, and Rollout**
-   - Expand unit and integration tests on both client and server for new hooks, reducers, and endpoints; cover schedule edge cases (overnight transitions) and SSE propagation.
-   - Execute targeted Robot suites: [tests/acceptance/customer_product_browsing.robot](tests/acceptance/customer_product_browsing.robot) and [tests/acceptance/customer_system_status.robot](tests/acceptance/customer_system_status.robot) on staging before merge; incorporate into CI pipeline gating per Implementation_Roadmap step 33.
-   - Finalize the kiosk status API runbook: document `KIOSK_TIMEZONE` and `system_config` dependencies, call out the `Cache-Control: no-cache` requirement for `/api/status/kiosk`, and note the reverse-proxy settings (`proxy_buffering off`, `X-Accel-Buffering off`) needed to keep `/api/status/events` SSE connections alive. Mirror the checklist in the README.
+      - Expand unit and integration tests on both client and server for new hooks, reducers, and endpoints; cover schedule edge cases (overnight transitions) and SSE propagation.
+      - Execute targeted Robot suites: [tests/acceptance/customer_product_browsing.robot](tests/acceptance/customer_product_browsing.robot) and [tests/acceptance/customer_system_status.robot](tests/acceptance/customer_system_status.robot) on staging before merge; incorporate into CI pipeline gating per Implementation_Roadmap step 33.
+      - Finalize the kiosk status API runbook: document `KIOSK_TIMEZONE` and `system_config` dependencies, call out the `Cache-Control: no-cache` requirement for `/api/status/kiosk`, and note the reverse-proxy settings (`proxy_buffering off`, `X-Accel-Buffering off`) needed to keep `/api/status/events` SSE connections alive. Mirror the checklist in the README.
 
 ## Risks and Follow-Ups
 

@@ -31,15 +31,12 @@ C4Context
     Person(customer, "Customer", "Student member who purchases snacks and drinks from the kiosk")
     Person(admin, "Administrator", "Staff member who manages inventory, products, and system configuration")
 
-    System(snackbar, "Snack Bar Kiosk System", "Self-service kiosk enabling students to browse products and complete purchases using MobilePay")
-
-    System_Ext(mobilepay, "MobilePay API", "External payment processing service for QR code-based mobile payments")
+    System(snackbar, "Snack Bar Kiosk System", "Self-service kiosk enabling students to browse products and confirm payments manually")
     System_Ext(email, "Email Service", "SMTP/API service for sending notifications (low stock, errors, payment failures)")
     System_Ext(google, "Google OAuth", "Optional external authentication provider for admin login")
 
     Rel(customer, snackbar, "Browses products, adds to cart, completes payment", "HTTPS")
     Rel(admin, snackbar, "Manages products, inventory, views statistics, configures system", "HTTPS")
-    Rel(snackbar, mobilepay, "Initiates payments, checks status, receives webhooks", "HTTPS/REST API")
     Rel(snackbar, email, "Sends notifications", "SMTP/HTTPS")
     Rel(snackbar, google, "Authenticates admin users (optional)", "OAuth 2.0")
 ```
@@ -47,11 +44,11 @@ C4Context
 ### Context Diagram Description
 
 | Element | Type | Description |
-|---------|------|-------------|
+| --------- | ------ | ------------- |
 | **Customer** | Person | Student member who uses the kiosk to browse and purchase snacks/drinks. No authentication required. Expected 50-100 transactions/day. |
 | **Administrator** | Person | Staff member with moderate technical expertise. Manages inventory, products, views statistics. Requires authentication. |
-| **Snack Bar Kiosk System** | System | The core system consisting of customer-facing kiosk and admin web portal. Handles product display, shopping cart, payments, inventory, and reporting. |
-| **MobilePay API** | External System | Nordic mobile payment service by Danske Bank. Provides QR code generation, payment processing, and webhook notifications. |
+| **Snack Bar Kiosk System** | System | The core system consisting of customer-facing kiosk and admin web portal. Handles product display, shopping cart, manual payment confirmation, inventory, and reporting. |
+| **Manual Confirmation Loop** | Process | On-kiosk flow guiding the customer to confirm payment and storing audit entries without third-party dependencies. |
 | **Email Service** | External System | SMTP server or API service (SendGrid, AWS SES, Mailgun) for admin notifications including low stock alerts, system errors, and payment issues. |
 | **Google OAuth** | External System | Optional authentication provider for admin login. Implements OAuth 2.0 Authorization Code flow. |
 
@@ -72,12 +69,11 @@ C4Container
         Container(nginx, "Nginx Reverse Proxy", "Nginx 1.24+", "Handles SSL/TLS termination, serves static files, routes API requests")
         Container(kiosk_ui, "Kiosk Web Application", "React 19.2, Vite", "Customer-facing touchscreen interface for browsing products and completing purchases")
         Container(admin_ui, "Admin Web Portal", "React 19.2, Vite", "Administrative interface for managing products, inventory, and viewing statistics")
-        Container(api, "API Server", "Node.js 24.11 LTS, Express.js 5.1", "RESTful API handling business logic, authentication, payment processing, and data operations")
+        Container(api, "API Server", "Node.js 24.11 LTS, Express.js 5.1", "RESTful API handling business logic, authentication, manual payment confirmation, and data operations")
         ContainerDb(db, "Database", "PostgreSQL 18", "Stores products, categories, transactions, admin users, configuration, and audit logs")
         Container(pm2, "Process Manager", "PM2 2.5+", "Manages Node.js processes, clustering, auto-restart, and log rotation")
     }
 
-    System_Ext(mobilepay, "MobilePay API", "Payment processing service")
     System_Ext(email, "Email Service", "Notification delivery")
     System_Ext(google, "Google OAuth", "Authentication provider")
 
@@ -89,7 +85,6 @@ C4Container
     Rel(kiosk_ui, api, "Makes API calls", "HTTPS/REST")
     Rel(admin_ui, api, "Makes API calls", "HTTPS/REST")
     Rel(api, db, "Reads/writes data", "PostgreSQL Protocol")
-    Rel(api, mobilepay, "Processes payments", "HTTPS/REST")
     Rel(api, email, "Sends notifications", "SMTP/HTTPS")
     Rel(api, google, "Authenticates admins", "OAuth 2.0")
     Rel(pm2, api, "Manages processes", "Process Management")
@@ -98,11 +93,11 @@ C4Container
 ### Container Descriptions
 
 | Container | Technology | Purpose | Port |
-|-----------|------------|---------|------|
+| --------- | ---------- | ------- | ---- |
 | **Nginx Reverse Proxy** | Nginx 1.24+ | SSL/TLS termination, static file serving, request routing, compression, caching | 80, 443 |
 | **Kiosk Web Application** | React 19.2, Vite 5.0 | Customer-facing SPA for product browsing, cart management, and payment | Static files |
 | **Admin Web Portal** | React 19.2, Vite 5.0 | Administrative SPA for product management, inventory, statistics, and configuration | Static files |
-| **API Server** | Node.js 24.11 LTS, Express.js 5.1 | RESTful backend handling business logic, authentication, and integrations | 3000 |
+| **API Server** | Node.js 24.11 LTS, Express.js 5.1 | RESTful backend handling business logic, authentication, manual payment confirmation, and integrations | 3000 |
 | **Database** | PostgreSQL 18 | Persistent storage for all application data | 5432 |
 | **Process Manager** | PM2 2.5+ | Node.js process management with clustering and auto-restart | N/A |
 
@@ -119,7 +114,6 @@ sequenceDiagram
     participant K as Kiosk UI
     participant A as API Server
     participant DB as PostgreSQL
-    participant MP as MobilePay API
 
     C->>N: Access kiosk (HTTPS)
     N->>K: Serve React app
@@ -132,16 +126,17 @@ sequenceDiagram
     C->>K: Add items to cart
     C->>K: Checkout
     K->>A: POST /api/transactions
-    A->>MP: Create payment (QR code)
-    MP-->>A: QR code + payment ID
-    A-->>K: QR code for display
-    K-->>C: Show QR code
-    
-    C->>MP: Scan & pay (MobilePay app)
-    MP->>A: Webhook: payment confirmed
-    A->>DB: Save transaction, update inventory
-    A-->>K: Payment success
-    K-->>C: Success message
+    A->>DB: Create pending transaction
+    DB-->>A: Transaction record
+    A-->>K: Checkout response (transactionId, payment instructions)
+    K-->>C: Show payment instructions
+
+    C->>K: Confirm payment on kiosk
+    K->>A: POST /api/transactions/:id/confirm
+    A->>DB: Persist confirmation and audit trail
+    DB-->>A: Confirmation stored
+    A-->>K: Confirmation success
+    K-->>C: Success message and receipt option
 ```
 
 ### 3.2 Admin Management Flow
@@ -206,11 +201,9 @@ graph TB
     end
     
     subgraph "External"
-        mobilepay[MobilePay API]
-        email[Email Service]
+      email[Email Service]
     end
     
-    api --> mobilepay
     api --> email
 ```
 
@@ -266,9 +259,8 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       SESSION_SECRET: ${SESSION_SECRET}
       BCRYPT_ROUNDS: 12
-      MOBILEPAY_API_KEY: ${MOBILEPAY_API_KEY}
-      MOBILEPAY_MERCHANT_ID: ${MOBILEPAY_MERCHANT_ID}
-      MOBILEPAY_WEBHOOK_SECRET: ${MOBILEPAY_WEBHOOK_SECRET}
+      CONFIRMATION_TIMEOUT_SECONDS: ${CONFIRMATION_TIMEOUT_SECONDS:-60}
+      CONFIRMATION_AUDIT_CHANNEL: ${CONFIRMATION_AUDIT_CHANNEL:-database}
       SMTP_HOST: ${SMTP_HOST}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USER: ${SMTP_USER}
@@ -454,7 +446,7 @@ http {
             add_header Cache-Control "public, immutable";
         }
         
-        # API proxy
+        # API proxy (includes manual payment confirmation routes)
         location /api/ {
             proxy_pass http://api_backend;
             proxy_http_version 1.1;
@@ -467,16 +459,6 @@ http {
             proxy_cache_bypass $http_upgrade;
             proxy_read_timeout 60s;
             proxy_send_timeout 60s;
-        }
-        
-        # MobilePay webhooks
-        location /api/webhooks/mobilepay {
-            proxy_pass http://api_backend;
-            proxy_http_version 1.1;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
         }
         
         # Product images
@@ -501,7 +483,7 @@ http {
 ## 5. Technology Stack Summary
 
 | Layer | Technology | Version | Purpose |
-|-------|------------|---------|---------|
+| ----- | ---------- | ------- | ------- |
 | **Reverse Proxy** | Nginx | 1.24+ | SSL termination, static files, routing |
 | **Frontend** | React | 19.2 | Customer kiosk and admin portal UI |
 | **Build Tool** | Vite | 5.0 | Frontend build and development |
@@ -554,7 +536,7 @@ graph TB
 ### Security Controls
 
 | Control | Implementation | SRS Requirement |
-|---------|----------------|-----------------|
+| ------- | -------------- | --------------- |
 | **Transport Security** | TLS 1.2+ via Nginx | NFR-9 |
 | **Password Storage** | bcrypt (12 rounds) | NFR-8 |
 | **API Authentication** | JWT tokens | FR-5.1 |
@@ -583,18 +565,19 @@ flowchart LR
     end
     
     subgraph "Service Layer"
-        payment[Payment Service]
-        email[Email Service]
-        image[Image Service]
+      confirmation[Manual Confirmation Service]
+      email[Email Service]
+      image[Image Service]
+      auditWriter[Audit Trail Writer]
     end
     
     subgraph "Data Layer"
-        db[(PostgreSQL)]
+      db[(PostgreSQL)]
+      audit[(Audit Trail Tables)]
     end
     
     subgraph "External"
-        mp[MobilePay]
-        smtp[SMTP]
+      smtp[SMTP]
     end
     
     kiosk --> products
@@ -605,14 +588,16 @@ flowchart LR
     admin --> stats
     
     products --> db
-    transactions --> payment
+    transactions --> confirmation
     transactions --> db
     inventory --> db
     inventory --> email
     auth --> db
     stats --> db
     
-    payment --> mp
+    confirmation --> auditWriter
+    auditWriter --> audit
+    audit --> db
     email --> smtp
     image --> db
 ```
@@ -622,7 +607,7 @@ flowchart LR
 ## 8. Deployment Environments
 
 | Environment | Purpose | Infrastructure |
-|-------------|---------|----------------|
+| ----------- | ------- | -------------- |
 | **Development** | Local development | Docker Compose, local PostgreSQL |
 | **Staging** | Pre-production testing | Docker containers, staging database |
 | **Production** | Live system | Docker Swarm/Kubernetes, managed PostgreSQL |

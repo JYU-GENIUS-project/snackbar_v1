@@ -13,7 +13,7 @@ The Self-Service Snack Bar Kiosk System requires a modern, full-stack technology
 
 1. **Kiosk Interface:** Customer-facing touchscreen application for browsing products and completing purchases
 2. **Admin Web Portal:** Administrative interface for managing products, inventory, statistics, and configuration
-3. **Backend API:** RESTful service handling business logic, payment processing, and data operations
+3. **Backend API:** RESTful service handling business logic, manual payment confirmation, and data operations
 4. **Database:** Persistent storage for products, transactions, inventory, and configuration
 
 Key requirements from the SRS influencing this decision:
@@ -47,7 +47,7 @@ We will adopt the **PERN stack** as the primary technology stack:
 #### Backend (Node.js + Express.js + TypeScript)
 
 | Component | Version | Purpose |
-|-----------|---------|---------|
+| --------- | ------- | ------- |
 | **Node.js** | 24.11 LTS | JavaScript runtime with V8 engine |
 | **Express.js** | 5.1 | Minimalist web framework for REST API |
 | **pg (node-postgres)** | 8.11.x | PostgreSQL client with connection pooling |
@@ -64,7 +64,7 @@ We will adopt the **PERN stack** as the primary technology stack:
 #### Frontend (React + TypeScript)
 
 | Component | Version | Purpose |
-|-----------|---------|---------|
+| --------- | ------- | ------- |
 | **React** | 19.2 | UI component library |
 | **react-router-dom** | 6.20.x | Client-side routing |
 | **axios** | 1.6.x | HTTP client for API calls |
@@ -100,7 +100,7 @@ We will adopt the **PERN stack** as the primary technology stack:
 #### Development Tools
 
 | Tool | Version | Purpose |
-|------|---------|---------|
+| ---- | ------- | ------- |
 | **ESLint** | 8.x | JavaScript/React linting |
 | **Prettier** | 3.x | Code formatting |
 | **Jest** | 29.x | Unit and integration testing |
@@ -111,7 +111,7 @@ We will adopt the **PERN stack** as the primary technology stack:
 #### Process Management and Deployment
 
 | Tool | Version | Purpose |
-|------|---------|---------|
+| ---- | ------- | ------- |
 | **PM2** | 2.5+ | Node.js process management, clustering |
 | **Nginx** | 1.24+ | Reverse proxy, SSL termination |
 | **Docker** | 24.x | Containerization |
@@ -267,7 +267,7 @@ Type definitions required:
 
 ### Project Structure
 
-```
+```text
 snackbar/
 ├── server/                    # Backend
 │   ├── src/
@@ -325,7 +325,7 @@ snackbar/
 
 ### API Architecture
 
-```
+```text
 /api
 ├── /auth
 │   ├── POST /login            # Admin login
@@ -343,6 +343,7 @@ snackbar/
 │   └── DELETE /:id            # Delete category (admin)
 ├── /transactions
 │   ├── POST /                 # Create transaction (kiosk)
+│   ├── POST /:id/confirm      # Confirm payment (kiosk)
 │   ├── GET /                  # List transactions (admin)
 │   └── GET /stats             # Statistics (admin)
 ├── /inventory
@@ -351,8 +352,6 @@ snackbar/
 ├── /config
 │   ├── GET /                  # Get configuration (admin)
 │   └── PUT /                  # Update configuration (admin)
-└── /webhooks
-    └── POST /mobilepay        # MobilePay callback
 ```
 
 ---

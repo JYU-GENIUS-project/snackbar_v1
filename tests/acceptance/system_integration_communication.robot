@@ -4,10 +4,10 @@ Documentation       System Integration & Communication User Stories (US-064 to U
 ...                 
 ...                 These tests verify system-level requirements for:
 ...                 - Image metadata removal (EXIF stripping)
-...                 - MobilePay API retry with exponential backoff
-...                 - Graceful handling of API unavailability
+...                 - Manual confirmation audit retry with exponential backoff
+...                 - Graceful handling of confirmation service downtime
 ...                 - Email notification retry logic
-...                 - Comprehensive payment transaction logging
+...                 - Comprehensive manual confirmation transaction logging
 
 Library             SeleniumLibrary
 Resource            ../resources/common.robot
@@ -60,91 +60,91 @@ US-064: Privacy Compliance Verification - Comprehensive Test
     And the system should verify metadata removal before final storage
     And re-downloading the image should confirm zero EXIF data present
 
-US-065: Retry Failed MobilePay API Calls With Exponential Backoff - Main Scenario
-    [Documentation]    As a system, I want to retry failed MobilePay API calls up to 3 times
-    ...                with exponential backoff so that temporary network issues don't cause payment failures.
+US-065: Retry Failed Confirmation Audit Writes With Exponential Backoff - Main Scenario
+    [Documentation]    As a system, I want to retry manual confirmation audit writes up to 3 times
+    ...                with exponential backoff so that transient issues do not lose confirmed payments.
     [Tags]    US-065    system    integration    reliability    critical
     
-    Given a customer has completed their cart and initiated checkout
-    And the MobilePay API experiences a temporary network error
-    When the system attempts to initiate the payment
-    Then the system should retry the API call automatically
+    Given a customer confirmed payment on the kiosk
+    And the confirmation audit service experiences a temporary database error
+    When the system attempts to persist the confirmation event
+    Then the system should retry the audit write automatically
     And the first retry should occur after 1 second
     And the second retry should occur after 2 seconds (exponential backoff)
     And the third retry should occur after 4 seconds
     And a maximum of 3 retries should be attempted
-    And if successful on retry, the customer should see the QR code normally
+    And if successful on retry, the customer should remain on the success screen
 
 US-065: Exponential Backoff Timing Validation - Edge Case
-    [Documentation]    Verify retry timing follows exponential backoff pattern correctly
+    [Documentation]    Verify manual confirmation retry timing follows exponential backoff correctly
     [Tags]    US-065    system    integration    edge-case
     
-    Given a customer initiates a payment
-    When the MobilePay API returns transient errors (500, 503, 504)
+    Given a confirmation audit write fails transiently
+    When the confirmation service returns transient errors (network timeout, 500, 503)
     Then the system should wait 1 second before retry 1
     And wait 2 seconds before retry 2 (2^1)
     And wait 4 seconds before retry 3 (2^2)
     And the total maximum wait time should be 7 seconds (1+2+4)
     And network errors (timeouts, connection refused) should trigger retries
     And HTTP 4xx client errors (400, 401, 404) should NOT trigger retries
-    And the customer should see a "Processing payment..." indicator during retries
+    And the kiosk should display a "Recording confirmation..." indicator during retries
 
 US-065: Retry Success And Failure Scenarios - Comprehensive Test
-    [Documentation]    Test various retry outcomes and edge cases
+    [Documentation]    Test various manual confirmation retry outcomes and edge cases
     [Tags]    US-065    system    integration    comprehensive
     
-    Given the system has retry logic configured
-    When MobilePay API fails on first attempt but succeeds on retry 2
-    Then the customer should see the QR code successfully
-    And the transaction log should record 2 API attempts with timestamps
+    Given the confirmation audit retry logic is configured
+    When the confirmation service fails on first attempt but succeeds on retry 2
+    Then the confirmation timeline should show the event recorded
+    And the audit log should record 2 write attempts with timestamps
     When all 3 retries fail
-    Then the customer should see error message "Payment service temporarily unavailable. Please try again."
-    And the customer should be able to retry their checkout
-    And the admin should receive an alert about repeated API failures
-    And the system should track API success rate and retry statistics
+    Then the kiosk should show "Confirmation service temporarily unavailable"
+    And the customer should be able to request staff assistance
+    And the admin should receive an alert about repeated confirmation failures
+    And the system should track confirmation audit success rate and retry statistics
 
-US-066: Handle MobilePay API Unavailability Gracefully - Main Scenario
-    [Documentation]    As a system, I want to handle MobilePay API unavailability gracefully
-    ...                so that customers receive clear error messages rather than system crashes.
+US-066: Handle Confirmation Service Downtime Gracefully - Main Scenario
+    [Documentation]    As a system, I want to handle manual confirmation service downtime gracefully
+    ...                so that customers receive clear guidance without kiosk failures.
     [Tags]    US-066    system    integration    reliability    critical
     
-    Given a customer has items in cart and clicks checkout
-    When the MobilePay API is completely unavailable (returns 503 or times out)
+    Given the kiosk attempts to record a manual confirmation event
+    When the confirmation service is completely unavailable (returns 503 or times out)
     Then the system should display a user-friendly error message
-    And the message should say "Payment service is temporarily unavailable. Please try again in a few minutes."
+    And the message should say "Confirmation service is temporarily unavailable. Please contact staff."
     And the kiosk UI should remain functional (not crash or freeze)
     And the customer should have options to "Retry" or "Cancel and Return to Shopping"
     And the cart should be preserved so the customer doesn't lose their selections
-    And the system should log the API unavailability event for monitoring
+    And the system should log the confirmation service outage for monitoring
 
-US-066: Graceful Degradation During Outages - Edge Case
-    [Documentation]    Verify system remains stable during prolonged API outages
+US-066: Graceful Degradation During Extended Downtime - Edge Case
+    [Documentation]    Verify system remains stable during prolonged confirmation service downtime
     [Tags]    US-066    system    integration    edge-case
     
-    Given the MobilePay API is experiencing an extended outage
-    When multiple customers attempt checkout during the outage
-    Then each customer should see the error message clearly
+    Given the confirmation service is experiencing an extended outage
+    When multiple customers attempt to confirm payments during the outage
+    Then each customer should see the downtime message clearly
     And the system should not crash or become unresponsive
     And the kiosk should allow customers to continue browsing products
     And customers should be able to modify their carts normally
-    And admin portal should show API health status as "Down" with red indicator
-    And admin should receive critical alert email about API outage
+    And admin portal should show confirmation service health status as "Down" with red indicator
+    And admin should receive critical alert email about the outage
     And the system should continue attempting health checks every 30 seconds
 
-US-066: API Recovery And Automatic Resumption - Comprehensive Test
-    [Documentation]    Test system behavior when API recovers from outage
+US-066: Service Recovery And Automatic Resumption - Comprehensive Test
+    [Documentation]    Test system behavior when confirmation service recovers from outage
     [Tags]    US-066    system    integration    comprehensive
     
-    Given the MobilePay API was unavailable and is now recovered
-    When a customer who previously saw error tries checkout again
-    Then the system should successfully process the payment
-    And the QR code should be generated normally
-    And the admin portal API health status should update to "Online" with green indicator
+    Given the confirmation service was unavailable and is now recovered
+    When a customer who previously saw an error tries to confirm again
+    Then the system should successfully record the confirmation
+    And the success screen should render normally
+    And the admin portal health status should update to "Online" with green indicator
     And previous error logs should be marked as "Resolved"
-    When API transitions from available to unavailable mid-transaction
-    Then the customer should see error after retry attempts exhausted
-    And the transaction should be marked as "Failed - API Unavailable"
-    And the customer should be guided to contact staff if issue persists
+    When the service transitions from available to unavailable mid-confirmation
+    Then the customer should see an error after retry attempts are exhausted
+    And the confirmation should be marked as "Failed - Service Unavailable"
+    And the customer should be guided to contact staff if the issue persists
 
 US-067: Retry Failed Email Notifications Up To 3 Times - Main Scenario
     [Documentation]    As a system, I want to retry failed email notifications up to 3 times
@@ -193,52 +193,52 @@ US-067: Email Notification Failure Handling - Comprehensive Test
     And the admin should receive a summary of delayed notifications
     And the system should track email delivery success rate metrics
 
-US-068: Log All Payment Transactions With Detailed Status - Main Scenario
-    [Documentation]    As a system, I want to log all payment transactions with detailed status information
-    ...                so that payment issues can be debugged and reconciled.
+US-068: Log Manual Confirmation Transactions With Detailed Status - Main Scenario
+    [Documentation]    As a system, I want to log manual confirmation transactions with detailed status information
+    ...                so that confirmation issues can be debugged and reconciled.
     [Tags]    US-068    system    logging    debugging    critical
     
     Given a customer completes a purchase transaction
-    When the payment is processed
+    When the manual confirmation is processed
     Then the system should create a comprehensive transaction log entry
     And the log should include unique transaction ID
     And the log should include timestamp (date and time with milliseconds)
     And the log should include cart items (product names, quantities, prices)
     And the log should include total amount
-    And the log should include payment method (MobilePay)
-    And the log should include MobilePay transaction ID
-    And the log should include payment status (Initiated, Pending, Confirmed, Failed, Uncertain)
+    And the log should include payment method (Manual Confirmation)
+    And the log should include manual confirmation reference ID
+    And the log should include payment status (Initiated, Pending Confirmation, Confirmed, Failed, Uncertain)
     And the log should be searchable in the admin portal
 
-US-068: Payment Status Transitions Logging - Edge Case
-    [Documentation]    Verify all payment status transitions are logged
+US-068: Confirmation Status Transitions Logging - Edge Case
+    [Documentation]    Verify all manual confirmation status transitions are logged
     [Tags]    US-068    system    logging    edge-case
     
     Given a customer initiates a payment
-    When payment status changes from "Initiated" to "Pending"
+    When payment status changes from "Initiated" to "Pending Confirmation"
     Then the status change should be logged with timestamp
-    When payment status changes from "Pending" to "Confirmed"
+    When payment status changes from "Pending Confirmation" to "Confirmed"
     Then the status change should be logged with timestamp
-    And the log should include MobilePay confirmation details
-    When a payment fails
+    And the log should include confirmation metadata (attendant ID, kiosk ID)
+    When a confirmation fails
     Then the status change to "Failed" should be logged
     And the log should include error code and error message
     When payment status is "Uncertain"
-    Then the log should include all MobilePay API responses received
+    Then the log should include all confirmation service responses received
     And the log should flag the transaction for manual review
 
-US-068: Comprehensive Payment Debug Information - Comprehensive Test
-    [Documentation]    Ensure payment logs contain sufficient detail for debugging and reconciliation
+US-068: Comprehensive Confirmation Debug Information - Comprehensive Test
+    [Documentation]    Ensure confirmation logs contain sufficient detail for debugging and reconciliation
     [Tags]    US-068    system    logging    comprehensive
     
-    Given the system processes various payment transactions
+    Given the system processes various manual confirmation transactions
     When viewing transaction logs in admin portal
     Then each log entry should include customer session ID (for debugging)
-    And API request/response details (sanitized, no sensitive data in plain text)
-    And network latency measurements (time to MobilePay API)
+    And confirmation service request/response details (sanitized, no sensitive data in plain text)
+    And network latency measurements (time to confirmation service)
     And retry attempt count (if retries occurred)
     And kiosk identifier (which kiosk the transaction came from)
-    And admin user who reconciled uncertain payments (if applicable)
+    And admin user who reconciled uncertain confirmations (if applicable)
     And logs should be retained for 3 years
     And logs should be exportable to CSV for analysis
     And logs should support filtering by status, date range, amount, and kiosk
@@ -319,19 +319,19 @@ The system should verify metadata removal before final storage
 Re-downloading the image should confirm zero EXIF data present
     Log    Re-download confirms zero EXIF data
 
-# --- MobilePay API Retry Keywords (US-065) ---
+# --- Manual Confirmation Audit Retry Keywords (US-065) ---
 
-A customer has completed their cart and initiated checkout
-    Log    Customer checkout initiated after cart completion
+A customer confirmed payment on the kiosk
+    Log    Customer confirmed payment via kiosk interface
 
-The MobilePay API experiences a temporary network error
-    Log    Simulating MobilePay temporary network error
+The confirmation audit service experiences a temporary database error
+    Log    Simulating transient database error in confirmation audit service
 
-The system attempts to initiate the payment
-    Log    Payment initiation attempted via MobilePay
+The system attempts to persist the confirmation event
+    Log    Attempting to write manual confirmation event to audit store
 
-The system should retry the API call automatically
-    Log    Automatic retry logic engaged for payment API
+The system should retry the audit write automatically
+    Log    Automatic retry logic engaged for confirmation audit write
 
 The first retry should occur after 1 second
     Log    Retry schedule verified: first retry at 1 second
@@ -345,14 +345,14 @@ The third retry should occur after 4 seconds
 A maximum of 3 retries should be attempted
     Log    Retry limit enforced at 3 attempts
 
-If successful on retry, the customer should see the QR code normally
-    Log    Customer presented with QR code after retry success
+If successful on retry, the customer should remain on the success screen
+    Log    Customer remains on success screen after retry success
 
-A customer initiates a payment
-    Log    Customer initiated payment request
+A confirmation audit write fails transiently
+    Log    Simulating transient confirmation audit write failure
 
-The MobilePay API returns transient errors (500, 503, 504)
-    Log    MobilePay returned transient server errors (500, 503, 504)
+The confirmation service returns transient errors (network timeout, 500, 503)
+    Log    Confirmation service returning transient errors (timeout, 500, 503)
 
 The system should wait 1 second before retry 1
     Log    Retry wait time validated at 1 second before retry 1
@@ -367,122 +367,122 @@ The total maximum wait time should be 7 seconds (1+2+4)
     Log    Cumulative wait time verified at 7 seconds
 
 Network errors (timeouts, connection refused) should trigger retries
-    Log    Network errors configured to trigger retry sequence
+    Log    Network errors configured to trigger confirmation retry sequence
 
 HTTP 4xx client errors (400, 401, 404) should NOT trigger retries
-    Log    4xx client errors excluded from retry logic
+    Log    4xx client errors excluded from confirmation retry logic
 
-The customer should see a "Processing payment..." indicator during retries
-    Log    UI displays "Processing payment..." indicator during retries
+The kiosk should display a "Recording confirmation..." indicator during retries
+    Log    UI displays "Recording confirmation..." indicator during retries
 
-The system has retry logic configured
-    Log    Retry logic configuration confirmed
+The confirmation audit retry logic is configured
+    Log    Confirmation retry logic configuration confirmed
 
-MobilePay API fails on first attempt but succeeds on retry 2
-    Log    Scenario: failure on attempt 1, success on retry 2
+The confirmation service fails on first attempt but succeeds on retry 2
+    Log    Scenario: confirmation failure on attempt 1, success on retry 2
 
-The customer should see the QR code successfully
-    Log    QR code displayed after successful retry
+The confirmation timeline should show the event recorded
+    Log    Confirmation timeline updated after retry success
 
-The transaction log should record 2 API attempts with timestamps
-    Log    Transaction log records two API attempts with timestamps
+The audit log should record 2 write attempts with timestamps
+    Log    Audit log records two write attempts with timestamps
 
 All 3 retries fail
-    Log    Scenario: all three retries failed
+    Log    Scenario: all three confirmation retries failed
 
-The customer should see error message "Payment service temporarily unavailable. Please try again."
-    Log    Customer sees friendly error message after retry exhaustion
+The kiosk should show "Confirmation service temporarily unavailable"
+    Log    Kiosk displays confirmation service outage message
 
-The customer should be able to retry their checkout
-    Log    Customer offered option to retry checkout
+The customer should be able to request staff assistance
+    Log    UI prompts customer to request staff assistance
 
-The admin should receive an alert about repeated API failures
-    Log    Admin alert generated for repeated API failures
+The admin should receive an alert about repeated confirmation failures
+    Log    Admin alert generated for repeated confirmation failures
 
-The system should track API success rate and retry statistics
-    Log    Metric collection enabled for API retries and success rate
+The system should track confirmation audit success rate and retry statistics
+    Log    Metrics collected for confirmation audit success rate and retries
 
-# --- MobilePay API Unavailability Keywords (US-066) ---
+# --- Manual Confirmation Service Downtime Keywords (US-066) ---
 
-A customer has items in cart and clicks checkout
-    Log    Customer proceeds to checkout with items in cart
+The kiosk attempts to record a manual confirmation event
+    Log    Kiosk attempting to record manual confirmation event
 
-The MobilePay API is completely unavailable (returns 503 or times out)
-    Log    Simulating MobilePay total outage (503/timeout)
+The confirmation service is completely unavailable (returns 503 or times out)
+    Log    Simulating complete confirmation service outage (503/timeout)
 
 The system should display a user-friendly error message
-    Log    UI displays user-friendly outage message
+    Log    UI displays user-friendly confirmation outage message
 
-The message should say "Payment service is temporarily unavailable. Please try again in a few minutes."
-    Log    Error message content verified for outage scenario
+The message should say "Confirmation service is temporarily unavailable. Please contact staff."
+    Log    Error message content verified for confirmation outage
 
 The kiosk UI should remain functional (not crash or freeze)
-    Log    Kiosk UI remains responsive during outage
+    Log    Kiosk UI remains responsive during confirmation outage
 
 The customer should have options to "Retry" or "Cancel and Return to Shopping"
     Log    Options presented: Retry, Cancel and Return to Shopping
 
 The cart should be preserved so the customer doesn't lose their selections
-    Log    Cart contents preserved during payment outage
+    Log    Cart contents preserved during confirmation outage
 
-The system should log the API unavailability event for monitoring
-    Log    Monitoring system logs API unavailability event
+The system should log the confirmation service outage for monitoring
+    Log    Monitoring system logs confirmation service outage
 
-The MobilePay API is experiencing an extended outage
-    Log    Extended outage scenario active
+The confirmation service is experiencing an extended outage
+    Log    Extended confirmation service outage scenario active
 
-Multiple customers attempt checkout during the outage
-    Log    Multiple checkout attempts simulated during outage
+Multiple customers attempt to confirm payments during the outage
+    Log    Multiple confirmation attempts simulated during outage
 
-Each customer should see the error message clearly
-    Log    Error message displayed consistently for all customers
+Each customer should see the downtime message clearly
+    Log    Downtime message displayed consistently for all customers
 
 The system should not crash or become unresponsive
-    Log    System stability maintained during outage
+    Log    System stability maintained during confirmation outage
 
 The kiosk should allow customers to continue browsing products
-    Log    Customers can continue browsing despite outage
+    Log    Customers can continue browsing despite confirmation outage
 
 Customers should be able to modify their carts normally
-    Log    Cart modifications remain functional during outage
+    Log    Cart modifications remain functional during confirmation outage
 
-Admin portal should show API health status as "Down" with red indicator
-    Log    Admin portal health status shows Down with red indicator
+Admin portal should show confirmation service health status as "Down" with red indicator
+    Log    Admin portal health status shows confirmation service Down with red indicator
 
-Admin should receive critical alert email about API outage
-    Log    Critical alert email sent to admin regarding outage
+Admin should receive critical alert email about the outage
+    Log    Critical alert email sent to admin regarding confirmation outage
 
 The system should continue attempting health checks every 30 seconds
-    Log    Health checks scheduled every 30 seconds during outage
+    Log    Health checks scheduled every 30 seconds during confirmation outage
 
-The MobilePay API was unavailable and is now recovered
-    Log    MobilePay outage resolved; service recovered
+The confirmation service was unavailable and is now recovered
+    Log    Confirmation service outage resolved; service recovered
 
-A customer who previously saw error tries checkout again
-    Log    Customer retries checkout post-recovery
+A customer who previously saw an error tries to confirm again
+    Log    Customer retries confirmation post-recovery
 
-The system should successfully process the payment
-    Log    Payment processed successfully after recovery
+The system should successfully record the confirmation
+    Log    Confirmation recorded successfully after recovery
 
-The QR code should be generated normally
-    Log    QR code generated normally post-recovery
+The success screen should render normally
+    Log    Success screen rendered normally post-recovery
 
-The admin portal API health status should update to "Online" with green indicator
+The admin portal health status should update to "Online" with green indicator
     Log    Admin portal status updated to Online with green indicator
 
 Previous error logs should be marked as "Resolved"
-    Log    Error logs flagged as resolved after recovery
+    Log    Error logs flagged as resolved after confirmation recovery
 
-API transitions from available to unavailable mid-transaction
-    Log    Simulating mid-transaction API outage
+The service transitions from available to unavailable mid-confirmation
+    Log    Simulating mid-confirmation service outage
 
-The customer should see error after retry attempts exhausted
-    Log    Customer informed of failure after retries exhausted
+The customer should see an error after retry attempts are exhausted
+    Log    Customer informed of failure after confirmation retries exhausted
 
-The transaction should be marked as "Failed - API Unavailable"
-    Log    Transaction status updated to Failed - API Unavailable
+The confirmation should be marked as "Failed - Service Unavailable"
+    Log    Confirmation status updated to Failed - Service Unavailable
 
-The customer should be guided to contact staff if issue persists
+The customer should be guided to contact staff if the issue persists
     Log    Guidance provided to contact staff for assistance
 
 # --- Email Notification Retry Keywords (US-067) ---
@@ -577,16 +577,16 @@ The admin should receive a summary of delayed notifications
 The system should track email delivery success rate metrics
     Log    Email delivery metrics updated for success rate tracking
 
-# --- Payment Transaction Logging Keywords (US-068) ---
+# --- Manual Confirmation Transaction Logging Keywords (US-068) ---
 
 A customer completes a purchase transaction
     Log    Customer purchase transaction completed
 
-The payment is processed
-    Log    Payment processing workflow executed
+The manual confirmation is processed
+    Log    Manual confirmation workflow executed
 
 The system should create a comprehensive transaction log entry
-    Log    Comprehensive transaction log entry created
+    Log    Comprehensive confirmation transaction log entry created
 
 The log should include unique transaction ID
     Log    Transaction log includes unique transaction ID
@@ -600,70 +600,70 @@ The log should include cart items (product names, quantities, prices)
 The log should include total amount
     Log    Transaction log contains total amount
 
-The log should include payment method (MobilePay)
-    Log    Transaction log captures payment method MobilePay
+The log should include payment method (Manual Confirmation)
+    Log    Transaction log captures payment method Manual Confirmation
 
-The log should include MobilePay transaction ID
-    Log    Transaction log stores MobilePay transaction ID
+The log should include manual confirmation reference ID
+    Log    Transaction log stores manual confirmation reference ID
 
-The log should include payment status (Initiated, Pending, Confirmed, Failed, Uncertain)
-    Log    Transaction log tracks payment status transitions
+The log should include payment status (Initiated, Pending Confirmation, Confirmed, Failed, Uncertain)
+    Log    Transaction log tracks confirmation status transitions
 
 The log should be searchable in the admin portal
     Log    Transaction log searchable via admin portal filters
 
-Payment status changes from "Initiated" to "Pending"
-    Log    Status transition recorded: Initiated -> Pending
+Payment status changes from "Initiated" to "Pending Confirmation"
+    Log    Status transition recorded: Initiated -> Pending Confirmation
 
 The status change should be logged with timestamp
-    Log    Timestamp stored for Initiated -> Pending transition
+    Log    Timestamp stored for Initiated -> Pending Confirmation transition
 
-Payment status changes from "Pending" to "Confirmed"
-    Log    Status transition recorded: Pending -> Confirmed
+Payment status changes from "Pending Confirmation" to "Confirmed"
+    Log    Status transition recorded: Pending Confirmation -> Confirmed
 
-The log should include MobilePay confirmation details
-    Log    Confirmation details stored for Pending -> Confirmed transition
+The log should include confirmation metadata (attendant ID, kiosk ID)
+    Log    Confirmation metadata stored (attendant ID, kiosk ID)
 
-A payment fails
-    Log    Payment failure event captured
+A confirmation fails
+    Log    Confirmation failure event captured
 
 The status change to "Failed" should be logged
     Log    Failure status and timestamp logged
 
 The log should include error code and error message
-    Log    Error code and message stored in log entry
+    Log    Error code and message stored in confirmation log entry
 
 Payment status is "Uncertain"
-    Log    Payment status flagged as Uncertain
+    Log    Confirmation status flagged as Uncertain
 
-The log should include all MobilePay API responses received
-    Log    API response history stored for Uncertain status
+The log should include all confirmation service responses received
+    Log    Confirmation service response history stored for Uncertain status
 
 The log should flag the transaction for manual review
     Log    Transaction flagged for manual review due to Uncertain status
 
-The system processes various payment transactions
-    Log    Processing variety of payment transactions for audit
+The system processes various manual confirmation transactions
+    Log    Processing variety of manual confirmation transactions for audit
 
 Viewing transaction logs in admin portal
-    Log    Admin reviewing transaction logs
+    Log    Admin reviewing confirmation transaction logs
 
 Each log entry should include customer session ID (for debugging)
     Log    Log entries include customer session ID for debugging
 
-API request/response details (sanitized, no sensitive data in plain text)
-    Log    Sanitized API request/response details retained in logs
+Confirmation service request/response details (sanitized, no sensitive data in plain text)
+    Log    Sanitized confirmation request/response details retained in logs
 
-Network latency measurements (time to MobilePay API)
-    Log    Network latency metrics captured for each transaction
+Network latency measurements (time to confirmation service)
+    Log    Network latency metrics captured for each confirmation
 
 Retry attempt count (if retries occurred)
-    Log    Retry count stored alongside transaction entries
+    Log    Retry count stored alongside confirmation entries
 
 Kiosk identifier (which kiosk the transaction came from)
     Log    Log includes kiosk identifier metadata
 
-Admin user who reconciled uncertain payments (if applicable)
+Admin user who reconciled uncertain confirmations (if applicable)
     Log    Logs record admin responsible for reconciliation
 
 Logs should be retained for 3 years
@@ -677,6 +677,9 @@ Logs should support filtering by status, date range, amount, and kiosk
 
 Sensitive payment card data should NEVER be logged (PCI-DSS compliance)
     Log    Confirmed: sensitive card data never logged (PCI-DSS compliant)
+
+A customer initiates a payment
+    Log    Customer initiated manual payment confirmation flow
 
 Logs should be write-only and immutable (cannot be edited or deleted)
     Log    Logs stored in immutable, append-only datastore
