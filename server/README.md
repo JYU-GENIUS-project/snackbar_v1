@@ -22,20 +22,18 @@ The default dev server binds to <http://localhost:3000> and reads configuration 
 
 ## Manual Payment Confirmation Flow
 
-- Creating a transaction (`POST /api/transactions`) responds with a `transactionId`, `transactionNumber`, and kiosk instructions; no third-party payment IDs are generated.
-- The kiosk confirms successful payment with `POST /api/transactions/:id/confirm` supplying `{ declaredTender: string, attendantCode?: string, notes?: string }`.
-- Confirmation requests require the transaction to be in `pending` state; the service persists the confirmation timestamp, channel (`kiosk` or `staff`), attendant metadata, and an immutable audit log entry.
-- The confirmation handler emits `transaction.confirmed` events on the internal event bus so downstream consumers (notifications, reconciliation jobs) can react to kiosk-side approvals.
-- Timeout handling is driven by `CONFIRMATION_TIMEOUT_SECONDS`; transactions exceeding this window without confirmation move to `abandoned` and surface on the admin dashboard for follow-up.
+- Current implementation exposes `POST /api/transactions` for transaction creation and already persists confirmation metadata fields (`confirmation_channel`, `confirmation_reference`, `confirmation_metadata`) on the transaction row.
+- The richer manual confirmation workflow for Phase 7 is specified in [docs/architecture/Phase7_Manual_Confirmation_Backend_Handoff.md](docs/architecture/Phase7_Manual_Confirmation_Backend_Handoff.md).
+- Planned Phase 7 work adds confirmation finalization, transaction audit retrieval, admin listing filters, timeout handling, and confirmation-service outage responses on top of the existing transaction creation baseline.
 
 ## Key Endpoints
 
 | Method | Path | Purpose |
 | ------ | ---- | ------- |
-| POST | `/api/transactions` | Create a pending transaction and cart snapshot |
-| POST | `/api/transactions/:id/confirm` | Mark a transaction as manually confirmed and persist audit metadata |
-| GET | `/api/transactions` | Paginated admin view with confirmation status filters |
-| GET | `/api/transactions/:id/audit` | Retrieve confirmation audit trail for reconciliation |
+| POST | `/api/transactions` | Create a transaction record; Phase 7 should constrain kiosk usage to pending checkout snapshots |
+| POST | `/api/transactions/:id/confirm` | Planned for Phase 7: finalize kiosk confirmation and persist audit metadata |
+| GET | `/api/transactions` | Planned for Phase 7: paginated admin view with confirmation status filters |
+| GET | `/api/transactions/:id/audit` | Planned for Phase 7: retrieve confirmation audit trail for reconciliation |
 | GET | `/api/status/kiosk` | Current kiosk operating status (used by client watchdog) |
 | GET | `/api/feed/products` | Product and availability feed for kiosk browsing |
 
@@ -56,13 +54,14 @@ The Docker Compose file maps these variables and mounts persistent volumes for u
 ## Middleware & Modules
 
 - **Authentication:** JWT bearer auth with optional Google OAuth handshake for admin login.
-- **Validation:** `express-validator` guards incoming payloads, including confirmation DTOs.
+- **Validation:** `express-validator` guards incoming payloads; transaction creation DTOs are implemented today and confirmation DTOs are planned for Phase 7.
 - **Error Handling:** Structured error responses with correlation IDs for log tracing.
 - **Upload Handling:** `multer` streams product image uploads to `uploads/` with extension whitelisting.
-- **Audit Logging:** `auditLogger` service records entity changes, including every confirmation attempt, in the `audit_logs` table.
+- **Audit Logging:** `auditLogger` service records entity changes today; Phase 7 expands it with explicit transaction-confirmation audit actions defined in the backend handoff contract.
 
 ## Development Tips
 
 - Seed data (`npm run seed`) before exercising kiosk flows; the seed script inserts sample products and an admin account (`admin@example.com` / `ChangeMe!123`).
-- To inspect confirmation audit trails locally, connect with `psql` and query `SELECT * FROM audit_logs WHERE entity_type = 'transaction' ORDER BY created_at DESC LIMIT 10;`.
+- To inspect current transaction records locally, connect with `psql` and query `SELECT transaction_number, payment_status, confirmation_reference FROM transactions ORDER BY created_at DESC LIMIT 10;`.
+- For the planned Phase 7 confirmation/audit contract, use [docs/architecture/Phase7_Manual_Confirmation_Backend_Handoff.md](docs/architecture/Phase7_Manual_Confirmation_Backend_Handoff.md) as the source of truth.
 - When running behind Nginx in development, ensure `/api` routes are proxied and WebSocket upgrades remain enabled for future real-time features.
