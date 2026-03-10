@@ -32,6 +32,20 @@ type TransactionRecord = {
     transaction_number: string;
 };
 
+type TransactionRow = {
+    id: string;
+    transaction_number: string;
+    total_amount: number | string;
+    payment_method: string | null;
+    payment_status: string;
+    confirmation_channel: string | null;
+    confirmation_reference: string | null;
+    confirmation_metadata: Record<string, unknown> | null;
+    completed_at: string | null;
+    created_at?: string | null;
+    updated_at?: string | null;
+};
+
 type InventoryDeduction = {
     trackingEnabled?: boolean;
     shortfall?: number;
@@ -44,6 +58,15 @@ type InventoryPostCommitSnapshot = {
     snapshot: Record<string, unknown>;
     shortfall?: number;
     delta?: number;
+};
+
+type TransactionLineItem = {
+    productId: string;
+    productName: string;
+    quantity: number;
+    unitPrice: number;
+    subtotal: number;
+    currency: string;
 };
 
 type TransactionResult = {
@@ -260,6 +283,36 @@ const insertTransactionItems = async (
             ],
         );
     }
+};
+
+const fetchTransactionItems = async (client: DbClient, transactionId: string) => {
+    const { rows } = (await client.query(
+        `SELECT product_id,
+                product_name,
+                quantity,
+                unit_price,
+                subtotal
+         FROM transaction_items
+         WHERE transaction_id = $1`,
+        [transactionId],
+    )) as DbQueryResult<
+        {
+            product_id: string;
+            product_name: string;
+            quantity: number;
+            unit_price: number | string;
+            subtotal: number | string;
+        }
+    >;
+
+    return rows.map((row) => ({
+        productId: row.product_id,
+        productName: row.product_name,
+        quantity: Number(row.quantity),
+        unitPrice: Number(row.unit_price),
+        subtotal: Number(row.subtotal),
+        currency: 'EUR',
+    }));
 };
 
 const createTransaction = async ({
@@ -551,16 +604,192 @@ const confirmTransaction = async ({
         throw new ApiError(400, 'Transaction id is required');
     }
 
-    normalizeOutcome(declaredOutcome);
+    const normalizedOutcome = normalizeOutcome(declaredOutcome);
 
-    throw new ApiError(501, 'Confirmation persistence not implemented', {
-        transactionId,
-        declaredOutcome,
-        declaredTender,
-        confirmationChannel,
-        confirmationReference,
-        confirmationMetadata,
-    });
+    const dbWithTransaction = db as unknown as {
+        transaction: <T>(
+            handler: (client: DbClient) => Promise<T>,
+        ) => Promise<T>;
+    };
+
+    const inventory = inventoryService as unknown as {
+        recordPurchaseDeduction: (params: {
+            productId: string;
+            quantity: number;
+            transactionId: string;
+            metadata: Record<string, unknown>;
+            client: DbClient;
+            deferPostProcessing: boolean;
+        }) => Promise<Record<string, unknown>>;
+        finalizeInventoryPostProcessing: (params: {
+            productId: string;
+            context: Record<string, unknown>;
+        }) => Promise<Record<string, unknown>>;
+    };
+
+    const result = await dbWithTransaction.transaction(
+        async (client: DbClient) => {
+            const transactionResult = (await client.query(
+                `SELECT id,
+                        transaction_number,
+                        total_amount,
+                        payment_method,
+                        payment_status,
+                        confirmation_channel,
+                        confirmation_reference,
+                        confirmation_metadata,
+                        completed_at,
+                        created_at,
+                        updated_at
+                 FROM transactions
+                 WHERE id = $1
+                 FOR UPDATE`,
+                [transactionId],
+            )) as DbQueryResult<TransactionRow>;
+
+            const transaction = transactionResult.rows[0];
+            if (!transaction) {
+                throw new ApiError(404, 'Transaction not found');
+            }
+
+            const currentStatus = transaction.payment_status
+                ? transaction.payment_status.toString().toUpperCase()
+                : '';
+            if (currentStatus !== 'PENDING') {
+                throw new ApiError(409, 'Transaction not pending', {
+                    status: transaction.payment_status,
+                });
+            }
+
+            const lineItems = await fetchTransactionItems(
+                client,
+                transactionId,
+            );
+
+            const mergedMetadata = {
+                ...(transaction.confirmation_metadata ?? {}),
+                ...(confirmationMetadata ?? {}),
+            } as Record<string, unknown>;
+
+            if (declaredTender) {
+                mergedMetadata.declaredTender = declaredTender;
+            }
+            mergedMetadata.confirmedAt = new Date().toISOString();
+
+            const updated = (await client.query(
+                `UPDATE transactions
+                 SET payment_status = $1,
+                     confirmation_channel = COALESCE($2, confirmation_channel),
+                     confirmation_reference = COALESCE($3, confirmation_reference),
+                     confirmation_metadata = $4,
+                     completed_at = CASE WHEN $1 = 'COMPLETED' THEN CURRENT_TIMESTAMP ELSE NULL END,
+                     updated_at = CURRENT_TIMESTAMP
+                 WHERE id = $5
+                 RETURNING id,
+                           transaction_number,
+                           total_amount,
+                           payment_method,
+                           payment_status,
+                           confirmation_channel,
+                           confirmation_reference,
+                           confirmation_metadata,
+                           completed_at,
+                           created_at,
+                           updated_at`,
+                [
+                    normalizedOutcome,
+                    confirmationChannel ?? null,
+                    confirmationReference ?? null,
+                    mergedMetadata,
+                    transactionId,
+                ],
+            )) as DbQueryResult<TransactionRow>;
+
+            const updatedTransaction = updated.rows[0];
+            if (!updatedTransaction) {
+                throw new ApiError(500, 'Failed to update transaction');
+            }
+
+            const shouldDeductInventory = normalizedOutcome === 'COMPLETED';
+            const deductions: InventoryDeduction[] = [];
+
+            if (shouldDeductInventory) {
+                for (const item of lineItems) {
+                    const deduction = await inventory.recordPurchaseDeduction({
+                        productId: item.productId,
+                        quantity: item.quantity,
+                        transactionId,
+                        metadata: {
+                            transactionNumber:
+                                updatedTransaction.transaction_number,
+                            subtotal: item.subtotal,
+                            currency: item.currency,
+                        },
+                        client,
+                        deferPostProcessing: true,
+                    });
+                    deductions.push({
+                        ...(deduction as InventoryDeduction),
+                        productId: item.productId,
+                    });
+                }
+            }
+
+            return {
+                transaction: updatedTransaction,
+                lineItems,
+                deductions,
+                shouldDeductInventory,
+            } as {
+                transaction: TransactionRow;
+                lineItems: TransactionLineItem[];
+                deductions: InventoryDeduction[];
+                shouldDeductInventory: boolean;
+            };
+        },
+    );
+
+    const postCommitSnapshots: InventoryPostCommitSnapshot[] = [];
+    if (result.shouldDeductInventory) {
+        for (const deduction of result.deductions) {
+            if (deduction.trackingEnabled === false) {
+                continue;
+            }
+
+            const snapshot = await inventory.finalizeInventoryPostProcessing({
+                productId: deduction.productId,
+                context: {
+                    source: 'purchase',
+                    transactionId: result.transaction.id,
+                    transactionNumber: result.transaction.transaction_number,
+                    shortfall: deduction.shortfall,
+                    delta: deduction.delta,
+                },
+            });
+
+            const postCommit: InventoryPostCommitSnapshot = {
+                productId: deduction.productId,
+                snapshot,
+            };
+            if (deduction.shortfall !== undefined) {
+                postCommit.shortfall = deduction.shortfall;
+            }
+            if (deduction.delta !== undefined) {
+                postCommit.delta = deduction.delta;
+            }
+            postCommitSnapshots.push(postCommit);
+        }
+    }
+
+    return {
+        transaction: result.transaction,
+        items: result.lineItems,
+        inventory: postCommitSnapshots,
+        inventoryTracking: result.deductions.every(
+            (entry) => entry.trackingEnabled !== false,
+        ),
+        inventoryApplied: result.shouldDeductInventory,
+    };
 };
 
 const transactionService = {
