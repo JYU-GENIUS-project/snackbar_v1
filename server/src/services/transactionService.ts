@@ -1,6 +1,11 @@
 import db from '../utils/database';
 import { ApiError } from '../middleware/errorHandler';
 import inventoryService from './inventoryService';
+import {
+    AuditActions,
+    EntityTypes,
+    createAuditLogWithRetry
+} from './auditService';
 
 type TransactionItemInput = {
     productId: string;
@@ -781,6 +786,54 @@ const confirmTransaction = async ({
         }
     }
 
+    const auditBase = {
+        adminId: null,
+        adminUsername: 'system',
+        entityType: EntityTypes.TRANSACTION,
+        entityId: result.transaction.id,
+        oldValues: {
+            status: 'PENDING'
+        },
+        newValues: {
+            transactionNumber: result.transaction.transaction_number,
+            confirmationReference: result.transaction.confirmation_reference,
+            confirmationChannel: result.transaction.confirmation_channel,
+            declaredTender: declaredTender ?? null,
+            status: result.transaction.payment_status,
+            totalAmount: result.transaction.total_amount
+        }
+    };
+
+    const attemptAudit = await createAuditLogWithRetry({
+        ...auditBase,
+        action: AuditActions.TRANSACTION_CONFIRMATION_ATTEMPTED
+    });
+
+    const outcomeAction =
+        result.transaction.payment_status === 'COMPLETED'
+            ? AuditActions.TRANSACTION_CONFIRMED
+            : result.transaction.payment_status === 'FAILED'
+              ? AuditActions.TRANSACTION_FAILED
+              : AuditActions.TRANSACTION_MARKED_UNCERTAIN;
+
+    const outcomeAudit = await createAuditLogWithRetry({
+        ...auditBase,
+        action: outcomeAction,
+        newValues: {
+            ...auditBase.newValues,
+            auditAttemptCount: attemptAudit.attempts,
+            auditAttemptTimestamps: attemptAudit.timestamps
+        }
+    });
+
+    if (!attemptAudit.succeeded || !outcomeAudit.succeeded) {
+        console.warn('[Transaction] Audit logging retries exhausted', {
+            transactionId: result.transaction.id,
+            attemptAuditSucceeded: attemptAudit.succeeded,
+            outcomeAuditSucceeded: outcomeAudit.succeeded
+        });
+    }
+
     return {
         transaction: result.transaction,
         items: result.lineItems,
@@ -789,6 +842,16 @@ const confirmTransaction = async ({
             (entry) => entry.trackingEnabled !== false,
         ),
         inventoryApplied: result.shouldDeductInventory,
+        audit: {
+            confirmationAttempt: {
+                succeeded: attemptAudit.succeeded,
+                attempts: attemptAudit.attempts
+            },
+            confirmationOutcome: {
+                succeeded: outcomeAudit.succeeded,
+                attempts: outcomeAudit.attempts
+            }
+        }
     };
 };
 

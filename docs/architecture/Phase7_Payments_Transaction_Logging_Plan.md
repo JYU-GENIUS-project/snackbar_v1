@@ -10,7 +10,7 @@ Deliver kiosk-driven manual payment confirmation with reliable transaction loggi
 - [x] Phase 0 - Readiness & Contract Verification (completed 2026-03-10)
 - [x] Phase 1 - Transaction Confirmation API Surface (Backend) (completed 2026-03-10)
 - [x] Phase 2 - Confirmation Persistence & Inventory Side Effects (completed 2026-03-10)
-- [ ] Phase 3 - Audit Logging & Retry/Backoff
+- [x] Phase 3 - Audit Logging & Retry/Backoff (completed 2026-03-10)
 - [ ] Phase 4 - Downtime Handling & Customer Guidance
 - [ ] Phase 5 - Admin Reconciliation & Transaction Queries
 - [ ] Phase 6 - Kiosk Integration With Confirmation API
@@ -163,6 +163,8 @@ Deliver kiosk-driven manual payment confirmation with reliable transaction loggi
 
 **Goal:** Ensure confirmation audit events are durable and resilient to transient failures.
 
+**Status:** Completed 2026-03-10
+
 #### Phase 3 Tasks
 
 1. Extend `auditService` with required confirmation actions and entity types:
@@ -179,6 +181,11 @@ Deliver kiosk-driven manual payment confirmation with reliable transaction loggi
 
 - system_integration_communication.robot (US-065) retry/backoff logic.
 - system_integration_communication.robot (US-068) audit trail detail requirements.
+
+#### Phase 3 Completion evidence
+
+- Added retryable audit logging helpers and confirmation actions in [server/src/services/auditService.ts](server/src/services/auditService.ts)
+- Added confirmation audit write/retry handling in [server/src/services/transactionService.ts](server/src/services/transactionService.ts)
 
 ---
 
