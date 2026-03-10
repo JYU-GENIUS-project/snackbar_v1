@@ -11,7 +11,7 @@ Deliver kiosk-driven manual payment confirmation with reliable transaction loggi
 - [x] Phase 1 - Transaction Confirmation API Surface (Backend) (completed 2026-03-10)
 - [x] Phase 2 - Confirmation Persistence & Inventory Side Effects (completed 2026-03-10)
 - [x] Phase 3 - Audit Logging & Retry/Backoff (completed 2026-03-10)
-- [ ] Phase 4 - Downtime Handling & Customer Guidance
+- [x] Phase 4 - Downtime Handling & Customer Guidance (completed 2026-03-10)
 - [ ] Phase 5 - Admin Reconciliation & Transaction Queries
 - [ ] Phase 6 - Kiosk Integration With Confirmation API
 - [ ] Phase 7 - Observability, Metrics, and Monitoring Hooks
@@ -193,6 +193,8 @@ Deliver kiosk-driven manual payment confirmation with reliable transaction loggi
 
 **Goal:** Keep kiosk usable when confirmation persistence is unavailable and provide clear guidance.
 
+**Status:** Completed 2026-03-10
+
 #### Phase 4 Tasks
 
 1. Detect confirmation persistence failures and return standardized error codes (`confirmation_unavailable`, `confirmation_persist_failed`).
@@ -208,6 +210,10 @@ Deliver kiosk-driven manual payment confirmation with reliable transaction loggi
 
 - system_integration_communication.robot (US-066) downtime handling.
 - customer_payment_checkout.robot (US-014) for retry and cart preservation.
+
+#### Phase 4 Completion evidence
+
+- Added standardized confirmation error codes and 503 handling in [server/src/services/transactionService.ts](server/src/services/transactionService.ts)
 
 ---
 

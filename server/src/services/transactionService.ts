@@ -147,6 +147,22 @@ const normalizeOutcome = (value: string) => {
     return normalized;
 };
 
+const isTransientDbError = (error: unknown) => {
+    if (!error || typeof error !== 'object') {
+        return false;
+    }
+    const record = error as { code?: string; message?: string };
+    const code = record.code ? record.code.toString() : '';
+    const message = record.message ? record.message.toString() : '';
+    return (
+        code === 'ECONNREFUSED' ||
+        code === 'ETIMEDOUT' ||
+        code === 'ENOTFOUND' ||
+        message.includes('Connection terminated') ||
+        message.includes('connection error')
+    );
+};
+
 const fetchProductsForItems = async (
     client: DbClient,
     items: TransactionItemInput[],
@@ -632,127 +648,153 @@ const confirmTransaction = async ({
         }) => Promise<Record<string, unknown>>;
     };
 
-    const result = await dbWithTransaction.transaction(
-        async (client: DbClient) => {
-            const transactionResult = (await client.query(
-                `SELECT id,
-                        transaction_number,
-                        total_amount,
-                        payment_method,
-                        payment_status,
-                        confirmation_channel,
-                        confirmation_reference,
-                        confirmation_metadata,
-                        completed_at,
-                        created_at,
-                        updated_at
-                 FROM transactions
-                 WHERE id = $1
-                 FOR UPDATE`,
-                [transactionId],
-            )) as DbQueryResult<TransactionRow>;
+    let result: {
+        transaction: TransactionRow;
+        lineItems: TransactionLineItem[];
+        deductions: InventoryDeduction[];
+        shouldDeductInventory: boolean;
+    };
 
-            const transaction = transactionResult.rows[0];
-            if (!transaction) {
-                throw new ApiError(404, 'Transaction not found');
-            }
+    try {
+        result = await dbWithTransaction.transaction(
+            async (client: DbClient) => {
+                const transactionResult = (await client.query(
+                    `SELECT id,
+                            transaction_number,
+                            total_amount,
+                            payment_method,
+                            payment_status,
+                            confirmation_channel,
+                            confirmation_reference,
+                            confirmation_metadata,
+                            completed_at,
+                            created_at,
+                            updated_at
+                     FROM transactions
+                     WHERE id = $1
+                     FOR UPDATE`,
+                    [transactionId],
+                )) as DbQueryResult<TransactionRow>;
 
-            const currentStatus = transaction.payment_status
-                ? transaction.payment_status.toString().toUpperCase()
-                : '';
-            if (currentStatus !== 'PENDING') {
-                throw new ApiError(409, 'Transaction not pending', {
-                    status: transaction.payment_status,
-                });
-            }
-
-            const lineItems = await fetchTransactionItems(
-                client,
-                transactionId,
-            );
-
-            const mergedMetadata = {
-                ...(transaction.confirmation_metadata ?? {}),
-                ...(confirmationMetadata ?? {}),
-            } as Record<string, unknown>;
-
-            if (declaredTender) {
-                mergedMetadata.declaredTender = declaredTender;
-            }
-            mergedMetadata.confirmedAt = new Date().toISOString();
-
-            const updated = (await client.query(
-                `UPDATE transactions
-                 SET payment_status = $1,
-                     confirmation_channel = COALESCE($2, confirmation_channel),
-                     confirmation_reference = COALESCE($3, confirmation_reference),
-                     confirmation_metadata = $4,
-                     completed_at = CASE WHEN $1 = 'COMPLETED' THEN CURRENT_TIMESTAMP ELSE NULL END,
-                     updated_at = CURRENT_TIMESTAMP
-                 WHERE id = $5
-                 RETURNING id,
-                           transaction_number,
-                           total_amount,
-                           payment_method,
-                           payment_status,
-                           confirmation_channel,
-                           confirmation_reference,
-                           confirmation_metadata,
-                           completed_at,
-                           created_at,
-                           updated_at`,
-                [
-                    normalizedOutcome,
-                    confirmationChannel ?? null,
-                    confirmationReference ?? null,
-                    mergedMetadata,
-                    transactionId,
-                ],
-            )) as DbQueryResult<TransactionRow>;
-
-            const updatedTransaction = updated.rows[0];
-            if (!updatedTransaction) {
-                throw new ApiError(500, 'Failed to update transaction');
-            }
-
-            const shouldDeductInventory = normalizedOutcome === 'COMPLETED';
-            const deductions: InventoryDeduction[] = [];
-
-            if (shouldDeductInventory) {
-                for (const item of lineItems) {
-                    const deduction = await inventory.recordPurchaseDeduction({
-                        productId: item.productId,
-                        quantity: item.quantity,
-                        transactionId,
-                        metadata: {
-                            transactionNumber:
-                                updatedTransaction.transaction_number,
-                            subtotal: item.subtotal,
-                            currency: item.currency,
-                        },
-                        client,
-                        deferPostProcessing: true,
-                    });
-                    deductions.push({
-                        ...(deduction as InventoryDeduction),
-                        productId: item.productId,
+                const transaction = transactionResult.rows[0];
+                if (!transaction) {
+                    throw new ApiError(404, 'Transaction not found', {
+                        code: 'transaction_not_found',
                     });
                 }
-            }
 
-            return {
-                transaction: updatedTransaction,
-                lineItems,
-                deductions,
-                shouldDeductInventory,
-            } as {
-                transaction: TransactionRow;
-                lineItems: TransactionLineItem[];
-                deductions: InventoryDeduction[];
-                shouldDeductInventory: boolean;
-            };
-        },
-    );
+                const currentStatus = transaction.payment_status
+                    ? transaction.payment_status.toString().toUpperCase()
+                    : '';
+                if (currentStatus !== 'PENDING') {
+                    throw new ApiError(409, 'Transaction not pending', {
+                        code: 'transaction_not_pending',
+                        status: transaction.payment_status,
+                    });
+                }
+
+                const lineItems = await fetchTransactionItems(
+                    client,
+                    transactionId,
+                );
+
+                const mergedMetadata = {
+                    ...(transaction.confirmation_metadata ?? {}),
+                    ...(confirmationMetadata ?? {}),
+                } as Record<string, unknown>;
+
+                if (declaredTender) {
+                    mergedMetadata.declaredTender = declaredTender;
+                }
+                mergedMetadata.confirmedAt = new Date().toISOString();
+
+                const updated = (await client.query(
+                    `UPDATE transactions
+                     SET payment_status = $1,
+                         confirmation_channel = COALESCE($2, confirmation_channel),
+                         confirmation_reference = COALESCE($3, confirmation_reference),
+                         confirmation_metadata = $4,
+                         completed_at = CASE WHEN $1 = 'COMPLETED' THEN CURRENT_TIMESTAMP ELSE NULL END,
+                         updated_at = CURRENT_TIMESTAMP
+                     WHERE id = $5
+                     RETURNING id,
+                               transaction_number,
+                               total_amount,
+                               payment_method,
+                               payment_status,
+                               confirmation_channel,
+                               confirmation_reference,
+                               confirmation_metadata,
+                               completed_at,
+                               created_at,
+                               updated_at`,
+                    [
+                        normalizedOutcome,
+                        confirmationChannel ?? null,
+                        confirmationReference ?? null,
+                        mergedMetadata,
+                        transactionId,
+                    ],
+                )) as DbQueryResult<TransactionRow>;
+
+                const updatedTransaction = updated.rows[0];
+                if (!updatedTransaction) {
+                    throw new ApiError(500, 'Failed to update transaction', {
+                        code: 'confirmation_persist_failed',
+                    });
+                }
+
+                const shouldDeductInventory = normalizedOutcome === 'COMPLETED';
+                const deductions: InventoryDeduction[] = [];
+
+                if (shouldDeductInventory) {
+                    for (const item of lineItems) {
+                        const deduction = await inventory.recordPurchaseDeduction({
+                            productId: item.productId,
+                            quantity: item.quantity,
+                            transactionId,
+                            metadata: {
+                                transactionNumber:
+                                    updatedTransaction.transaction_number,
+                                subtotal: item.subtotal,
+                                currency: item.currency,
+                            },
+                            client,
+                            deferPostProcessing: true,
+                        });
+                        deductions.push({
+                            ...(deduction as InventoryDeduction),
+                            productId: item.productId,
+                        });
+                    }
+                }
+
+                return {
+                    transaction: updatedTransaction,
+                    lineItems,
+                    deductions,
+                    shouldDeductInventory,
+                } as {
+                    transaction: TransactionRow;
+                    lineItems: TransactionLineItem[];
+                    deductions: InventoryDeduction[];
+                    shouldDeductInventory: boolean;
+                };
+            },
+        );
+    } catch (error) {
+        if (error instanceof ApiError) {
+            throw error;
+        }
+        if (isTransientDbError(error)) {
+            throw new ApiError(503, 'Confirmation persistence unavailable', {
+                code: 'confirmation_unavailable',
+            });
+        }
+        throw new ApiError(500, 'Failed to confirm transaction', {
+            code: 'confirmation_persist_failed',
+        });
+    }
 
     const postCommitSnapshots: InventoryPostCommitSnapshot[] = [];
     if (result.shouldDeductInventory) {
