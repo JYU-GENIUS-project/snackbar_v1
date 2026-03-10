@@ -855,8 +855,8 @@ const confirmTransaction = async ({
         result.transaction.payment_status === 'COMPLETED'
             ? AuditActions.TRANSACTION_CONFIRMED
             : result.transaction.payment_status === 'FAILED'
-              ? AuditActions.TRANSACTION_FAILED
-              : AuditActions.TRANSACTION_MARKED_UNCERTAIN;
+                ? AuditActions.TRANSACTION_FAILED
+                : AuditActions.TRANSACTION_MARKED_UNCERTAIN;
 
     const outcomeAudit = await createAuditLogWithRetry({
         ...auditBase,
