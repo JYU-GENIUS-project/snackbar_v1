@@ -54,8 +54,33 @@ type TransactionResult = {
     inventoryApplied: boolean;
 };
 
+type TransactionListFilters = {
+    status?: string;
+    page?: number;
+    pageSize?: number;
+    startDate?: string;
+    endDate?: string;
+    reference?: string;
+    kioskSessionId?: string;
+};
+
+type TransactionListResult = {
+    transactions: Record<string, unknown>[];
+    pagination: {
+        page: number;
+        pageSize: number;
+        total: number;
+    };
+};
+
 const PAYMENT_STATUSES = new Set([
     'PENDING',
+    'COMPLETED',
+    'FAILED',
+    'PAYMENT_UNCERTAIN',
+]);
+
+const CONFIRMATION_OUTCOMES = new Set([
     'COMPLETED',
     'FAILED',
     'PAYMENT_UNCERTAIN',
@@ -84,6 +109,14 @@ const normalizeQuantity = (value: number | string) => {
         throw new ApiError(400, 'Quantity must be a positive integer');
     }
     return quantity;
+};
+
+const normalizeOutcome = (value: string) => {
+    const normalized = value.toString().trim().toUpperCase();
+    if (!CONFIRMATION_OUTCOMES.has(normalized)) {
+        throw new ApiError(400, 'Invalid confirmation outcome');
+    }
+    return normalized;
 };
 
 const fetchProductsForItems = async (
@@ -380,8 +413,161 @@ const createTransaction = async ({
     };
 };
 
+const listTransactions = async (
+    filters: TransactionListFilters = {},
+): Promise<TransactionListResult> => {
+    const page = Number.isFinite(filters.page)
+        ? Math.max(1, Number(filters.page))
+        : 1;
+    const pageSize = Number.isFinite(filters.pageSize)
+        ? Math.min(100, Math.max(1, Number(filters.pageSize)))
+        : 25;
+    const offset = (page - 1) * pageSize;
+
+    const whereClause: string[] = [];
+    const params: unknown[] = [];
+    let paramIndex = 1;
+
+    if (filters.status) {
+        const normalizedStatus = normalizeStatus(filters.status);
+        whereClause.push(`payment_status = $${paramIndex++}`);
+        params.push(normalizedStatus);
+    }
+
+    if (filters.startDate) {
+        whereClause.push(`created_at >= $${paramIndex++}`);
+        params.push(new Date(filters.startDate));
+    }
+
+    if (filters.endDate) {
+        whereClause.push(`created_at <= $${paramIndex++}`);
+        params.push(new Date(filters.endDate));
+    }
+
+    if (filters.reference) {
+        whereClause.push(
+            `(transaction_number ILIKE $${paramIndex} OR confirmation_reference ILIKE $${paramIndex})`,
+        );
+        params.push(`%${filters.reference}%`);
+        paramIndex += 1;
+    }
+
+    if (filters.kioskSessionId) {
+        whereClause.push(
+            `confirmation_metadata ->> 'kioskSessionId' = $${paramIndex++}`,
+        );
+        params.push(filters.kioskSessionId);
+    }
+
+    const whereString =
+        whereClause.length > 0 ? `WHERE ${whereClause.join(' AND ')}` : '';
+
+    const countResult = (await db.query(
+        `SELECT COUNT(*) as total FROM transactions ${whereString}`,
+        params,
+    )) as DbQueryResult<{ total: string }>;
+
+    const total = parseInt(countResult.rows[0]?.total || '0', 10);
+
+    const dataResult = (await db.query(
+        `SELECT id,
+                transaction_number,
+                total_amount,
+                payment_method,
+                payment_status,
+                confirmation_channel,
+                confirmation_reference,
+                confirmation_metadata,
+                completed_at,
+                created_at,
+                updated_at
+         FROM transactions
+         ${whereString}
+         ORDER BY created_at DESC
+         LIMIT $${paramIndex++} OFFSET $${paramIndex}`,
+        [...params, pageSize, offset],
+    )) as DbQueryResult<Record<string, unknown>>;
+
+    return {
+        transactions: dataResult.rows,
+        pagination: {
+            page,
+            pageSize,
+            total,
+        },
+    };
+};
+
+const getTransactionAudit = async ({
+    transactionId,
+}: {
+    transactionId: string;
+}) => {
+    if (!transactionId) {
+        throw new ApiError(400, 'Transaction id is required');
+    }
+
+    const result = (await db.query(
+        `SELECT id,
+                admin_id,
+                admin_username,
+                action,
+                entity_type,
+                entity_id,
+                old_values,
+                new_values,
+                ip_address,
+                user_agent,
+                created_at
+         FROM audit_logs
+         WHERE entity_type = 'TRANSACTION'
+           AND entity_id = $1
+         ORDER BY created_at DESC`,
+        [transactionId],
+    )) as DbQueryResult<Record<string, unknown>>;
+
+    return {
+        transactionId,
+        audit: result.rows,
+    };
+};
+
+const confirmTransaction = async ({
+    transactionId,
+    declaredOutcome,
+    declaredTender,
+    confirmationChannel,
+    confirmationReference,
+    confirmationMetadata,
+}: {
+    transactionId: string;
+    declaredOutcome: string;
+    declaredTender?: string | null;
+    confirmationChannel?: string | null;
+    confirmationReference?: string | null;
+    confirmationMetadata?: Record<string, unknown> | null;
+}): Promise<Record<string, unknown>> => {
+    if (!transactionId) {
+        throw new ApiError(400, 'Transaction id is required');
+    }
+
+    normalizeOutcome(declaredOutcome);
+
+    throw new ApiError(501, 'Confirmation persistence not implemented', {
+        transactionId,
+        declaredOutcome,
+        declaredTender,
+        confirmationChannel,
+        confirmationReference,
+        confirmationMetadata,
+    });
+};
+
 const transactionService = {
     createTransaction,
+    listTransactions,
+    getTransactionAudit,
+    confirmTransaction,
 };
 
 export { createTransaction };

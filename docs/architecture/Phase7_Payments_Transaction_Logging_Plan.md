@@ -5,6 +5,18 @@
 
 Deliver kiosk-driven manual payment confirmation with reliable transaction logging and reconciliation for Issue #9, while strictly adhering to the Phase 6.5 UX contract and the Phase 7 backend handoff contract already defined in the workspace.
 
+## Progress Tracker
+
+- [x] Phase 0 - Readiness & Contract Verification (completed 2026-03-10)
+- [x] Phase 1 - Transaction Confirmation API Surface (Backend) (completed 2026-03-10)
+- [ ] Phase 2 - Confirmation Persistence & Inventory Side Effects
+- [ ] Phase 3 - Audit Logging & Retry/Backoff
+- [ ] Phase 4 - Downtime Handling & Customer Guidance
+- [ ] Phase 5 - Admin Reconciliation & Transaction Queries
+- [ ] Phase 6 - Kiosk Integration With Confirmation API
+- [ ] Phase 7 - Observability, Metrics, and Monitoring Hooks
+- [ ] Phase 8 - Validation & Regression Coverage
+
 ## Source of Truth (Must Not Diverge)
 
 - [docs/architecture/Phase7_Manual_Confirmation_Backend_Handoff.md](docs/architecture/Phase7_Manual_Confirmation_Backend_Handoff.md)
@@ -56,10 +68,17 @@ Deliver kiosk-driven manual payment confirmation with reliable transaction loggi
 
 **Goal:** Confirm prerequisites and prevent contract drift.
 
+**Status:** Completed 2026-03-10
+
 **Tasks**
 1. Verify Phase 6.5 UX contract surfaces remain unchanged (IDs, copy, timers).
 2. Confirm backend contract in [docs/architecture/Phase7_Manual_Confirmation_Backend_Handoff.md](docs/architecture/Phase7_Manual_Confirmation_Backend_Handoff.md) is treated as the API source of truth.
 3. Confirm dependencies from Issue #24 are complete (UX prerequisites already delivered).
+
+**Completion evidence**
+- UX selectors, copy, and timer overlap are defined in [docs/architecture/Phase6_5_Manual_Confirmation_UX_Contract.md](docs/architecture/Phase6_5_Manual_Confirmation_UX_Contract.md) and remain unchanged.
+- Backend confirmation contract is documented in [docs/architecture/Phase7_Manual_Confirmation_Backend_Handoff.md](docs/architecture/Phase7_Manual_Confirmation_Backend_Handoff.md) and referenced as the API source of truth.
+- Phase 6.5 prerequisite completion is recorded in [docs/architecture/Phase6_5_Manual_Confirmation_UX_Prerequisites_Implementation_Plan.md](docs/architecture/Phase6_5_Manual_Confirmation_UX_Prerequisites_Implementation_Plan.md).
 
 **Acceptance linkage**
 - Issue #9 constraints: Phase 6 UX prerequisites complete.
@@ -73,6 +92,8 @@ Deliver kiosk-driven manual payment confirmation with reliable transaction loggi
 ### Phase 1 - Transaction Confirmation API Surface (Backend)
 
 **Goal:** Implement the Phase 7 confirmation API surface exactly as defined by the backend handoff.
+
+**Status:** Completed 2026-03-10
 
 **Tasks**
 1. Add `POST /api/transactions/:id/confirm` for kiosk confirmation outcomes.
@@ -88,6 +109,11 @@ Deliver kiosk-driven manual payment confirmation with reliable transaction loggi
 **Tests**
 - system_technical_security.robot (US-059) for persistence timing and data completeness.
 - system_integration_communication.robot (US-068) for detailed transaction logging.
+
+**Completion evidence**
+- Added transaction confirmation endpoint: [server/src/routes/transactions.ts](server/src/routes/transactions.ts)
+- Added transaction listing and audit endpoints: [server/src/routes/transactions.ts](server/src/routes/transactions.ts)
+- Added service scaffolding for confirmation, list filters, and audit retrieval: [server/src/services/transactionService.ts](server/src/services/transactionService.ts)
 
 ---
 

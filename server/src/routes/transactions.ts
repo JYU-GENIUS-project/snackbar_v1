@@ -26,6 +26,14 @@ type TransactionPayload = {
     confirmationMetadata?: Record<string, unknown> | null;
 };
 
+type TransactionConfirmationPayload = {
+    declaredOutcome: string;
+    declaredTender?: string | null;
+    confirmationChannel?: string | null;
+    confirmationReference?: string | null;
+    confirmationMetadata?: Record<string, unknown> | null;
+};
+
 type TransactionResult = Record<string, unknown>;
 
 const asyncHandler = (
@@ -52,6 +60,28 @@ const transactionValidation = [
         .optional()
         .isString()
         .withMessage('paymentMethod must be a string'),
+    body('confirmationChannel')
+        .optional({ nullable: true })
+        .isString()
+        .withMessage('confirmationChannel must be a string'),
+    body('confirmationReference')
+        .optional({ nullable: true })
+        .isString()
+        .withMessage('confirmationReference must be a string'),
+    body('confirmationMetadata')
+        .optional({ nullable: true })
+        .isObject()
+        .withMessage('confirmationMetadata must be an object'),
+];
+
+const confirmValidation = [
+    body('declaredOutcome')
+        .isString()
+        .withMessage('declaredOutcome must be a string'),
+    body('declaredTender')
+        .optional({ nullable: true })
+        .isString()
+        .withMessage('declaredTender must be a string'),
     body('confirmationChannel')
         .optional({ nullable: true })
         .isString()
@@ -124,6 +154,118 @@ router.post(
         res.status(201).json({
             success: true,
             message: 'Transaction recorded successfully',
+            data: result,
+        });
+    }),
+);
+
+router.post(
+    '/:id/confirm',
+    confirmValidation,
+    asyncHandler(async (req, res) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            throw new ApiError(400, 'Validation failed', {
+                errors: errors.array(),
+            });
+        }
+
+        const transactionId = req.params.id;
+        const payload = req.body as TransactionConfirmationPayload;
+
+        const confirmTransaction =
+            transactionService.confirmTransaction as (params: {
+                transactionId: string;
+                declaredOutcome: string;
+                declaredTender?: string | null;
+                confirmationChannel?: string | null;
+                confirmationReference?: string | null;
+                confirmationMetadata?: Record<string, unknown> | null;
+            }) => Promise<TransactionResult>;
+
+        const result = await confirmTransaction({
+            transactionId,
+            declaredOutcome: payload.declaredOutcome,
+            declaredTender: payload.declaredTender ?? null,
+            confirmationChannel: payload.confirmationChannel ?? null,
+            confirmationReference: payload.confirmationReference ?? null,
+            confirmationMetadata: payload.confirmationMetadata ?? null,
+        });
+
+        res.status(202).json({
+            success: true,
+            message: 'Confirmation received',
+            data: result,
+        });
+    }),
+);
+
+router.get(
+    '/',
+    asyncHandler(async (req, res) => {
+        const listTransactions =
+            transactionService.listTransactions as (params: {
+                status?: string;
+                page?: number;
+                pageSize?: number;
+                startDate?: string;
+                endDate?: string;
+                reference?: string;
+                kioskSessionId?: string;
+            }) => Promise<Record<string, unknown>>;
+
+        const result = await listTransactions({
+            status:
+                typeof req.query.status === 'string'
+                    ? req.query.status
+                    : undefined,
+            page:
+                typeof req.query.page === 'string'
+                    ? Number(req.query.page)
+                    : undefined,
+            pageSize:
+                typeof req.query.pageSize === 'string'
+                    ? Number(req.query.pageSize)
+                    : undefined,
+            startDate:
+                typeof req.query.startDate === 'string'
+                    ? req.query.startDate
+                    : undefined,
+            endDate:
+                typeof req.query.endDate === 'string'
+                    ? req.query.endDate
+                    : undefined,
+            reference:
+                typeof req.query.reference === 'string'
+                    ? req.query.reference
+                    : undefined,
+            kioskSessionId:
+                typeof req.query.kioskSessionId === 'string'
+                    ? req.query.kioskSessionId
+                    : undefined,
+        });
+
+        res.status(200).json({
+            success: true,
+            message: 'Transactions retrieved',
+            data: result,
+        });
+    }),
+);
+
+router.get(
+    '/:id/audit',
+    asyncHandler(async (req, res) => {
+        const transactionId = req.params.id;
+        const getAudit = transactionService.getTransactionAudit as (params: {
+            transactionId: string;
+        }) => Promise<Record<string, unknown>>;
+
+        const result = await getAudit({ transactionId });
+
+        res.status(200).json({
+            success: true,
+            message: 'Transaction audit retrieved',
             data: result,
         });
     }),
