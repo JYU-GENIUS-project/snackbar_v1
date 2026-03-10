@@ -5,6 +5,7 @@ import useCart, { type CartItem, type CartProductSnapshot } from '../hooks/useCa
 import useKioskStatus, { type KioskStatusPayload, type InventoryAvailabilityEntry } from '../hooks/useKioskStatus.js';
 import ProductGridSkeleton from './ProductGridSkeleton.js';
 import ProductDetailModal from './ProductDetailModal';
+import { apiRequest, type ApiError } from '../services/apiClient.js';
 import { OFFLINE_FEED_STORAGE_KEY } from '../utils/offlineCache.js';
 import { logKioskEvent } from '../utils/analytics.js';
 
@@ -364,6 +365,18 @@ const formatDuration = (milliseconds: number) => {
 const formatConfirmationTimeoutLabel = (milliseconds: number) => {
     const totalSeconds = Math.max(0, Math.ceil(milliseconds / 1000));
     return totalSeconds === 1 ? '1 second' : `${totalSeconds} seconds`;
+};
+
+const createBasketHash = (items: CartItem[]) => {
+    const payload = items
+        .map((item) => `${item.id}:${item.quantity}:${item.price}`)
+        .sort()
+        .join('|');
+    let hash = 5381;
+    for (let i = 0; i < payload.length; i += 1) {
+        hash = (hash * 33) ^ payload.charCodeAt(i);
+    }
+    return `basket-${Math.abs(hash)}`;
 };
 
 const createConfirmationReference = () => {
@@ -837,10 +850,14 @@ const KioskApp = () => {
     const [toastMessage, setToastMessage] = useState('');
     const [limitMessage, setLimitMessage] = useState('');
     const [cartTimeoutWarning, setCartTimeoutWarning] = useState(false);
+    const [checkoutTransactionId, setCheckoutTransactionId] = useState<string | null>(null);
+    const [checkoutTransactionNumber, setCheckoutTransactionNumber] = useState<string | null>(null);
+    const [confirmationErrorMessage, setConfirmationErrorMessage] = useState<string | null>(null);
     const cartTimeoutRef = useRef<number | null>(null);
     const cartWarningRef = useRef<number | null>(null);
     const cartDeadlineRef = useRef<number | null>(null);
     const confirmationDeadlineRef = useRef<number | null>(null);
+    const confirmationTimeoutTriggeredRef = useRef(false);
     const ignoreActivityUntilRef = useRef<number>(0);
     const {
         cart,
@@ -848,7 +865,8 @@ const KioskApp = () => {
         setItemQuantity,
         removeItem: removeCartItem,
         clearCart: clearCartItems,
-        hydrateFromProducts
+        hydrateFromProducts,
+        sessionKey
     } = useCart();
     const hasCartItems = cart.length > 0;
     const cartCount = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart]);
@@ -892,6 +910,117 @@ const KioskApp = () => {
 
         logKioskEvent('kiosk.manual_confirmation_uncertain', basePayload);
     }, [cart.length, cartTotalCents, checkoutReferenceCode]);
+
+    const createPendingTransaction = useCallback(async () => {
+        const items = cart.map((item) => ({
+            productId: item.id,
+            quantity: item.quantity
+        }));
+
+        if (!items.length) {
+            return;
+        }
+
+        const response = await apiRequest<{
+            data?: {
+                transaction?: { id?: string; transaction_number?: string; payment_status?: string };
+                confirmationTimeoutSeconds?: number;
+            };
+        }>({
+            path: '/transactions',
+            method: 'POST',
+            body: {
+                items,
+                paymentStatus: 'PENDING',
+                paymentMethod: 'manual',
+                confirmationChannel: 'kiosk',
+                confirmationReference: checkoutReferenceCode,
+                confirmationMetadata: {
+                    kioskSessionId: sessionKey,
+                    cartTotal: Number((cartTotalCents / 100).toFixed(2)),
+                    basketHash: createBasketHash(cart),
+                    promptShownAt: new Date().toISOString()
+                }
+            }
+        });
+
+        const transaction = response?.data?.transaction;
+        if (transaction?.id) {
+            setCheckoutTransactionId(transaction.id);
+        }
+        if (transaction?.transaction_number) {
+            setCheckoutTransactionNumber(transaction.transaction_number);
+        }
+
+        if (response?.data?.confirmationTimeoutSeconds) {
+            const timeoutMs = response.data.confirmationTimeoutSeconds * 1000;
+            confirmationDeadlineRef.current = Date.now() + timeoutMs;
+            setConfirmationCountdownMs(timeoutMs);
+        }
+    }, [cart, cartTotalCents, checkoutReferenceCode, sessionKey]);
+
+    const submitConfirmation = useCallback(
+        async (
+            outcome: 'COMPLETED' | 'FAILED' | 'PAYMENT_UNCERTAIN',
+            metadata?: Record<string, unknown>
+        ) => {
+            if (!checkoutTransactionId) {
+                setConfirmationErrorMessage(
+                    'Confirmation service is temporarily unavailable. Please contact staff.'
+                );
+                finalizeManualConfirmationState('failure');
+                return;
+            }
+
+            try {
+                const response = await apiRequest<{
+                    data?: {
+                        transaction?: { payment_status?: string; paymentStatus?: string };
+                    };
+                }>({
+                    path: `/transactions/${checkoutTransactionId}/confirm`,
+                    method: 'POST',
+                    body: {
+                        declaredOutcome: outcome,
+                        declaredTender: 'manual',
+                        confirmationChannel: 'kiosk',
+                        confirmationReference: checkoutReferenceCode,
+                        confirmationMetadata: {
+                            kioskSessionId: sessionKey,
+                            ...metadata
+                        }
+                    }
+                });
+
+                const paymentStatus =
+                    response?.data?.transaction?.payment_status ||
+                    response?.data?.transaction?.paymentStatus ||
+                    outcome;
+
+                if (paymentStatus === 'COMPLETED') {
+                    finalizeManualConfirmationState('success');
+                } else if (paymentStatus === 'FAILED') {
+                    finalizeManualConfirmationState('failure');
+                } else {
+                    finalizeManualConfirmationState('uncertain');
+                }
+            } catch (error) {
+                const apiError = error as ApiError;
+                const details = apiError?.details as { code?: string } | null | undefined;
+                if (details?.code === 'confirmation_unavailable') {
+                    setConfirmationErrorMessage(
+                        'Confirmation service is temporarily unavailable. Please contact staff.'
+                    );
+                } else if (details?.code === 'confirmation_persist_failed') {
+                    setConfirmationErrorMessage(
+                        'Payment confirmation could not be recorded. Please contact staff.'
+                    );
+                }
+                finalizeManualConfirmationState('failure');
+            }
+        },
+        [checkoutReferenceCode, checkoutTransactionId, finalizeManualConfirmationState, sessionKey]
+    );
 
     const markCategoryFilterSelection = (category: string) => {
         if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
@@ -1485,8 +1614,14 @@ const KioskApp = () => {
             return;
         }
 
-        finalizeManualConfirmationState('uncertain');
-    }, [checkoutVisible, confirmationCountdownMs, finalizeManualConfirmationState, manualConfirmationState]);
+        if (!confirmationTimeoutTriggeredRef.current) {
+            confirmationTimeoutTriggeredRef.current = true;
+            setConfirmationErrorMessage(
+                'Waiting for confirmation. Please confirm payment or ask for assistance.'
+            );
+            void submitConfirmation('FAILED', { reason: 'timeout' });
+        }
+    }, [checkoutVisible, confirmationCountdownMs, manualConfirmationState, submitConfirmation]);
 
     const resetCartTimeout = useCallback(() => {
         if (cartTimeoutRef.current) {
@@ -1567,7 +1702,7 @@ const KioskApp = () => {
         };
     }, [hasCartItems, resetCartTimeout]);
 
-    const handleCheckout = () => {
+    const handleCheckout = async () => {
         if (!hasCartItems) {
             return;
         }
@@ -1584,6 +1719,10 @@ const KioskApp = () => {
         setManualConfirmationState('prompt');
         setCheckoutPromptReady(false);
         setCheckoutVisible(true);
+        setCheckoutTransactionId(null);
+        setCheckoutTransactionNumber(null);
+        setConfirmationErrorMessage(null);
+        confirmationTimeoutTriggeredRef.current = false;
         setCartOpen(false);
         setToastMessage('');
         resetCartTimeout();
@@ -1592,6 +1731,17 @@ const KioskApp = () => {
             totalEuros: Number.isFinite(cartTotalCents) ? Number((cartTotalCents / 100).toFixed(2)) : 0,
             confirmationReference: referenceCode
         });
+
+        try {
+            await createPendingTransaction();
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Unable to start checkout.';
+            setToastMessage(message);
+            logKioskEvent('kiosk.checkout_transaction_failed', {
+                confirmationReference: referenceCode,
+                error: message
+            });
+        }
     };
 
     const dismissCheckoutPrompt = (reason: 'backdrop' | 'cancel') => {
@@ -1600,6 +1750,10 @@ const KioskApp = () => {
         setCheckoutPromptReady(false);
         confirmationDeadlineRef.current = null;
         setConfirmationCountdownMs(CONFIRMATION_TIMEOUT_MS);
+        setCheckoutTransactionId(null);
+        setCheckoutTransactionNumber(null);
+        setConfirmationErrorMessage(null);
+        confirmationTimeoutTriggeredRef.current = false;
         resetCartTimeout();
         logKioskEvent('kiosk.manual_confirmation_dismissed', {
             reason,
@@ -1611,11 +1765,14 @@ const KioskApp = () => {
     const handleConfirmPayment = () => {
         setManualConfirmationState('pending');
         resetCartTimeout();
+        setConfirmationErrorMessage(null);
         logKioskEvent('kiosk.manual_confirmation_prompt_acknowledged', {
             confirmationReference: checkoutReferenceCode || null,
             cartSize: cart.length,
             totalEuros: Number.isFinite(cartTotalCents) ? Number((cartTotalCents / 100).toFixed(2)) : 0
         });
+
+        void submitConfirmation('COMPLETED');
     };
 
     const handleRetryPayment = () => {
@@ -1623,6 +1780,8 @@ const KioskApp = () => {
         setCheckoutPromptReady(true);
         confirmationDeadlineRef.current = Date.now() + CONFIRMATION_TIMEOUT_MS;
         setConfirmationCountdownMs(CONFIRMATION_TIMEOUT_MS);
+        setConfirmationErrorMessage(null);
+        confirmationTimeoutTriggeredRef.current = false;
         resetCartTimeout();
         logKioskEvent('kiosk.manual_confirmation_retry_requested', {
             confirmationReference: checkoutReferenceCode || null,
@@ -1651,6 +1810,9 @@ const KioskApp = () => {
             setCheckoutReferenceCode('');
             confirmationDeadlineRef.current = null;
             setConfirmationCountdownMs(CONFIRMATION_TIMEOUT_MS);
+            setCheckoutTransactionId(null);
+            setCheckoutTransactionNumber(null);
+            setConfirmationErrorMessage(null);
         }
     }, [hasCartItems]);
 
@@ -1690,6 +1852,8 @@ const KioskApp = () => {
         const timer = window.setTimeout(() => {
             confirmationDeadlineRef.current = null;
             setCheckoutReferenceCode('');
+            setCheckoutTransactionId(null);
+            setCheckoutTransactionNumber(null);
             void clearCart();
         }, SUCCESS_MESSAGE_MIN_DURATION_MS);
 
@@ -2277,7 +2441,11 @@ const KioskApp = () => {
                             >
                                 <div className="manual-confirmation-outcome-icon" aria-hidden="true">❌</div>
                                 <h3>Payment Failed</h3>
-                                <p>We could not verify your payment. Your cart is still intact and inventory has not been deducted.</p>
+                                <p>
+                                    {confirmationErrorMessage
+                                        ? confirmationErrorMessage
+                                        : 'We could not verify your payment. Your cart is still intact and inventory has not been deducted.'}
+                                </p>
                                 <div className="manual-confirmation-outcome-details">
                                     <span><strong>Items:</strong> {listPurchasedItems(cart)}</span>
                                     <span><strong>Total:</strong> {formatPriceFromCents(cartTotalCents)}</span>

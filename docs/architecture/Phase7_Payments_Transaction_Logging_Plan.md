@@ -13,7 +13,7 @@ Deliver kiosk-driven manual payment confirmation with reliable transaction loggi
 - [x] Phase 3 - Audit Logging & Retry/Backoff (completed 2026-03-10)
 - [x] Phase 4 - Downtime Handling & Customer Guidance (completed 2026-03-10)
 - [x] Phase 5 - Admin Reconciliation & Transaction Queries (completed 2026-03-10)
-- [ ] Phase 6 - Kiosk Integration With Confirmation API
+- [x] Phase 6 - Kiosk Integration With Confirmation API (completed 2026-03-10)
 - [ ] Phase 7 - Observability, Metrics, and Monitoring Hooks
 - [ ] Phase 8 - Validation & Regression Coverage
 
@@ -251,6 +251,8 @@ Deliver kiosk-driven manual payment confirmation with reliable transaction loggi
 
 **Goal:** Wire the kiosk UX states to the confirmation API without altering the Phase 6.5 UX contract.
 
+**Status:** Completed 2026-03-10
+
 #### Phase 6 Tasks
 
 1. On checkout: create a `PENDING` transaction (POST /api/transactions).
@@ -268,6 +270,10 @@ Deliver kiosk-driven manual payment confirmation with reliable transaction loggi
 #### Phase 6 Tests
 
 - customer_payment_checkout.robot (US-011–US-015).
+
+#### Phase 6 Completion evidence
+
+- Added transaction creation + confirmation API wiring in [client/src/components/KioskApp.tsx](client/src/components/KioskApp.tsx)
 
 ---
 
