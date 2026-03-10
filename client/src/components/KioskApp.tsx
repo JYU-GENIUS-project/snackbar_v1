@@ -851,6 +851,11 @@ const KioskApp = () => {
         hydrateFromProducts
     } = useCart();
     const hasCartItems = cart.length > 0;
+    const cartCount = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart]);
+    const cartTotalCents = useMemo(
+        () => cart.reduce((sum, item) => sum + toCents(item.price) * item.quantity, 0),
+        [cart]
+    );
     const [outOfStockPrompt, setOutOfStockPrompt] = useState<NormalizedProduct | null>(null);
     const [selectedProduct, setSelectedProduct] = useState<NormalizedProduct | null>(null);
     const outOfStockDialogRef = useRef<HTMLDivElement | null>(null);
@@ -1157,12 +1162,6 @@ const KioskApp = () => {
             window.removeEventListener('focus', handleFocus);
         };
     }, [refetch]);
-
-    const cartCount = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart]);
-    const cartTotalCents = useMemo(
-        () => cart.reduce((sum, item) => sum + toCents(item.price) * item.quantity, 0),
-        [cart]
-    );
 
     const addProductToCart = async (product: NormalizedProduct) => {
         const existing = cart.find((item) => item.id === product.id);
