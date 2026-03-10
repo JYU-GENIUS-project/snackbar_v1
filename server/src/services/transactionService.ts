@@ -74,6 +74,11 @@ type TransactionLineItem = {
     currency: string;
 };
 
+type AdminActor = {
+    id: string;
+    username: string;
+};
+
 type TransactionResult = {
     transaction: TransactionRecord;
     items: Array<Record<string, unknown>>;
@@ -897,11 +902,256 @@ const confirmTransaction = async ({
     };
 };
 
+const reconcileTransaction = async ({
+    transactionId,
+    action,
+    notes,
+    metadata,
+    actor
+}: {
+    transactionId: string;
+    action: string;
+    notes?: string | null;
+    metadata?: Record<string, unknown> | null;
+    actor: AdminActor;
+}): Promise<Record<string, unknown>> => {
+    if (!transactionId) {
+        throw new ApiError(400, 'Transaction id is required');
+    }
+
+    const normalizedAction = action.toString().trim().toUpperCase();
+    if (!['CONFIRMED', 'REFUNDED'].includes(normalizedAction)) {
+        throw new ApiError(400, 'Invalid reconciliation action');
+    }
+
+    const newStatus = normalizedAction === 'CONFIRMED' ? 'COMPLETED' : 'FAILED';
+
+    const dbWithTransaction = db as unknown as {
+        transaction: <T>(
+            handler: (client: DbClient) => Promise<T>,
+        ) => Promise<T>;
+    };
+
+    const inventory = inventoryService as unknown as {
+        recordPurchaseDeduction: (params: {
+            productId: string;
+            quantity: number;
+            transactionId: string;
+            metadata: Record<string, unknown>;
+            client: DbClient;
+            deferPostProcessing: boolean;
+        }) => Promise<Record<string, unknown>>;
+        finalizeInventoryPostProcessing: (params: {
+            productId: string;
+            context: Record<string, unknown>;
+        }) => Promise<Record<string, unknown>>;
+    };
+
+    let result: {
+        transaction: TransactionRow;
+        lineItems: TransactionLineItem[];
+        deductions: InventoryDeduction[];
+        shouldDeductInventory: boolean;
+    };
+
+    result = await dbWithTransaction.transaction(async (client: DbClient) => {
+        const transactionResult = (await client.query(
+            `SELECT id,
+                    transaction_number,
+                    total_amount,
+                    payment_method,
+                    payment_status,
+                    confirmation_channel,
+                    confirmation_reference,
+                    confirmation_metadata,
+                    completed_at,
+                    created_at,
+                    updated_at
+             FROM transactions
+             WHERE id = $1
+             FOR UPDATE`,
+            [transactionId],
+        )) as DbQueryResult<TransactionRow>;
+
+        const transaction = transactionResult.rows[0];
+        if (!transaction) {
+            throw new ApiError(404, 'Transaction not found', {
+                code: 'transaction_not_found',
+            });
+        }
+
+        const currentStatus = transaction.payment_status
+            ? transaction.payment_status.toString().toUpperCase()
+            : '';
+        if (currentStatus !== 'PAYMENT_UNCERTAIN') {
+            throw new ApiError(409, 'Transaction not uncertain', {
+                code: 'transaction_not_uncertain',
+                status: transaction.payment_status,
+            });
+        }
+
+        const lineItems = await fetchTransactionItems(client, transactionId);
+
+        const mergedMetadata = {
+            ...(transaction.confirmation_metadata ?? {}),
+            ...(metadata ?? {}),
+            reconciliationNotes: notes ?? null,
+            reconciliationOutcome: normalizedAction,
+            reconciledAt: new Date().toISOString(),
+            reconciledBy: actor.id,
+            reconciledByUsername: actor.username
+        } as Record<string, unknown>;
+
+        const updated = (await client.query(
+            `UPDATE transactions
+             SET payment_status = $1,
+                 confirmation_metadata = $2,
+                 completed_at = CASE WHEN $1 = 'COMPLETED' THEN CURRENT_TIMESTAMP ELSE completed_at END,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE id = $3
+             RETURNING id,
+                       transaction_number,
+                       total_amount,
+                       payment_method,
+                       payment_status,
+                       confirmation_channel,
+                       confirmation_reference,
+                       confirmation_metadata,
+                       completed_at,
+                       created_at,
+                       updated_at`,
+            [newStatus, mergedMetadata, transactionId],
+        )) as DbQueryResult<TransactionRow>;
+
+        const updatedTransaction = updated.rows[0];
+        if (!updatedTransaction) {
+            throw new ApiError(500, 'Failed to reconcile transaction', {
+                code: 'reconciliation_persist_failed',
+            });
+        }
+
+        const shouldDeductInventory = newStatus === 'COMPLETED';
+        const deductions: InventoryDeduction[] = [];
+
+        if (shouldDeductInventory) {
+            for (const item of lineItems) {
+                const deduction = await inventory.recordPurchaseDeduction({
+                    productId: item.productId,
+                    quantity: item.quantity,
+                    transactionId,
+                    metadata: {
+                        transactionNumber: updatedTransaction.transaction_number,
+                        subtotal: item.subtotal,
+                        currency: item.currency,
+                        reconciliation: true
+                    },
+                    client,
+                    deferPostProcessing: true,
+                });
+                deductions.push({
+                    ...(deduction as InventoryDeduction),
+                    productId: item.productId,
+                });
+            }
+        }
+
+        return {
+            transaction: updatedTransaction,
+            lineItems,
+            deductions,
+            shouldDeductInventory,
+        } as {
+            transaction: TransactionRow;
+            lineItems: TransactionLineItem[];
+            deductions: InventoryDeduction[];
+            shouldDeductInventory: boolean;
+        };
+    });
+
+    const postCommitSnapshots: InventoryPostCommitSnapshot[] = [];
+    if (result.shouldDeductInventory) {
+        for (const deduction of result.deductions) {
+            if (deduction.trackingEnabled === false) {
+                continue;
+            }
+
+            const snapshot = await inventory.finalizeInventoryPostProcessing({
+                productId: deduction.productId,
+                context: {
+                    source: 'reconciliation',
+                    transactionId: result.transaction.id,
+                    transactionNumber: result.transaction.transaction_number,
+                    shortfall: deduction.shortfall,
+                    delta: deduction.delta,
+                    adminId: actor.id
+                },
+            });
+
+            const postCommit: InventoryPostCommitSnapshot = {
+                productId: deduction.productId,
+                snapshot,
+            };
+            if (deduction.shortfall !== undefined) {
+                postCommit.shortfall = deduction.shortfall;
+            }
+            if (deduction.delta !== undefined) {
+                postCommit.delta = deduction.delta;
+            }
+            postCommitSnapshots.push(postCommit);
+        }
+    }
+
+    const auditAction =
+        normalizedAction === 'CONFIRMED'
+            ? AuditActions.TRANSACTION_RECONCILED_CONFIRMED
+            : AuditActions.TRANSACTION_RECONCILED_REFUNDED;
+
+    const reconciliationAudit = await createAuditLogWithRetry({
+        adminId: actor.id,
+        adminUsername: actor.username,
+        action: auditAction,
+        entityType: EntityTypes.TRANSACTION,
+        entityId: result.transaction.id,
+        oldValues: {
+            status: 'PAYMENT_UNCERTAIN'
+        },
+        newValues: {
+            status: result.transaction.payment_status,
+            reconciliationOutcome: normalizedAction,
+            reconciliationNotes: notes ?? null
+        }
+    });
+
+    if (!reconciliationAudit.succeeded) {
+        console.warn('[Transaction] Reconciliation audit logging failed', {
+            transactionId: result.transaction.id,
+            attempts: reconciliationAudit.attempts
+        });
+    }
+
+    return {
+        transaction: result.transaction,
+        items: result.lineItems,
+        inventory: postCommitSnapshots,
+        inventoryTracking: result.deductions.every(
+            (entry) => entry.trackingEnabled !== false,
+        ),
+        inventoryApplied: result.shouldDeductInventory,
+        audit: {
+            reconciliation: {
+                succeeded: reconciliationAudit.succeeded,
+                attempts: reconciliationAudit.attempts
+            }
+        }
+    };
+};
+
 const transactionService = {
     createTransaction,
     listTransactions,
     getTransactionAudit,
     confirmTransaction,
+    reconcileTransaction,
 };
 
 export { createTransaction };

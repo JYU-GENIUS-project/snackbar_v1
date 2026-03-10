@@ -7,6 +7,7 @@ import {
 } from 'express';
 import { body, validationResult } from 'express-validator';
 
+import { authenticate } from '../middleware/auth';
 import { ApiError } from '../middleware/errorHandler';
 import transactionService from '../services/transactionService';
 
@@ -32,6 +33,12 @@ type TransactionConfirmationPayload = {
     confirmationChannel?: string | null;
     confirmationReference?: string | null;
     confirmationMetadata?: Record<string, unknown> | null;
+};
+
+type TransactionReconcilePayload = {
+    action: string;
+    notes?: string | null;
+    metadata?: Record<string, unknown> | null;
 };
 
 type TransactionResult = Record<string, unknown>;
@@ -94,6 +101,20 @@ const confirmValidation = [
         .optional({ nullable: true })
         .isObject()
         .withMessage('confirmationMetadata must be an object'),
+];
+
+const reconcileValidation = [
+    body('action')
+        .isIn(['CONFIRMED', 'REFUNDED'])
+        .withMessage('action must be CONFIRMED or REFUNDED'),
+    body('notes')
+        .optional({ nullable: true })
+        .isString()
+        .withMessage('notes must be a string'),
+    body('metadata')
+        .optional({ nullable: true })
+        .isObject()
+        .withMessage('metadata must be an object'),
 ];
 
 router.post(
@@ -171,6 +192,9 @@ router.post(
         }
 
         const transactionId = req.params.id;
+        if (!transactionId) {
+            throw new ApiError(400, 'Transaction id is required');
+        }
         const payload = req.body as TransactionConfirmationPayload;
 
         const confirmTransaction =
@@ -202,6 +226,7 @@ router.post(
 
 router.get(
     '/',
+    authenticate as unknown as RequestHandler,
     asyncHandler(async (req, res) => {
         const listTransactions =
             transactionService.listTransactions as (params: {
@@ -214,36 +239,39 @@ router.get(
                 kioskSessionId?: string;
             }) => Promise<Record<string, unknown>>;
 
-        const result = await listTransactions({
-            status:
-                typeof req.query.status === 'string'
-                    ? req.query.status
-                    : undefined,
-            page:
-                typeof req.query.page === 'string'
-                    ? Number(req.query.page)
-                    : undefined,
-            pageSize:
-                typeof req.query.pageSize === 'string'
-                    ? Number(req.query.pageSize)
-                    : undefined,
-            startDate:
-                typeof req.query.startDate === 'string'
-                    ? req.query.startDate
-                    : undefined,
-            endDate:
-                typeof req.query.endDate === 'string'
-                    ? req.query.endDate
-                    : undefined,
-            reference:
-                typeof req.query.reference === 'string'
-                    ? req.query.reference
-                    : undefined,
-            kioskSessionId:
-                typeof req.query.kioskSessionId === 'string'
-                    ? req.query.kioskSessionId
-                    : undefined,
-        });
+        const listPayload: {
+            status?: string;
+            page?: number;
+            pageSize?: number;
+            startDate?: string;
+            endDate?: string;
+            reference?: string;
+            kioskSessionId?: string;
+        } = {};
+
+        if (typeof req.query.status === 'string') {
+            listPayload.status = req.query.status;
+        }
+        if (typeof req.query.page === 'string') {
+            listPayload.page = Number(req.query.page);
+        }
+        if (typeof req.query.pageSize === 'string') {
+            listPayload.pageSize = Number(req.query.pageSize);
+        }
+        if (typeof req.query.startDate === 'string') {
+            listPayload.startDate = req.query.startDate;
+        }
+        if (typeof req.query.endDate === 'string') {
+            listPayload.endDate = req.query.endDate;
+        }
+        if (typeof req.query.reference === 'string') {
+            listPayload.reference = req.query.reference;
+        }
+        if (typeof req.query.kioskSessionId === 'string') {
+            listPayload.kioskSessionId = req.query.kioskSessionId;
+        }
+
+        const result = await listTransactions(listPayload);
 
         res.status(200).json({
             success: true,
@@ -255,8 +283,12 @@ router.get(
 
 router.get(
     '/:id/audit',
+    authenticate as unknown as RequestHandler,
     asyncHandler(async (req, res) => {
         const transactionId = req.params.id;
+        if (!transactionId) {
+            throw new ApiError(400, 'Transaction id is required');
+        }
         const getAudit = transactionService.getTransactionAudit as (params: {
             transactionId: string;
         }) => Promise<Record<string, unknown>>;
@@ -266,6 +298,56 @@ router.get(
         res.status(200).json({
             success: true,
             message: 'Transaction audit retrieved',
+            data: result,
+        });
+    }),
+);
+
+router.post(
+    '/:id/reconcile',
+    authenticate as unknown as RequestHandler,
+    reconcileValidation,
+    asyncHandler(async (req, res) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            throw new ApiError(400, 'Validation failed', {
+                errors: errors.array(),
+            });
+        }
+
+        const transactionId = req.params.id;
+        if (!transactionId) {
+            throw new ApiError(400, 'Transaction id is required');
+        }
+        const payload = req.body as TransactionReconcilePayload;
+
+        const reconcileTransaction =
+            (transactionService as {
+                reconcileTransaction: (params: {
+                    transactionId: string;
+                    action: string;
+                    notes?: string | null;
+                    metadata?: Record<string, unknown> | null;
+                    actor: { id: string; username: string };
+                }) => Promise<TransactionResult>;
+            }).reconcileTransaction;
+
+        const actor = req.user as { id: string; username: string } | undefined;
+        if (!actor) {
+            throw new ApiError(401, 'Authentication required');
+        }
+
+        const result = await reconcileTransaction({
+            transactionId,
+            action: payload.action,
+            notes: payload.notes ?? null,
+            metadata: payload.metadata ?? null,
+            actor,
+        });
+
+        res.status(200).json({
+            success: true,
+            message: 'Transaction reconciled',
             data: result,
         });
     }),

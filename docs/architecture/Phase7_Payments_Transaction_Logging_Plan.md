@@ -12,7 +12,7 @@ Deliver kiosk-driven manual payment confirmation with reliable transaction loggi
 - [x] Phase 2 - Confirmation Persistence & Inventory Side Effects (completed 2026-03-10)
 - [x] Phase 3 - Audit Logging & Retry/Backoff (completed 2026-03-10)
 - [x] Phase 4 - Downtime Handling & Customer Guidance (completed 2026-03-10)
-- [ ] Phase 5 - Admin Reconciliation & Transaction Queries
+- [x] Phase 5 - Admin Reconciliation & Transaction Queries (completed 2026-03-10)
 - [ ] Phase 6 - Kiosk Integration With Confirmation API
 - [ ] Phase 7 - Observability, Metrics, and Monitoring Hooks
 - [ ] Phase 8 - Validation & Regression Coverage
@@ -221,6 +221,8 @@ Deliver kiosk-driven manual payment confirmation with reliable transaction loggi
 
 **Goal:** Provide admin reconciliation flows for `PAYMENT_UNCERTAIN` outcomes.
 
+**Status:** Completed 2026-03-10
+
 #### Phase 5 Tasks
 
 1. Provide transaction list filtering by `PAYMENT_UNCERTAIN`, `FAILED`, `PENDING`, `COMPLETED`.
@@ -237,6 +239,11 @@ Deliver kiosk-driven manual payment confirmation with reliable transaction loggi
 
 - customer_payment_checkout.robot (US-015-Edge) admin reconciliation scenarios.
 - system_integration_communication.robot (US-068) status transition logging.
+
+#### Phase 5 Completion evidence
+
+- Added reconciliation endpoint and auth guard in [server/src/routes/transactions.ts](server/src/routes/transactions.ts)
+- Added reconciliation processing and audit logging in [server/src/services/transactionService.ts](server/src/services/transactionService.ts)
 
 ---
 
