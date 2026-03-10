@@ -168,6 +168,15 @@ const isTransientDbError = (error: unknown) => {
     );
 };
 
+const logStructuredEvent = (event: string, payload: Record<string, unknown>) => {
+    const entry = {
+        event,
+        timestamp: new Date().toISOString(),
+        ...payload
+    };
+    console.info('[Transaction]', JSON.stringify(entry));
+};
+
 const fetchProductsForItems = async (
     client: DbClient,
     items: TransactionItemInput[],
@@ -881,6 +890,20 @@ const confirmTransaction = async ({
         });
     }
 
+    logStructuredEvent('transaction.confirmation_processed', {
+        transactionId: result.transaction.id,
+        transactionNumber: result.transaction.transaction_number,
+        status: result.transaction.payment_status,
+        confirmationReference: result.transaction.confirmation_reference,
+        confirmationChannel: result.transaction.confirmation_channel,
+        declaredTender: declaredTender ?? null,
+        auditAttempts: {
+            confirmationAttempt: attemptAudit.attempts,
+            confirmationOutcome: outcomeAudit.attempts
+        },
+        inventoryApplied: result.shouldDeductInventory
+    });
+
     return {
         transaction: result.transaction,
         items: result.lineItems,
@@ -1128,6 +1151,17 @@ const reconcileTransaction = async ({
             attempts: reconciliationAudit.attempts
         });
     }
+
+    logStructuredEvent('transaction.reconciled', {
+        transactionId: result.transaction.id,
+        transactionNumber: result.transaction.transaction_number,
+        status: result.transaction.payment_status,
+        reconciliationOutcome: normalizedAction,
+        reconciliationNotes: notes ?? null,
+        reconciledBy: actor.id,
+        auditAttempts: reconciliationAudit.attempts,
+        inventoryApplied: result.shouldDeductInventory
+    });
 
     return {
         transaction: result.transaction,
