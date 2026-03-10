@@ -39,6 +39,15 @@ Comprehensive Robot Framework acceptance test suite created for the Snackbar Sel
 11. **system_technical_security.robot** - 15 tests (US-059 to US-063)
 12. **system_integration_communication.robot** - 15 tests (US-064 to US-068)
 
+### Phase 6.5 Manual Confirmation UX Prerequisite Status
+
+- **Implementation status**: The Issue #24 prerequisite UX slice is implemented across the Phase 6.5 UX contract, kiosk checkout UI, and Phase 7 backend handoff documentation.
+- **Primary customer acceptance owner**: `customer_payment_checkout.robot` remains the authoritative suite for the manual confirmation prompt, kiosk confirmation CTA, and success/failure/uncertain outcome states (US-011 through US-015).
+- **Timer overlap owner**: `customer_shopping_cart.robot` remains the authoritative suite for cart inactivity reset, warning, and auto-clear behavior that must continue to hold while the manual confirmation modal is active (US-010, US-010-Edge, US-010-Boundary).
+- **Monitoring/performance owner**: `admin_monitoring_troubleshooting.robot` continues to own prompt-display timing and confirmation prompt quality checks used by the Phase 6.5 UX contract (US-057, US-058).
+- **Selector and hook contract**: The current prerequisite baseline aligns to `manual-confirmation-modal`, `confirm-payment-button`, `payment-success-message`, `payment-error-message`, `payment-uncertain-message`, `retry-payment-button`, `cancel-payment-button`, and the browser hooks `window.simulateManualConfirmationSuccess()`, `window.simulateManualConfirmationFailure()`, and `window.simulateManualConfirmationPending()`.
+- **Execution note**: Acceptance ownership and documentation are now aligned for the prerequisite slice; durable confirmation persistence, retry backoff, admin notifications, and reconciliation remain Phase 7 implementation work.
+
 #### By Priority
 
 - **High Priority User Stories**: All 68 user stories covered
@@ -152,7 +161,7 @@ Comprehensive Robot Framework acceptance test suite created for the Snackbar Sel
 
 ### Configuration
 
-**requirements.txt**
+#### requirements.txt
 
 - robotframework >= 6.1.0
 - robotframework-seleniumlibrary >= 6.1.0
@@ -234,7 +243,7 @@ All tests successfully validated using `robot --dryrun`:
 
 ## Repository Structure
 
-```
+```text
 snackbar/
 ├── reqeng/
 │   ├── user_stories.md
@@ -270,7 +279,7 @@ This Robot Framework test suite provides comprehensive automated acceptance test
 
 ---
 **Created**: 2025-11-14  
-**Updated**: 2025-11-28  
+**Updated**: 2026-03-09  
 **Author**: Senior Test Automation Engineer (GitHub Copilot Agent)  
-**Version**: 2.0  
+**Version**: 2.1  
 **Status**: Ready for execution

@@ -12,6 +12,9 @@ const TEST_CONTROL_STORAGE_KEY = 'snackbar-test-controls';
 const TEST_CONTROL_ALLOWED_STATUSES = new Set(['open', 'closed', 'maintenance']);
 const CART_TIMEOUT_MS = 5 * 60 * 1000;
 const CART_WARNING_MS = 30 * 1000;
+const CONFIRMATION_TIMEOUT_MS = 60 * 1000;
+const SUCCESS_MESSAGE_MIN_DURATION_MS = 3 * 1000;
+const ADMIN_SUPPORT_EMAIL = 'support@snackbar.local';
 
 const TRUST_MODE_STORAGE_KEY = 'snackbar-trust-mode-disabled';
 const OUT_OF_STOCK_DIALOG_TITLE_ID = 'kiosk-out-of-stock-title';
@@ -75,11 +78,16 @@ type StatusOverlay = {
     lastUpdated?: string | null;
 };
 
+type ManualConfirmationState = 'prompt' | 'pending' | 'success' | 'failure' | 'uncertain';
+
 declare global {
     interface Window {
         snackbarApplyTestControls?: (update: unknown) => void;
         snackbarDebugReadTestControls?: () => KioskTestControls;
         snackbarCurrentTestControls?: KioskTestControls;
+        simulateManualConfirmationSuccess?: () => void;
+        simulateManualConfirmationFailure?: () => void;
+        simulateManualConfirmationPending?: () => void;
     }
 }
 
@@ -346,6 +354,33 @@ const formatRelativeTimestamp = (isoValue?: string | null): string | null => {
 const formatPrice = (value: number | string | null | undefined) => `${Number(value ?? 0).toFixed(2)}€`;
 const toCents = (value: number | string | null | undefined) => Math.round(Number(value ?? 0) * 100);
 const formatPriceFromCents = (cents: number) => `${(cents / 100).toFixed(2)}€`;
+const formatDuration = (milliseconds: number) => {
+    const totalSeconds = Math.max(0, Math.ceil(milliseconds / 1000));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+};
+
+const formatConfirmationTimeoutLabel = (milliseconds: number) => {
+    const totalSeconds = Math.max(0, Math.ceil(milliseconds / 1000));
+    return totalSeconds === 1 ? '1 second' : `${totalSeconds} seconds`;
+};
+
+const createConfirmationReference = () => {
+    const compactTimestamp = new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14);
+    const suffix = Math.random().toString(36).slice(2, 6).toUpperCase();
+    return `CONF-${compactTimestamp}-${suffix}`;
+};
+
+const listPurchasedItems = (items: CartItem[]) => {
+    if (items.length === 0) {
+        return 'No items in cart';
+    }
+
+    return items
+        .map((item) => `${item.name}${item.quantity > 1 ? ` x${item.quantity}` : ''}`)
+        .join(', ');
+};
 const DEFAULT_PRODUCT_IMAGE = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300"><rect width="400" height="300" fill="%23e5e7eb"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="%236b7280" font-size="28">No Image</text></svg>';
 const REQUIRED_CUSTOMER_FILTERS = [
     { name: 'Hot Drinks', id: 'virtual-hot-drinks' }
@@ -794,11 +829,18 @@ const KioskApp = () => {
     const [selectedCategory, setSelectedCategory] = useState<string>('All Products');
     const [cartOpen, setCartOpen] = useState(false);
     const [checkoutVisible, setCheckoutVisible] = useState(false);
+    const [checkoutPromptReady, setCheckoutPromptReady] = useState(false);
+    const [checkoutReferenceCode, setCheckoutReferenceCode] = useState('');
+    const [manualConfirmationState, setManualConfirmationState] = useState<ManualConfirmationState>('prompt');
+    const [cartCountdownMs, setCartCountdownMs] = useState(CART_TIMEOUT_MS);
+    const [confirmationCountdownMs, setConfirmationCountdownMs] = useState(CONFIRMATION_TIMEOUT_MS);
     const [toastMessage, setToastMessage] = useState('');
     const [limitMessage, setLimitMessage] = useState('');
     const [cartTimeoutWarning, setCartTimeoutWarning] = useState(false);
     const cartTimeoutRef = useRef<number | null>(null);
     const cartWarningRef = useRef<number | null>(null);
+    const cartDeadlineRef = useRef<number | null>(null);
+    const confirmationDeadlineRef = useRef<number | null>(null);
     const ignoreActivityUntilRef = useRef<number>(0);
     const {
         cart,
@@ -809,6 +851,11 @@ const KioskApp = () => {
         hydrateFromProducts
     } = useCart();
     const hasCartItems = cart.length > 0;
+    const cartCount = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart]);
+    const cartTotalCents = useMemo(
+        () => cart.reduce((sum, item) => sum + toCents(item.price) * item.quantity, 0),
+        [cart]
+    );
     const [outOfStockPrompt, setOutOfStockPrompt] = useState<NormalizedProduct | null>(null);
     const [selectedProduct, setSelectedProduct] = useState<NormalizedProduct | null>(null);
     const outOfStockDialogRef = useRef<HTMLDivElement | null>(null);
@@ -822,6 +869,29 @@ const KioskApp = () => {
     const previousCheckoutFocusRef = useRef<HTMLElement | null>(null);
     const inventoryWarningLoggedRef = useRef(false);
     const categoryFilterTimingRef = useRef<{ category: string; startedAt: number } | null>(null);
+
+    const finalizeManualConfirmationState = useCallback((nextState: Exclude<ManualConfirmationState, 'prompt'>) => {
+        setCheckoutPromptReady(false);
+        setManualConfirmationState(nextState);
+
+        const basePayload = {
+            confirmationReference: checkoutReferenceCode || null,
+            cartSize: cart.length,
+            totalEuros: Number.isFinite(cartTotalCents) ? Number((cartTotalCents / 100).toFixed(2)) : 0
+        };
+
+        if (nextState === 'success') {
+            logKioskEvent('kiosk.manual_confirmation_completed', basePayload);
+            return;
+        }
+
+        if (nextState === 'failure') {
+            logKioskEvent('kiosk.manual_confirmation_failed', basePayload);
+            return;
+        }
+
+        logKioskEvent('kiosk.manual_confirmation_uncertain', basePayload);
+    }, [cart.length, cartTotalCents, checkoutReferenceCode]);
 
     const markCategoryFilterSelection = (category: string) => {
         if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
@@ -911,7 +981,12 @@ const KioskApp = () => {
 
         previousCheckoutFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
         const primaryButton = checkoutPrimaryActionRef.current;
-        if (primaryButton && typeof primaryButton.focus === 'function') {
+        if (
+            manualConfirmationState === 'prompt'
+            && primaryButton
+            && !primaryButton.disabled
+            && typeof primaryButton.focus === 'function'
+        ) {
             primaryButton.focus({ preventScroll: true });
             return;
         }
@@ -919,7 +994,18 @@ const KioskApp = () => {
         if (dialogNode && typeof dialogNode.focus === 'function') {
             dialogNode.focus({ preventScroll: true });
         }
-    }, [checkoutVisible]);
+    }, [checkoutVisible, manualConfirmationState]);
+
+    useEffect(() => {
+        if (!checkoutVisible || !checkoutPromptReady || manualConfirmationState !== 'prompt') {
+            return;
+        }
+
+        const primaryButton = checkoutPrimaryActionRef.current;
+        if (primaryButton && !primaryButton.disabled && typeof primaryButton.focus === 'function') {
+            primaryButton.focus({ preventScroll: true });
+        }
+    }, [checkoutPromptReady, checkoutVisible, manualConfirmationState]);
 
     useEffect(() => {
         if (trackingDisabled && !inventoryWarningLoggedRef.current) {
@@ -1076,12 +1162,6 @@ const KioskApp = () => {
             window.removeEventListener('focus', handleFocus);
         };
     }, [refetch]);
-
-    const cartCount = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart]);
-    const cartTotalCents = useMemo(
-        () => cart.reduce((sum, item) => sum + toCents(item.price) * item.quantity, 0),
-        [cart]
-    );
 
     const addProductToCart = async (product: NormalizedProduct) => {
         const existing = cart.find((item) => item.id === product.id);
@@ -1334,6 +1414,80 @@ const KioskApp = () => {
         return Math.min(CART_WARNING_MS, resolvedCartTimeoutMs);
     }, [resolvedCartTimeoutMs, testControls.cartWarningLeadMs]);
 
+    useEffect(() => {
+        if (typeof window === 'undefined' || !checkoutVisible) {
+            setCheckoutPromptReady(false);
+            return undefined;
+        }
+
+        setCheckoutPromptReady(false);
+        const timer = window.setTimeout(() => {
+            setCheckoutPromptReady(true);
+        }, 150);
+
+        return () => {
+            window.clearTimeout(timer);
+        };
+    }, [checkoutVisible, checkoutReferenceCode]);
+
+    useEffect(() => {
+        if (!checkoutVisible) {
+            confirmationDeadlineRef.current = null;
+            setConfirmationCountdownMs(CONFIRMATION_TIMEOUT_MS);
+            return;
+        }
+
+        confirmationDeadlineRef.current = Date.now() + CONFIRMATION_TIMEOUT_MS;
+        setConfirmationCountdownMs(CONFIRMATION_TIMEOUT_MS);
+    }, [checkoutVisible, manualConfirmationState]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') {
+            return undefined;
+        }
+
+        if (!hasCartItems && !checkoutVisible) {
+            return undefined;
+        }
+
+        const updateCountdowns = () => {
+            if (cartDeadlineRef.current) {
+                setCartCountdownMs(Math.max(0, cartDeadlineRef.current - Date.now()));
+            } else {
+                setCartCountdownMs(resolvedCartTimeoutMs);
+            }
+
+            if (checkoutVisible && confirmationDeadlineRef.current) {
+                setConfirmationCountdownMs(Math.max(0, confirmationDeadlineRef.current - Date.now()));
+            } else {
+                setConfirmationCountdownMs(CONFIRMATION_TIMEOUT_MS);
+            }
+        };
+
+        updateCountdowns();
+        const interval = window.setInterval(updateCountdowns, 250);
+
+        return () => {
+            window.clearInterval(interval);
+        };
+    }, [checkoutVisible, hasCartItems, resolvedCartTimeoutMs]);
+
+    useEffect(() => {
+        if (!checkoutVisible) {
+            return;
+        }
+
+        if (manualConfirmationState !== 'prompt' && manualConfirmationState !== 'pending') {
+            return;
+        }
+
+        if (confirmationCountdownMs > 0) {
+            return;
+        }
+
+        finalizeManualConfirmationState('uncertain');
+    }, [checkoutVisible, confirmationCountdownMs, finalizeManualConfirmationState, manualConfirmationState]);
+
     const resetCartTimeout = useCallback(() => {
         if (cartTimeoutRef.current) {
             window.clearTimeout(cartTimeoutRef.current);
@@ -1344,12 +1498,16 @@ const KioskApp = () => {
         setCartTimeoutWarning(false);
 
         if (!hasCartItems) {
+            cartDeadlineRef.current = null;
+            setCartCountdownMs(resolvedCartTimeoutMs);
             return;
         }
 
         const totalTimeout = resolvedCartTimeoutMs;
         const warningLead = Math.min(resolvedCartWarningLeadMs, totalTimeout);
         ignoreActivityUntilRef.current = 0;
+        cartDeadlineRef.current = Date.now() + totalTimeout;
+        setCartCountdownMs(totalTimeout);
 
         if (warningLead > 0 && warningLead < totalTimeout) {
             cartWarningRef.current = window.setTimeout(() => {
@@ -1363,6 +1521,9 @@ const KioskApp = () => {
                 cartSize: cart.length,
                 timeoutMs: totalTimeout
             });
+            confirmationDeadlineRef.current = null;
+            setManualConfirmationState('prompt');
+            setCheckoutReferenceCode('');
             void clearCart();
             setCartOpen(false);
             setToastMessage('Cart cleared due to inactivity.');
@@ -1381,6 +1542,7 @@ const KioskApp = () => {
             if (cartWarningRef.current) {
                 window.clearTimeout(cartWarningRef.current);
             }
+            cartDeadlineRef.current = null;
             setCartTimeoutWarning(false);
             return undefined;
         }
@@ -1417,12 +1579,54 @@ const KioskApp = () => {
             });
             return;
         }
+        const referenceCode = createConfirmationReference();
+        setCheckoutReferenceCode(referenceCode);
+        setManualConfirmationState('prompt');
+        setCheckoutPromptReady(false);
         setCheckoutVisible(true);
         setCartOpen(false);
         setToastMessage('');
+        resetCartTimeout();
         logKioskEvent('kiosk.checkout_started', {
             cartSize: cart.length,
+            totalEuros: Number.isFinite(cartTotalCents) ? Number((cartTotalCents / 100).toFixed(2)) : 0,
+            confirmationReference: referenceCode
+        });
+    };
+
+    const dismissCheckoutPrompt = (reason: 'backdrop' | 'cancel') => {
+        setCheckoutVisible(false);
+        setManualConfirmationState('prompt');
+        setCheckoutPromptReady(false);
+        confirmationDeadlineRef.current = null;
+        setConfirmationCountdownMs(CONFIRMATION_TIMEOUT_MS);
+        resetCartTimeout();
+        logKioskEvent('kiosk.manual_confirmation_dismissed', {
+            reason,
+            confirmationReference: checkoutReferenceCode || null,
+            cartSize: cart.length
+        });
+    };
+
+    const handleConfirmPayment = () => {
+        setManualConfirmationState('pending');
+        resetCartTimeout();
+        logKioskEvent('kiosk.manual_confirmation_prompt_acknowledged', {
+            confirmationReference: checkoutReferenceCode || null,
+            cartSize: cart.length,
             totalEuros: Number.isFinite(cartTotalCents) ? Number((cartTotalCents / 100).toFixed(2)) : 0
+        });
+    };
+
+    const handleRetryPayment = () => {
+        setManualConfirmationState('prompt');
+        setCheckoutPromptReady(true);
+        confirmationDeadlineRef.current = Date.now() + CONFIRMATION_TIMEOUT_MS;
+        setConfirmationCountdownMs(CONFIRMATION_TIMEOUT_MS);
+        resetCartTimeout();
+        logKioskEvent('kiosk.manual_confirmation_retry_requested', {
+            confirmationReference: checkoutReferenceCode || null,
+            cartSize: cart.length
         });
     };
 
@@ -1443,8 +1647,56 @@ const KioskApp = () => {
     useEffect(() => {
         if (!hasCartItems) {
             setCheckoutVisible(false);
+            setManualConfirmationState('prompt');
+            setCheckoutReferenceCode('');
+            confirmationDeadlineRef.current = null;
+            setConfirmationCountdownMs(CONFIRMATION_TIMEOUT_MS);
         }
     }, [hasCartItems]);
+
+    useEffect(() => {
+        if (!checkoutVisible || !checkoutPromptReady) {
+            return;
+        }
+
+        resetCartTimeout();
+        logKioskEvent('kiosk.manual_confirmation_prompt_ready', {
+            confirmationReference: checkoutReferenceCode || null,
+            cartSize: cart.length
+        });
+    }, [cart.length, checkoutPromptReady, checkoutReferenceCode, checkoutVisible, resetCartTimeout]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') {
+            return undefined;
+        }
+
+        window.simulateManualConfirmationSuccess = () => finalizeManualConfirmationState('success');
+        window.simulateManualConfirmationFailure = () => finalizeManualConfirmationState('failure');
+        window.simulateManualConfirmationPending = () => finalizeManualConfirmationState('uncertain');
+
+        return () => {
+            delete window.simulateManualConfirmationSuccess;
+            delete window.simulateManualConfirmationFailure;
+            delete window.simulateManualConfirmationPending;
+        };
+    }, [finalizeManualConfirmationState]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined' || manualConfirmationState !== 'success') {
+            return undefined;
+        }
+
+        const timer = window.setTimeout(() => {
+            confirmationDeadlineRef.current = null;
+            setCheckoutReferenceCode('');
+            void clearCart();
+        }, SUCCESS_MESSAGE_MIN_DURATION_MS);
+
+        return () => {
+            window.clearTimeout(timer);
+        };
+    }, [clearCart, manualConfirmationState]);
 
     useEffect(() => {
         if (typeof window === 'undefined') {
@@ -1900,55 +2152,184 @@ const KioskApp = () => {
                     role="presentation"
                     onClick={(event) => {
                         if (event.target === event.currentTarget) {
-                            setCheckoutVisible(false);
+                            dismissCheckoutPrompt('backdrop');
                         }
                     }}
                 >
                     <div
-                        id="checkout-dialog"
-                        className="checkout-dialog"
+                        id="manual-confirmation-modal"
+                        className="checkout-dialog manual-confirmation-modal"
                         role="dialog"
                         aria-modal="true"
-                        aria-labelledby="checkout-dialog-title"
+                        aria-labelledby="manual-confirmation-title"
+                        aria-describedby="manual-confirmation-description"
                         tabIndex={-1}
                         ref={checkoutDialogRef}
                     >
-                        <h2 id="checkout-dialog-title" className="dialog-title">Complete your purchase</h2>
-                        <p className="dialog-message">Scan the code or choose a payment option.</p>
-                        <div
-                            id="payment-qr-code"
-                            className="payment-qr-code"
-                            role="img"
-                            aria-label="QR code to complete payment"
-                        />
-                        <div className="checkout-summary">
-                            <span className="checkout-total-label">Total due</span>
-                            <span className="checkout-total-amount">{formatPriceFromCents(cartTotalCents)}</span>
+                        <div className="manual-confirmation-header">
+                            <h2 id="manual-confirmation-title" className="dialog-title">Confirm your payment</h2>
+                            <p id="manual-confirmation-description" className="dialog-message manual-confirmation-message">
+                                Confirm your payment on this kiosk after completing payment with your preferred method.
+                                Show receipt to staff if requested.
+                            </p>
                         </div>
-                        <div className="checkout-actions">
-                            <button
-                                type="button"
-                                className="payment-action-button"
-                                ref={checkoutPrimaryActionRef}
-                                onClick={() => logKioskEvent('kiosk.payment_action_selected', { action: 'mobile-pay' })}
+
+                        {trackingDisabled && (
+                            <div className="manual-confirmation-warning" role="status" aria-live="polite">
+                                ⚠️ Inventory tracking is disabled. Verify the items are in the cabinet before confirming payment.
+                            </div>
+                        )}
+
+                        {(manualConfirmationState === 'prompt' || manualConfirmationState === 'pending') && (
+                            <>
+                                <div className="manual-confirmation-payment-panel">
+                                    <div
+                                        id="payment-qr-code"
+                                        className={`payment-qr-code${checkoutPromptReady ? '' : ' loading'}`}
+                                        role="img"
+                                        aria-label="QR code to complete payment"
+                                    >
+                                        <span className="payment-qr-status">
+                                            {checkoutPromptReady ? 'Payment area ready' : 'Preparing payment area…'}
+                                        </span>
+                                    </div>
+                                    <div className="manual-confirmation-reference-block" aria-live="polite">
+                                        <span className="manual-confirmation-reference-label">Confirmation reference</span>
+                                        <strong className="manual-confirmation-reference-code">{checkoutReferenceCode}</strong>
+                                    </div>
+                                </div>
+
+                                {manualConfirmationState === 'pending' && (
+                                    <div className="manual-confirmation-status-panel pending" role="status" aria-live="polite">
+                                        <strong>Waiting for confirmation…</strong>
+                                        <span>Manual confirmation is being checked. Keep this screen visible until an outcome is shown.</span>
+                                    </div>
+                                )}
+
+                                <div className="checkout-summary manual-confirmation-summary">
+                                    <span className="checkout-total-label">Total due</span>
+                                    <span className="checkout-total-amount">{formatPriceFromCents(cartTotalCents)}</span>
+                                </div>
+
+                                <div className="manual-confirmation-timers" role="status" aria-live="polite">
+                                    <div className="manual-confirmation-timer-row">
+                                        <span className="manual-confirmation-timer-label">Cart clears after inactivity</span>
+                                        <span className="manual-confirmation-timer-value">{formatDuration(cartCountdownMs)}</span>
+                                    </div>
+                                    <div className="manual-confirmation-timer-row">
+                                        <span className="manual-confirmation-timer-label">Confirmation timeout</span>
+                                        <span className="manual-confirmation-timer-value">{formatConfirmationTimeoutLabel(confirmationCountdownMs)}</span>
+                                    </div>
+                                    {cartTimeoutWarning && (
+                                        <div className="manual-confirmation-timer-warning">
+                                            Cart will clear soon due to inactivity. Tap any action to keep this session active.
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="checkout-actions manual-confirmation-actions">
+                                    <button
+                                        id="confirm-payment-button"
+                                        type="button"
+                                        className="payment-action-button primary"
+                                        ref={checkoutPrimaryActionRef}
+                                        onClick={handleConfirmPayment}
+                                        disabled={!checkoutPromptReady || manualConfirmationState === 'pending'}
+                                        aria-disabled={!checkoutPromptReady || manualConfirmationState === 'pending'}
+                                    >
+                                        {manualConfirmationState === 'pending' ? 'Checking payment…' : 'I have paid'}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="payment-action-button secondary"
+                                        onClick={() => dismissCheckoutPrompt('cancel')}
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </>
+                        )}
+
+                        {manualConfirmationState === 'success' && (
+                            <div
+                                id="payment-success-message"
+                                className="manual-confirmation-outcome success"
+                                role="status"
+                                aria-live="polite"
                             >
-                                Pay with mobile
-                            </button>
-                            <button
-                                type="button"
-                                className="payment-action-button"
-                                onClick={() => logKioskEvent('kiosk.payment_action_selected', { action: 'print-receipt' })}
+                                <div className="manual-confirmation-outcome-icon" aria-hidden="true">✅</div>
+                                <h3>Payment Complete</h3>
+                                <p>Your payment has been confirmed. You may take your items.</p>
+                                <div className="manual-confirmation-outcome-details">
+                                    <span><strong>Items:</strong> {listPurchasedItems(cart)}</span>
+                                    <span><strong>Total:</strong> {formatPriceFromCents(cartTotalCents)}</span>
+                                    <span><strong>Reference:</strong> {checkoutReferenceCode}</span>
+                                </div>
+                            </div>
+                        )}
+
+                        {manualConfirmationState === 'failure' && (
+                            <div
+                                id="payment-error-message"
+                                className="manual-confirmation-outcome failure"
+                                role="alert"
+                                aria-live="assertive"
                             >
-                                Print receipt
-                            </button>
-                            <button
-                                type="button"
-                                className="payment-action-button secondary"
-                                onClick={() => setCheckoutVisible(false)}
+                                <div className="manual-confirmation-outcome-icon" aria-hidden="true">❌</div>
+                                <h3>Payment Failed</h3>
+                                <p>We could not verify your payment. Your cart is still intact and inventory has not been deducted.</p>
+                                <div className="manual-confirmation-outcome-details">
+                                    <span><strong>Items:</strong> {listPurchasedItems(cart)}</span>
+                                    <span><strong>Total:</strong> {formatPriceFromCents(cartTotalCents)}</span>
+                                    <span><strong>Reference:</strong> {checkoutReferenceCode}</span>
+                                </div>
+                                <div className="checkout-actions manual-confirmation-actions">
+                                    <button
+                                        id="retry-payment-button"
+                                        type="button"
+                                        className="payment-action-button primary"
+                                        onClick={handleRetryPayment}
+                                    >
+                                        Try Again
+                                    </button>
+                                    <button
+                                        id="cancel-payment-button"
+                                        type="button"
+                                        className="payment-action-button secondary"
+                                        onClick={() => dismissCheckoutPrompt('cancel')}
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {manualConfirmationState === 'uncertain' && (
+                            <div
+                                id="payment-uncertain-message"
+                                className="manual-confirmation-outcome uncertain"
+                                role="alert"
+                                aria-live="assertive"
                             >
-                                Cancel
-                            </button>
-                        </div>
+                                <div className="manual-confirmation-outcome-icon" aria-hidden="true">⚠️</div>
+                                <h3>Manual confirmation pending</h3>
+                                <p>Payment processor error. If you were charged, you may take your items while staff reviews this purchase.</p>
+                                <div className="manual-confirmation-outcome-details">
+                                    <span><strong>Reference:</strong> {checkoutReferenceCode}</span>
+                                    <span><strong>Total:</strong> {formatPriceFromCents(cartTotalCents)}</span>
+                                    <span><strong>Contact:</strong> {ADMIN_SUPPORT_EMAIL}</span>
+                                </div>
+                                <div className="checkout-actions manual-confirmation-actions">
+                                    <button
+                                        type="button"
+                                        className="payment-action-button secondary"
+                                        onClick={() => dismissCheckoutPrompt('cancel')}
+                                    >
+                                        Close
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

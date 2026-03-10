@@ -1,8 +1,8 @@
 <!-- markdownlint-disable MD013 -->
 # Traceability Audit Report
 
-**Date:** 2025-11-25  
-**Audit Scope:** User Stories (US-001 to US-068) to Test Cases  
+**Date:** 2026-03-09  
+**Audit Scope:** User Stories (US-001 to US-068) to Test Cases, plus Phase 6.5 manual confirmation prerequisite artifacts  
 **Status:** ✅ PASSED - 100% Coverage
 
 ---
@@ -10,6 +10,8 @@
 ## Executive Summary
 
 This report documents the traceability audit between user stories defined in `reqeng/user_stories.md` and Robot Framework test cases in the `tests/` directory. The audit verified that every user story has corresponding test coverage.
+
+This audit also reconfirms that the Phase 6.5 manual confirmation prerequisite work for Issue #24 is traceable across the current UX contract, kiosk implementation surfaces, backend handoff documentation, and the acceptance suites that Phase 7 will inherit.
 
 ### Key Findings
 
@@ -37,6 +39,30 @@ User stories were considered covered if their ID appeared in either:
 - `[Tags]` section of a test case
 - `[Documentation]` section of a test case
 - Test case name (e.g., `US-019: Secure Admin Login...`)
+
+For the Phase 6.5 addendum, FR-2.5 and FR-3.x requirements were considered traceable when the requirement could be followed through all of the following layers:
+
+- authoritative UX or backend handoff documentation under `docs/architecture/`
+- implemented or designated production surfaces in the kiosk/backend codebase
+- an owning acceptance or system-validation suite under `tests/acceptance/`
+
+---
+
+## Phase 6.5 Manual Confirmation Addendum
+
+| Requirement | Phase 6.5 artifact(s) | Owning validation | Status |
+| --- | --- | --- | --- |
+| FR-2.5, FR-2.5.2 | `docs/architecture/Phase6_5_Manual_Confirmation_UX_Contract.md`; `client/src/components/KioskApp.tsx` timer overlap logic and cart activity reset behavior | `tests/acceptance/customer_shopping_cart.robot` (US-010, US-010-Edge, US-010-Boundary) | ✅ Traced |
+| FR-3.1, FR-3.2 | `docs/architecture/Phase6_5_Manual_Confirmation_UX_Contract.md`; `client/src/components/KioskApp.tsx`; `client/src/styles.css` modal and CTA hierarchy | `tests/acceptance/customer_payment_checkout.robot` (US-011, US-012); `tests/acceptance/admin_monitoring_troubleshooting.robot` (US-057) | ✅ Traced |
+| FR-3.4 | `docs/architecture/Phase6_5_Manual_Confirmation_UX_Contract.md`; `client/src/components/KioskApp.tsx` success state | `tests/acceptance/customer_payment_checkout.robot` (US-013) | ✅ Traced |
+| FR-3.5, FR-3.5.1, FR-3.5.2 | `docs/architecture/Phase6_5_Manual_Confirmation_UX_Contract.md`; `client/src/components/KioskApp.tsx` failure and uncertain states plus confirmation timeout messaging | `tests/acceptance/customer_payment_checkout.robot` (US-014, US-015) | ✅ Traced |
+| FR-3.3, FR-3.6 | `docs/architecture/Phase7_Manual_Confirmation_Backend_Handoff.md`; `server/README.md`; designated Phase 7 server surfaces in `server/src/routes/transactions.ts`, `server/src/services/transactionService.ts`, and `server/src/services/auditService.ts` | `tests/acceptance/system_technical_security.robot` (US-059, US-063); `tests/acceptance/system_integration_communication.robot` (US-065, US-066, US-068) | ✅ Traced |
+
+### Phase 6.5 Audit Notes
+
+- The manual confirmation selector/state contract is now explicit and stable for QA: `manual-confirmation-modal`, `confirm-payment-button`, `payment-success-message`, `payment-error-message`, `payment-uncertain-message`, `retry-payment-button`, and `cancel-payment-button`.
+- Customer-facing outcome wording is now anchored in the UX contract and kiosk implementation so the acceptance suites no longer depend on an implied generic checkout dialog.
+- The prerequisite slice stops at UX readiness and backend handoff. Durable confirmation persistence, retry backoff execution, alerting, and reconciliation remain Phase 7 implementation responsibilities.
 
 ---
 
