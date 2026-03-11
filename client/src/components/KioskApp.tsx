@@ -4,7 +4,7 @@ import { useProductFeed, type ProductFeedProduct } from '../hooks/useProductFeed
 import useCart, { type CartItem, type CartProductSnapshot } from '../hooks/useCart.js';
 import useKioskStatus, { type KioskStatusPayload, type InventoryAvailabilityEntry } from '../hooks/useKioskStatus.js';
 import ProductGridSkeleton from './ProductGridSkeleton.js';
-import ProductDetailModal from './ProductDetailModal';
+import ProductDetailModal from './ProductDetailModal.js';
 import { apiRequest, type ApiError } from '../services/apiClient.js';
 import { OFFLINE_FEED_STORAGE_KEY } from '../utils/offlineCache.js';
 import { logKioskEvent } from '../utils/analytics.js';
@@ -39,6 +39,8 @@ type NormalizedTestControls = {
     cartTimeoutMs?: number | null;
     cartWarningLeadMs?: number | null;
 };
+
+type StatusOverride = 'open' | 'closed' | 'maintenance';
 
 type NormalizedCategory = {
     id: string | null;
@@ -110,7 +112,7 @@ const normalizeTestControls = (input: unknown): NormalizedTestControls | null =>
         if (statusOverride === null || statusOverride === undefined) {
             normalized.statusOverride = null;
         } else if (typeof statusOverride === 'string' && TEST_CONTROL_ALLOWED_STATUSES.has(statusOverride)) {
-            normalized.statusOverride = statusOverride;
+            normalized.statusOverride = statusOverride as StatusOverride;
         } else {
             normalized.statusOverride = null;
         }
@@ -184,7 +186,7 @@ const mergeTestControls = (current: KioskTestControls | null | undefined, update
     ];
 
     fields.forEach((key) => {
-        const value = normalized[key];
+        const value = normalized[key as keyof NormalizedTestControls];
         if (value === null || value === undefined) {
             if (Object.prototype.hasOwnProperty.call(next, key)) {
                 delete next[key];
@@ -192,9 +194,45 @@ const mergeTestControls = (current: KioskTestControls | null | undefined, update
             }
             return;
         }
-        if (next[key] !== value) {
-            next[key] = value as KioskTestControls[typeof key];
-            changed = true;
+        switch (key) {
+            case 'statusOverride':
+                if (next.statusOverride !== value) {
+                    next.statusOverride = value as StatusOverride;
+                    changed = true;
+                }
+                break;
+            case 'statusMessage':
+                if (next.statusMessage !== value) {
+                    next.statusMessage = value as string;
+                    changed = true;
+                }
+                break;
+            case 'statusNextOpen':
+                if (next.statusNextOpen !== value) {
+                    next.statusNextOpen = value as string;
+                    changed = true;
+                }
+                break;
+            case 'inventoryTrackingEnabled':
+                if (next.inventoryTrackingEnabled !== value) {
+                    next.inventoryTrackingEnabled = value as boolean;
+                    changed = true;
+                }
+                break;
+            case 'cartTimeoutMs':
+                if (next.cartTimeoutMs !== value) {
+                    next.cartTimeoutMs = value as number;
+                    changed = true;
+                }
+                break;
+            case 'cartWarningLeadMs':
+                if (next.cartWarningLeadMs !== value) {
+                    next.cartWarningLeadMs = value as number;
+                    changed = true;
+                }
+                break;
+            default:
+                break;
         }
     });
 
@@ -237,7 +275,7 @@ const readTestControls = (): KioskTestControls => {
             return {};
         }
         const sanitized: KioskTestControls = {};
-        if (Object.prototype.hasOwnProperty.call(normalized, 'statusOverride')) {
+        if (normalized.statusOverride !== null && normalized.statusOverride !== undefined) {
             sanitized.statusOverride = normalized.statusOverride;
         }
         if (normalized.statusMessage) {
@@ -431,26 +469,28 @@ const normalizeProduct = (product: ProductFeedProduct): NormalizedProduct => {
         : categories.map((category) => category.id).filter((id): id is string => Boolean(id));
 
     const resolvedId = typeof product.id === 'string' && product.id.trim() ? product.id : product.name || 'product';
+    const statusValue = product.available === false ? 'inactive' : 'active';
 
     return {
         id: resolvedId,
         name: product.name || 'Product',
         price: Number(product.price ?? 0),
-        purchaseLimit: Number.isFinite(limit) && limit > 0 ? limit : null,
+        purchaseLimit: typeof limit === 'number' && Number.isFinite(limit) && limit > 0 ? limit : null,
         stockQuantity,
         lowStockThreshold,
         isOutOfStock,
         isLowStock,
-        status: product.status || 'active',
+        status: statusValue,
         imageUrl: product.primaryMedia?.url || null,
         imageAlt: product.primaryMedia?.alt || product.name || 'Product image',
-        description: product.description || metadataDescription || '',
-        allergens: typeof product.allergens === 'string' && product.allergens.trim()
-            ? product.allergens.trim()
-            : metadataAllergens || '',
+        description: metadataDescription || '',
+        allergens: metadataAllergens || '',
         categoryId: categoryIds[0] || null,
         categoryIds,
-        categories,
+        categories: categories.map((category) => ({
+            ...category,
+            name: category.name ?? null
+        })),
         available: product.available !== false
     };
 };
@@ -573,7 +613,7 @@ const parsePurchaseLimitDetails = (details: unknown): { limit?: number } | null 
     }
 
     const limit = typeof candidate.limit === 'number' ? candidate.limit : Number.parseInt(String(candidate.limit), 10);
-    return Number.isFinite(limit) ? { limit } : { limit: undefined };
+    return Number.isFinite(limit) ? { limit } : null;
 };
 
 const KioskApp = () => {
@@ -708,7 +748,7 @@ const KioskApp = () => {
         }
         const windows = Array.isArray(statusPayload?.windows) ? statusPayload.windows : [];
         if (windows.length > 0) {
-            const window = windows[0];
+            const window = windows[0] as { start?: string; end?: string } | undefined;
             if (window?.start && window?.end) {
                 return `${window.start}–${window.end}`;
             }
@@ -1215,12 +1255,14 @@ const KioskApp = () => {
         const dialogNode = outOfStockDialogRef.current;
         const confirmButton = outOfStockConfirmRef.current;
         const cancelButton = outOfStockCancelRef.current;
-        const focusables = [confirmButton, cancelButton].filter((node) => node && typeof node.focus === 'function');
+        const focusables = [confirmButton, cancelButton].filter(
+            (node): node is HTMLButtonElement => Boolean(node && typeof node.focus === 'function')
+        );
 
         previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
         if (focusables.length > 0) {
-            focusables[0].focus({ preventScroll: true });
+            focusables[0]?.focus({ preventScroll: true });
         } else if (dialogNode && typeof dialogNode.focus === 'function') {
             dialogNode.focus({ preventScroll: true });
         }
@@ -1241,8 +1283,10 @@ const KioskApp = () => {
                 return;
             }
 
-            const activeElement = document.activeElement;
-            const currentIndex = focusables.indexOf(activeElement);
+            const activeElement = document.activeElement instanceof HTMLButtonElement
+                ? document.activeElement
+                : null;
+            const currentIndex = focusables.indexOf(activeElement as HTMLButtonElement);
             const fallbackIndex = event.shiftKey ? focusables.length - 1 : 0;
             const nextIndex = currentIndex === -1
                 ? fallbackIndex
@@ -1339,7 +1383,8 @@ const KioskApp = () => {
                     id: product.id,
                     name: product.name,
                     price: product.price,
-                    purchaseLimit: product.purchaseLimit
+                    purchaseLimit: product.purchaseLimit,
+                    imageUrl: product.imageUrl ?? null
                 },
                 nextQuantity
             );
@@ -1496,7 +1541,8 @@ const KioskApp = () => {
                     id: target.id,
                     name: target.name,
                     price: target.price,
-                    purchaseLimit: target.purchaseLimit
+                    purchaseLimit: target.purchaseLimit,
+                    imageUrl: target.imageUrl ?? null
                 },
                 target.quantity + 1
             );
@@ -1517,7 +1563,8 @@ const KioskApp = () => {
                     id: target.id,
                     name: target.name,
                     price: target.price,
-                    purchaseLimit: target.purchaseLimit
+                    purchaseLimit: target.purchaseLimit,
+                    imageUrl: target.imageUrl ?? null
                 },
                 target.quantity - 1
             );
@@ -1908,6 +1955,60 @@ const KioskApp = () => {
             window.removeEventListener('keydown', handleKeyDown);
         };
     }, [cartOpen, checkoutVisible, outOfStockPrompt]);
+
+    const selectedProductDetail = useMemo(() => {
+        if (!selectedProduct) {
+            return null;
+        }
+        const detail: {
+            id: string;
+            name: string;
+            price: number;
+            isOutOfStock: boolean;
+            isLowStock: boolean;
+            purchaseLimit: number | null;
+            description?: string;
+            imageUrl?: string;
+            imageAlt?: string;
+            allergens?: string;
+            categories?: Array<{ id?: string; name?: string }>;
+        } = {
+            id: selectedProduct.id,
+            name: selectedProduct.name,
+            price: selectedProduct.price,
+            isOutOfStock: selectedProduct.isOutOfStock,
+            isLowStock: selectedProduct.isLowStock,
+            purchaseLimit: selectedProduct.purchaseLimit
+        };
+        if (selectedProduct.description) {
+            detail.description = selectedProduct.description;
+        }
+        if (selectedProduct.imageUrl) {
+            detail.imageUrl = selectedProduct.imageUrl;
+        }
+        if (selectedProduct.imageAlt) {
+            detail.imageAlt = selectedProduct.imageAlt;
+        }
+        if (selectedProduct.allergens) {
+            detail.allergens = selectedProduct.allergens;
+        }
+        const categories = selectedProduct.categories
+            ?.map((category) => {
+                const entry: { id?: string; name?: string } = {};
+                if (category.id) {
+                    entry.id = category.id;
+                }
+                if (category.name) {
+                    entry.name = category.name;
+                }
+                return entry;
+            })
+            .filter((entry) => Boolean(entry.id || entry.name));
+        if (categories && categories.length > 0) {
+            detail.categories = categories;
+        }
+        return detail;
+    }, [selectedProduct]);
 
     return (
         <div className={`kiosk-app${overlayInfo.active ? ' kiosk-unavailable' : ''}`}>
@@ -2534,9 +2635,13 @@ const KioskApp = () => {
 
             {selectedProduct && (
                 <ProductDetailModal
-                    product={selectedProduct}
+                    product={selectedProductDetail}
                     onDismiss={() => setSelectedProduct(null)}
-                    onAddToCart={(product) => handleAddToCart(product)}
+                    onAddToCart={() => {
+                        if (selectedProduct) {
+                            handleAddToCart(selectedProduct);
+                        }
+                    }}
                     connectionState={kioskConnectionState}
                 />
             )}

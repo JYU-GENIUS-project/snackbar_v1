@@ -21,7 +21,7 @@ if (!rootElement) {
   throw new Error('Root element not found');
 }
 
-const Devtools: ComponentType | null = import.meta.env.DEV
+const Devtools: ComponentType<{ initialIsOpen?: boolean }> | null = import.meta.env.DEV
   ? lazy(async () => {
     const module = await import('@tanstack/react-query-devtools');
     return { default: module.ReactQueryDevtools };
