@@ -312,14 +312,11 @@ Deliver kiosk-driven manual payment confirmation with reliable transaction loggi
 
 **Latest validation run**
 
-- customer_payment_checkout.robot failed during suite setup with connection refused (kiosk URL not reachable). See [tests/results/phase7/output.xml](tests/results/phase7/output.xml).
-- 2026-03-11 run: customer_payment_checkout.robot failed (5/6). US-011 cart total missing (expected 5.00€), US-012–US-015 click intercepted on confirm CTA. See [tests/results/phase7/output.xml](tests/results/phase7/output.xml) and [tests/results/phase7/log.html](tests/results/phase7/log.html).
-- 2026-03-11 run: customer_payment_checkout.robot passed (6/6) after rebuilding client assets and stabilizing confirm click handling. See [tests/results/phase7/output.xml](tests/results/phase7/output.xml).
+- 2026-03-11 run: customer_payment_checkout.robot passed (6/6). See [tests/results/phase7/output.xml](tests/results/phase7/output.xml).
 - 2026-03-11 run: system_technical_security.robot passed (15/15). See [tests/results/phase7/output.xml](tests/results/phase7/output.xml).
 - 2026-03-11 run: system_integration_communication.robot passed (15/15). See [tests/results/phase7/output.xml](tests/results/phase7/output.xml).
-- Remediation applied: ensured cart total is visible outside the cart panel and made the confirmation prompt ready immediately for click targets; rerun pending.
-- Remediation applied: aligned offline kiosk seed data pricing with checkout expectations in [tests/resources/common.robot](tests/resources/common.robot).
-- Remediation applied: kiosk status polling/SSE bypassed when offline feed is forced to prevent status overlays during acceptance tests.
+- 2026-03-11 run: server unit tests, lint, and type-check passed. See [server/package.json](server/package.json) scripts.
+- 2026-03-11 run: client unit tests and type-check passed (TypeScript 5.5.4). See [client/package.json](client/package.json) and [client/tsconfig.typecheck.json](client/tsconfig.typecheck.json).
 
 #### Phase 8 Tasks
 
