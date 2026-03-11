@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { apiRequest } from '../services/apiClient.js';
+import { apiRequest, API_BASE_URL } from '../services/apiClient.js';
 
 type SummaryResponse = {
     data?: {
@@ -105,12 +105,20 @@ const StatisticsPanel = ({ token }: StatisticsPanelProps) => {
     const [periodView, setPeriodView] = useState<'daily' | 'weekly' | 'monthly'>('daily');
     const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
     const [detailOpen, setDetailOpen] = useState(false);
+    const [exportMessage, setExportMessage] = useState<string | null>(null);
 
     const activeRange = useMemo(() => {
         if (startDate && endDate) {
             return { startDate, endDate };
         }
-        const preset = presetRanges.find((range) => range.label === selectedPreset) ?? presetRanges[2];
+        const preset =
+            presetRanges.find((range) => range.label === selectedPreset)
+            ?? presetRanges[2]
+            ?? presetRanges[0];
+        if (!preset) {
+            const fallback = buildDateString(new Date());
+            return { startDate: fallback, endDate: fallback };
+        }
         const start = buildDateString(preset.start());
         const end = buildDateString(preset.end());
         return { startDate: start, endDate: end };
@@ -186,6 +194,38 @@ const StatisticsPanel = ({ token }: StatisticsPanelProps) => {
         setRevenueSeries(revenueResponse.data ?? null);
     }, [token, activeRange, periodView]);
 
+    const handleExportCsv = async () => {
+        setExportMessage(null);
+        const url = new URL(`${API_BASE_URL}/transactions/export`, window.location.origin);
+        url.searchParams.set('startDate', activeRange.startDate);
+        url.searchParams.set('endDate', activeRange.endDate);
+
+        const response = await fetch(url.toString(), {
+            method: 'GET',
+            headers: {
+                Authorization: `Bearer ${token}`
+            }
+        });
+
+        if (!response.ok) {
+            setExportMessage('Failed to export CSV');
+            return;
+        }
+
+        const blob = await response.blob();
+        const downloadUrl = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        const contentDisposition = response.headers.get('content-disposition');
+        const filenameMatch = contentDisposition?.match(/filename="?([^";]+)"?/i);
+        link.download = filenameMatch?.[1] ?? 'transactions.csv';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(downloadUrl);
+        setExportMessage('CSV export complete');
+    };
+
     useEffect(() => {
         void fetchStatistics();
     }, [fetchStatistics]);
@@ -202,8 +242,12 @@ const StatisticsPanel = ({ token }: StatisticsPanelProps) => {
                     <h2>Statistics & Reporting</h2>
                     <p className="helper">Monitor revenue trends and export analytics.</p>
                 </div>
-                <button className="button" type="button">Export to CSV</button>
+                <button className="button" type="button" onClick={handleExportCsv}>
+                    Export to CSV
+                </button>
             </div>
+
+            {exportMessage && <div className="alert success">{exportMessage}</div>}
 
             <div className="stack" style={{ marginTop: '1rem' }}>
                 <div className="inline preset-date-ranges">

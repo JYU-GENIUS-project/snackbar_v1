@@ -351,6 +351,149 @@ router.get(
     }),
 );
 
+router.get(
+    '/export',
+    authenticate as unknown as RequestHandler,
+    asyncHandler(async (req, res) => {
+        const exportTransactions =
+            transactionService.exportTransactions as (params: {
+                status?: string;
+                startDate?: string;
+                endDate?: string;
+                reference?: string;
+                kioskSessionId?: string;
+                productId?: string;
+                productName?: string;
+                amountMin?: number;
+                amountMax?: number;
+                sortBy?: 'date' | 'amount' | 'status';
+                sortDirection?: 'asc' | 'desc';
+                search?: string;
+            }) => Promise<Array<Record<string, unknown>>>;
+
+        const exportPayload: {
+            status?: string;
+            startDate?: string;
+            endDate?: string;
+            reference?: string;
+            kioskSessionId?: string;
+            productId?: string;
+            productName?: string;
+            amountMin?: number;
+            amountMax?: number;
+            sortBy?: 'date' | 'amount' | 'status';
+            sortDirection?: 'asc' | 'desc';
+            search?: string;
+        } = {};
+
+        if (typeof req.query.status === 'string') {
+            exportPayload.status = req.query.status;
+        }
+        if (typeof req.query.startDate === 'string') {
+            exportPayload.startDate = req.query.startDate;
+        }
+        if (typeof req.query.endDate === 'string') {
+            exportPayload.endDate = req.query.endDate;
+        }
+        if (typeof req.query.reference === 'string') {
+            exportPayload.reference = req.query.reference;
+        }
+        if (typeof req.query.kioskSessionId === 'string') {
+            exportPayload.kioskSessionId = req.query.kioskSessionId;
+        }
+        if (typeof req.query.productId === 'string') {
+            exportPayload.productId = req.query.productId;
+        }
+        if (typeof req.query.productName === 'string') {
+            exportPayload.productName = req.query.productName;
+        }
+        if (typeof req.query.amountMin === 'string') {
+            const parsed = Number(req.query.amountMin);
+            if (Number.isFinite(parsed)) {
+                exportPayload.amountMin = parsed;
+            }
+        }
+        if (typeof req.query.amountMax === 'string') {
+            const parsed = Number(req.query.amountMax);
+            if (Number.isFinite(parsed)) {
+                exportPayload.amountMax = parsed;
+            }
+        }
+        if (typeof req.query.sortBy === 'string') {
+            const sortBy = req.query.sortBy.toLowerCase();
+            if (sortBy === 'date' || sortBy === 'amount' || sortBy === 'status') {
+                exportPayload.sortBy = sortBy;
+            }
+        }
+        if (typeof req.query.sortDirection === 'string') {
+            const direction = req.query.sortDirection.toLowerCase();
+            if (direction === 'asc' || direction === 'desc') {
+                exportPayload.sortDirection = direction;
+            }
+        }
+        if (typeof req.query.search === 'string') {
+            exportPayload.search = req.query.search;
+        }
+
+        const rows = await exportTransactions(exportPayload);
+
+        const formatDateForFilename = (value?: string) => {
+            if (!value) {
+                return new Date().toISOString().slice(0, 10);
+            }
+            const parsed = new Date(value);
+            if (Number.isNaN(parsed.getTime())) {
+                return new Date().toISOString().slice(0, 10);
+            }
+            return parsed.toISOString().slice(0, 10);
+        };
+
+        const startLabel = formatDateForFilename(exportPayload.startDate);
+        const endLabel = formatDateForFilename(exportPayload.endDate ?? exportPayload.startDate);
+        const filename = `transactions_${startLabel}_to_${endLabel}.csv`;
+
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+        const filterEntries = Object.entries(exportPayload).filter(([, value]) => value !== undefined && value !== '');
+        if (filterEntries.length > 0) {
+            const filterText = filterEntries
+                .map(([key, value]) => `${key}=${value}`)
+                .join('; ');
+            res.write(`Filters: ${filterText}\n`);
+        }
+
+        res.write('Transaction ID,Date,Time,Items,Quantities,Total Amount,Payment Status\n');
+        rows.forEach((row) => {
+            const record = row as {
+                transaction_id?: string;
+                transaction_number?: string;
+                timestamp?: string;
+                items?: string | null;
+                quantities?: string | null;
+                total_amount?: number | string;
+                payment_status?: string;
+            };
+            const timestamp = record.timestamp ?? '';
+            const [datePart, timePart] = timestamp.split(' ');
+            const csvRow = [
+                record.transaction_number ?? record.transaction_id ?? '',
+                datePart ?? '',
+                timePart ?? '',
+                record.items ?? '',
+                record.quantities ?? '',
+                Number(record.total_amount ?? 0).toFixed(2),
+                record.payment_status ?? ''
+            ]
+                .map((value) => `"${String(value).replace(/"/g, '""')}"`)
+                .join(',');
+            res.write(`${csvRow}\n`);
+        });
+
+        res.end();
+    }),
+);
+
 router.post(
     '/:id/reconcile',
     authenticate as unknown as RequestHandler,

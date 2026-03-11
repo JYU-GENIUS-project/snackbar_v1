@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react';
-import { apiRequest } from '../services/apiClient.js';
+import { apiRequest, API_BASE_URL } from '../services/apiClient.js';
 
 type TransactionItem = {
     productId?: string | null;
@@ -94,6 +94,7 @@ const TransactionsPanel = ({ token }: TransactionsPanelProps) => {
     const [reconcileNotes, setReconcileNotes] = useState('');
     const [reconcileMessage, setReconcileMessage] = useState<string | null>(null);
     const [reconcileError, setReconcileError] = useState<string | null>(null);
+    const [exportMessage, setExportMessage] = useState<string | null>(null);
 
     const totalPages = useMemo(() => {
         return Math.max(1, Math.ceil(pagination.total / pagination.pageSize));
@@ -202,6 +203,57 @@ const TransactionsPanel = ({ token }: TransactionsPanelProps) => {
         }
     };
 
+    const handleExportCsv = async () => {
+        setExportMessage(null);
+        setErrorMessage(null);
+        try {
+            const url = new URL(`${API_BASE_URL}/transactions/export`, window.location.origin);
+            const params: Record<string, string> = {
+                status: statusFilter,
+                startDate,
+                endDate,
+                productName,
+                amountMin,
+                amountMax,
+                search,
+                sortBy,
+                sortDirection
+            };
+            Object.entries(params).forEach(([key, value]) => {
+                if (value) {
+                    url.searchParams.set(key, value);
+                }
+            });
+
+            const response = await fetch(url.toString(), {
+                method: 'GET',
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to export CSV');
+            }
+
+            const blob = await response.blob();
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            const contentDisposition = response.headers.get('content-disposition');
+            const filenameMatch = contentDisposition?.match(/filename="?([^";]+)"?/i);
+            link.download = filenameMatch?.[1] ?? 'transactions.csv';
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(downloadUrl);
+            setExportMessage(`Export complete: ${pagination.total} transactions exported`);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Failed to export CSV';
+            setErrorMessage(message);
+        }
+    };
+
     const selectedItems = selectedTransaction?.items ?? [];
     const selectedReference = selectedTransaction?.confirmation_reference || 'N/A';
     const selectedStatusLabel = formatStatusLabel(selectedTransaction?.payment_status);
@@ -214,6 +266,9 @@ const TransactionsPanel = ({ token }: TransactionsPanelProps) => {
                     <p className="helper">Search, filter, and reconcile kiosk transactions.</p>
                 </div>
                 <div className="inline">
+                    <button className="button" type="button" onClick={handleExportCsv}>
+                        Export to CSV
+                    </button>
                     <button id="clear-filters-button" className="button secondary" type="button" onClick={clearFilters}>
                         Clear Filters
                     </button>
@@ -352,6 +407,7 @@ const TransactionsPanel = ({ token }: TransactionsPanelProps) => {
             )}
 
             {errorMessage && <div className="alert error">{errorMessage}</div>}
+            {exportMessage && <div className="alert success">{exportMessage}</div>}
 
             <div className="table-wrapper" style={{ marginTop: '1rem' }}>
                 <table className="table">

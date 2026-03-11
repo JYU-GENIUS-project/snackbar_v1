@@ -113,6 +113,16 @@ type TransactionListResult = {
     };
 };
 
+type TransactionExportRow = {
+    transaction_id: string;
+    transaction_number: string;
+    timestamp: string;
+    items: string | null;
+    quantities: string | null;
+    total_amount: number | string;
+    payment_status: string;
+};
+
 const PAYMENT_STATUSES = new Set([
     'PENDING',
     'COMPLETED',
@@ -509,29 +519,7 @@ const createTransaction = async ({
     };
 };
 
-const listTransactions = async (
-    filters: TransactionListFilters = {},
-): Promise<TransactionListResult> => {
-    const page = Number.isFinite(filters.page)
-        ? Math.max(1, Number(filters.page))
-        : 1;
-    const pageSize = Number.isFinite(filters.pageSize)
-        ? Math.min(100, Math.max(1, Number(filters.pageSize)))
-        : 50;
-    const offset = (page - 1) * pageSize;
-
-    const sortBy = filters.sortBy ?? 'date';
-    const sortDirection = (filters.sortDirection ?? 'desc')
-        .toString()
-        .toLowerCase();
-    const sortOrder = sortDirection === 'asc' ? 'ASC' : 'DESC';
-    const sortColumn =
-        sortBy === 'amount'
-            ? 't.total_amount'
-            : sortBy === 'status'
-                ? 't.payment_status'
-                : 't.created_at';
-
+const buildTransactionWhere = (filters: TransactionListFilters) => {
     const whereClause: string[] = [];
     const params: unknown[] = [];
     let paramIndex = 1;
@@ -621,6 +609,36 @@ const listTransactions = async (
     const whereString =
         whereClause.length > 0 ? `WHERE ${whereClause.join(' AND ')}` : '';
 
+    return { whereString, params, paramIndex };
+};
+
+const listTransactions = async (
+    filters: TransactionListFilters = {},
+): Promise<TransactionListResult> => {
+    const page = Number.isFinite(filters.page)
+        ? Math.max(1, Number(filters.page))
+        : 1;
+    const pageSize = Number.isFinite(filters.pageSize)
+        ? Math.min(100, Math.max(1, Number(filters.pageSize)))
+        : 50;
+    const offset = (page - 1) * pageSize;
+
+    const sortBy = filters.sortBy ?? 'date';
+    const sortDirection = (filters.sortDirection ?? 'desc')
+        .toString()
+        .toLowerCase();
+    const sortOrder = sortDirection === 'asc' ? 'ASC' : 'DESC';
+    const sortColumn =
+        sortBy === 'amount'
+            ? 't.total_amount'
+            : sortBy === 'status'
+                ? 't.payment_status'
+                : 't.created_at';
+
+    const { whereString, params, paramIndex: baseParamIndex } =
+        buildTransactionWhere(filters);
+    let paramIndex = baseParamIndex;
+
     const countResult = (await db.query(
         `SELECT COUNT(*) as total
          FROM transactions t
@@ -673,6 +691,43 @@ const listTransactions = async (
             total,
         },
     };
+};
+
+const exportTransactions = async (
+    filters: TransactionListFilters = {},
+): Promise<TransactionExportRow[]> => {
+    const sortBy = filters.sortBy ?? 'date';
+    const sortDirection = (filters.sortDirection ?? 'desc')
+        .toString()
+        .toLowerCase();
+    const sortOrder = sortDirection === 'asc' ? 'ASC' : 'DESC';
+    const sortColumn =
+        sortBy === 'amount'
+            ? 't.total_amount'
+            : sortBy === 'status'
+                ? 't.payment_status'
+                : 't.created_at';
+
+    const { whereString, params } = buildTransactionWhere(filters);
+
+    const result = (await db.query(
+        `SELECT t.id AS transaction_id,
+                t.transaction_number,
+                TO_CHAR(COALESCE(t.completed_at, t.created_at), 'YYYY-MM-DD HH24:MI:SS') AS timestamp,
+                STRING_AGG(ti.product_name, ', ' ORDER BY ti.product_name) AS items,
+                STRING_AGG(ti.quantity::text, ', ' ORDER BY ti.product_name) AS quantities,
+                t.total_amount,
+                t.payment_status
+         FROM transactions t
+         LEFT JOIN transaction_items ti
+           ON ti.transaction_id = t.id
+         ${whereString}
+         GROUP BY t.id
+         ORDER BY ${sortColumn} ${sortOrder}`,
+        params,
+    )) as DbQueryResult<TransactionExportRow>;
+
+    return result.rows;
 };
 
 const getTransactionAudit = async ({
@@ -1279,6 +1334,7 @@ const reconcileTransaction = async ({
 const transactionService = {
     createTransaction,
     listTransactions,
+    exportTransactions,
     getTransactionAudit,
     confirmTransaction,
     reconcileTransaction,
