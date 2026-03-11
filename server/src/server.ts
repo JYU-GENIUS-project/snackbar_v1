@@ -27,6 +27,7 @@ import notificationRoutes from './routes/notifications';
 import transactionRoutes from './routes/transactions';
 import statusRoutes from './routes/status';
 import cartRoutes from './routes/cart';
+import analyticsRoutes from './routes/analytics';
 import mediaStorage from './utils/mediaStorage';
 import notificationService from './services/notificationService';
 import db from './utils/database';
@@ -194,6 +195,9 @@ app.use('/api/notifications', apiLimiter, notificationRoutes);
 
 // Customer transaction routes
 app.use('/api/transactions', apiLimiter, transactionRoutes);
+
+// Analytics routes
+app.use('/api/analytics', apiLimiter, analyticsRoutes);
 
 // Cart session routes
 app.use('/api/cart', apiLimiter, cartRoutes);
