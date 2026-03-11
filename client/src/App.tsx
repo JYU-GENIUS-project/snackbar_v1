@@ -337,8 +337,9 @@ const App = () => {
       setAdminRoute(isAdminRoute(window.location.pathname));
     };
 
-    const wrapHistoryMethod = <T extends (...args: unknown[]) => unknown>(method: T) => {
-      return function wrappedHistoryMethod(this: History, ...args: Parameters<T>) {
+    type HistoryMethod = (data: unknown, unused: string, url?: string | URL | null) => void;
+    const wrapHistoryMethod = (method: HistoryMethod) => {
+      return function wrappedHistoryMethod(this: History, ...args: Parameters<HistoryMethod>) {
         const result = method.apply(this, args);
         handleRouteChange();
         return result;

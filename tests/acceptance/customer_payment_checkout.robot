@@ -147,7 +147,7 @@ A confirmation prompt is displayed
 
 The customer confirms payment on the kiosk
     [Documentation]    Simulates the customer pressing the confirm button
-    Click Button    id=confirm-payment-button
+    Click Confirm Payment Button
 
 The kiosk records manual confirmation
     [Documentation]    Simulates backend confirmation recording
@@ -173,7 +173,7 @@ Payment has been completed successfully
     Click Element    id=cart-icon
     Click Button    id=checkout-button
     Wait Until Element Is Visible    id=manual-confirmation-modal    timeout=2s
-    Click Button    id=confirm-payment-button
+    Click Confirm Payment Button
     Execute Javascript    window.simulateManualConfirmationSuccess()
     Wait Until Element Is Visible    id=payment-success-message    timeout=10s
 
@@ -226,7 +226,7 @@ Payment has failed
     Click Element    id=cart-icon
     Click Button    id=checkout-button
     Wait Until Element Is Visible    id=manual-confirmation-modal    timeout=2s
-    Click Button    id=confirm-payment-button
+    Click Confirm Payment Button
     Execute Javascript    window.simulateManualConfirmationFailure()
     Wait Until Element Is Visible    id=payment-error-message    timeout=10s
 
@@ -285,7 +285,7 @@ Payment was potentially charged but confirmation unclear
     Click Element    id=cart-icon
     Click Button    id=checkout-button
     Wait Until Element Is Visible    id=manual-confirmation-modal    timeout=2s
-    Click Button    id=confirm-payment-button
+    Click Confirm Payment Button
     Execute Javascript    window.simulateManualConfirmationPending()
     Wait Until Element Is Visible    id=payment-uncertain-message    timeout=10s
 

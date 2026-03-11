@@ -46,7 +46,7 @@ describe('useKioskStatus', () => {
         mockUseQuery.mockImplementation((params: UseQueryParams) => {
             const { queryFn, onSuccess } = params;
             const execute = async () => {
-                const data = await queryFn({ signal: undefined });
+                const data = await queryFn({});
                 if (typeof onSuccess === 'function') {
                     onSuccess(data);
                 }

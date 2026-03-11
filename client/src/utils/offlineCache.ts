@@ -50,6 +50,10 @@ const sanitizeStatusPayload = (input: unknown): OfflineStatusPayload | null => {
     }
 
     const candidate = input as Record<string, unknown>;
+    const maintenanceCandidate =
+        typeof candidate.maintenance === 'object' && candidate.maintenance !== null
+            ? (candidate.maintenance as Record<string, unknown>)
+            : {};
     const statusValue = typeof candidate.status === 'string' && candidate.status.trim() ? candidate.status.trim() : 'unknown';
     return {
         status: statusValue,
@@ -58,9 +62,9 @@ const sanitizeStatusPayload = (input: unknown): OfflineStatusPayload | null => {
         nextOpen: typeof candidate.nextOpen === 'string' ? candidate.nextOpen : null,
         nextClose: typeof candidate.nextClose === 'string' ? candidate.nextClose : null,
         maintenance: {
-            enabled: sanitizeBoolean(candidate?.maintenance?.enabled, false),
-            message: typeof candidate?.maintenance?.message === 'string' ? candidate.maintenance.message : null,
-            since: typeof candidate?.maintenance?.since === 'string' ? candidate.maintenance.since : null
+            enabled: sanitizeBoolean(maintenanceCandidate.enabled, false),
+            message: typeof maintenanceCandidate.message === 'string' ? maintenanceCandidate.message : null,
+            since: typeof maintenanceCandidate.since === 'string' ? maintenanceCandidate.since : null
         },
         timezone: typeof candidate.timezone === 'string' ? candidate.timezone : null,
         generatedAt: typeof candidate.generatedAt === 'string' ? candidate.generatedAt : new Date().toISOString(),

@@ -7,6 +7,7 @@ import {
 } from 'express';
 import { body, validationResult } from 'express-validator';
 
+import { authenticate } from '../middleware/auth';
 import { ApiError } from '../middleware/errorHandler';
 import transactionService from '../services/transactionService';
 
@@ -24,6 +25,20 @@ type TransactionPayload = {
     confirmationChannel?: string | null;
     confirmationReference?: string | null;
     confirmationMetadata?: Record<string, unknown> | null;
+};
+
+type TransactionConfirmationPayload = {
+    declaredOutcome: string;
+    declaredTender?: string | null;
+    confirmationChannel?: string | null;
+    confirmationReference?: string | null;
+    confirmationMetadata?: Record<string, unknown> | null;
+};
+
+type TransactionReconcilePayload = {
+    action: string;
+    notes?: string | null;
+    metadata?: Record<string, unknown> | null;
 };
 
 type TransactionResult = Record<string, unknown>;
@@ -64,6 +79,42 @@ const transactionValidation = [
         .optional({ nullable: true })
         .isObject()
         .withMessage('confirmationMetadata must be an object'),
+];
+
+const confirmValidation = [
+    body('declaredOutcome')
+        .isString()
+        .withMessage('declaredOutcome must be a string'),
+    body('declaredTender')
+        .optional({ nullable: true })
+        .isString()
+        .withMessage('declaredTender must be a string'),
+    body('confirmationChannel')
+        .optional({ nullable: true })
+        .isString()
+        .withMessage('confirmationChannel must be a string'),
+    body('confirmationReference')
+        .optional({ nullable: true })
+        .isString()
+        .withMessage('confirmationReference must be a string'),
+    body('confirmationMetadata')
+        .optional({ nullable: true })
+        .isObject()
+        .withMessage('confirmationMetadata must be an object'),
+];
+
+const reconcileValidation = [
+    body('action')
+        .isIn(['CONFIRMED', 'REFUNDED'])
+        .withMessage('action must be CONFIRMED or REFUNDED'),
+    body('notes')
+        .optional({ nullable: true })
+        .isString()
+        .withMessage('notes must be a string'),
+    body('metadata')
+        .optional({ nullable: true })
+        .isObject()
+        .withMessage('metadata must be an object'),
 ];
 
 router.post(
@@ -124,6 +175,179 @@ router.post(
         res.status(201).json({
             success: true,
             message: 'Transaction recorded successfully',
+            data: result,
+        });
+    }),
+);
+
+router.post(
+    '/:id/confirm',
+    confirmValidation,
+    asyncHandler(async (req, res) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            throw new ApiError(400, 'Validation failed', {
+                errors: errors.array(),
+            });
+        }
+
+        const transactionId = req.params.id;
+        if (!transactionId) {
+            throw new ApiError(400, 'Transaction id is required');
+        }
+        const payload = req.body as TransactionConfirmationPayload;
+
+        const confirmTransaction =
+            transactionService.confirmTransaction as (params: {
+                transactionId: string;
+                declaredOutcome: string;
+                declaredTender?: string | null;
+                confirmationChannel?: string | null;
+                confirmationReference?: string | null;
+                confirmationMetadata?: Record<string, unknown> | null;
+            }) => Promise<TransactionResult>;
+
+        const result = await confirmTransaction({
+            transactionId,
+            declaredOutcome: payload.declaredOutcome,
+            declaredTender: payload.declaredTender ?? null,
+            confirmationChannel: payload.confirmationChannel ?? null,
+            confirmationReference: payload.confirmationReference ?? null,
+            confirmationMetadata: payload.confirmationMetadata ?? null,
+        });
+
+        res.status(202).json({
+            success: true,
+            message: 'Confirmation received',
+            data: result,
+        });
+    }),
+);
+
+router.get(
+    '/',
+    authenticate as unknown as RequestHandler,
+    asyncHandler(async (req, res) => {
+        const listTransactions =
+            transactionService.listTransactions as (params: {
+                status?: string;
+                page?: number;
+                pageSize?: number;
+                startDate?: string;
+                endDate?: string;
+                reference?: string;
+                kioskSessionId?: string;
+            }) => Promise<Record<string, unknown>>;
+
+        const listPayload: {
+            status?: string;
+            page?: number;
+            pageSize?: number;
+            startDate?: string;
+            endDate?: string;
+            reference?: string;
+            kioskSessionId?: string;
+        } = {};
+
+        if (typeof req.query.status === 'string') {
+            listPayload.status = req.query.status;
+        }
+        if (typeof req.query.page === 'string') {
+            listPayload.page = Number(req.query.page);
+        }
+        if (typeof req.query.pageSize === 'string') {
+            listPayload.pageSize = Number(req.query.pageSize);
+        }
+        if (typeof req.query.startDate === 'string') {
+            listPayload.startDate = req.query.startDate;
+        }
+        if (typeof req.query.endDate === 'string') {
+            listPayload.endDate = req.query.endDate;
+        }
+        if (typeof req.query.reference === 'string') {
+            listPayload.reference = req.query.reference;
+        }
+        if (typeof req.query.kioskSessionId === 'string') {
+            listPayload.kioskSessionId = req.query.kioskSessionId;
+        }
+
+        const result = await listTransactions(listPayload);
+
+        res.status(200).json({
+            success: true,
+            message: 'Transactions retrieved',
+            data: result,
+        });
+    }),
+);
+
+router.get(
+    '/:id/audit',
+    authenticate as unknown as RequestHandler,
+    asyncHandler(async (req, res) => {
+        const transactionId = req.params.id;
+        if (!transactionId) {
+            throw new ApiError(400, 'Transaction id is required');
+        }
+        const getAudit = transactionService.getTransactionAudit as (params: {
+            transactionId: string;
+        }) => Promise<Record<string, unknown>>;
+
+        const result = await getAudit({ transactionId });
+
+        res.status(200).json({
+            success: true,
+            message: 'Transaction audit retrieved',
+            data: result,
+        });
+    }),
+);
+
+router.post(
+    '/:id/reconcile',
+    authenticate as unknown as RequestHandler,
+    reconcileValidation,
+    asyncHandler(async (req, res) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            throw new ApiError(400, 'Validation failed', {
+                errors: errors.array(),
+            });
+        }
+
+        const transactionId = req.params.id;
+        if (!transactionId) {
+            throw new ApiError(400, 'Transaction id is required');
+        }
+        const payload = req.body as TransactionReconcilePayload;
+
+        const reconcileTransaction =
+            (transactionService as {
+                reconcileTransaction: (params: {
+                    transactionId: string;
+                    action: string;
+                    notes?: string | null;
+                    metadata?: Record<string, unknown> | null;
+                    actor: { id: string; username: string };
+                }) => Promise<TransactionResult>;
+            }).reconcileTransaction;
+
+        const actor = req.user as { id: string; username: string } | undefined;
+        if (!actor) {
+            throw new ApiError(401, 'Authentication required');
+        }
+
+        const result = await reconcileTransaction({
+            transactionId,
+            action: payload.action,
+            notes: payload.notes ?? null,
+            metadata: payload.metadata ?? null,
+            actor,
+        });
+
+        res.status(200).json({
+            success: true,
+            message: 'Transaction reconciled',
             data: result,
         });
     }),

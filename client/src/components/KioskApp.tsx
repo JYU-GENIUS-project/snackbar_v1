@@ -4,7 +4,8 @@ import { useProductFeed, type ProductFeedProduct } from '../hooks/useProductFeed
 import useCart, { type CartItem, type CartProductSnapshot } from '../hooks/useCart.js';
 import useKioskStatus, { type KioskStatusPayload, type InventoryAvailabilityEntry } from '../hooks/useKioskStatus.js';
 import ProductGridSkeleton from './ProductGridSkeleton.js';
-import ProductDetailModal from './ProductDetailModal';
+import ProductDetailModal from './ProductDetailModal.js';
+import { apiRequest, type ApiError } from '../services/apiClient.js';
 import { OFFLINE_FEED_STORAGE_KEY } from '../utils/offlineCache.js';
 import { logKioskEvent } from '../utils/analytics.js';
 
@@ -13,7 +14,7 @@ const TEST_CONTROL_ALLOWED_STATUSES = new Set(['open', 'closed', 'maintenance'])
 const CART_TIMEOUT_MS = 5 * 60 * 1000;
 const CART_WARNING_MS = 30 * 1000;
 const CONFIRMATION_TIMEOUT_MS = 60 * 1000;
-const SUCCESS_MESSAGE_MIN_DURATION_MS = 3 * 1000;
+const SUCCESS_MESSAGE_MIN_DURATION_MS = 4 * 1000;
 const ADMIN_SUPPORT_EMAIL = 'support@snackbar.local';
 
 const TRUST_MODE_STORAGE_KEY = 'snackbar-trust-mode-disabled';
@@ -38,6 +39,8 @@ type NormalizedTestControls = {
     cartTimeoutMs?: number | null;
     cartWarningLeadMs?: number | null;
 };
+
+type StatusOverride = 'open' | 'closed' | 'maintenance';
 
 type NormalizedCategory = {
     id: string | null;
@@ -109,7 +112,7 @@ const normalizeTestControls = (input: unknown): NormalizedTestControls | null =>
         if (statusOverride === null || statusOverride === undefined) {
             normalized.statusOverride = null;
         } else if (typeof statusOverride === 'string' && TEST_CONTROL_ALLOWED_STATUSES.has(statusOverride)) {
-            normalized.statusOverride = statusOverride;
+            normalized.statusOverride = statusOverride as StatusOverride;
         } else {
             normalized.statusOverride = null;
         }
@@ -183,7 +186,7 @@ const mergeTestControls = (current: KioskTestControls | null | undefined, update
     ];
 
     fields.forEach((key) => {
-        const value = normalized[key];
+        const value = normalized[key as keyof NormalizedTestControls];
         if (value === null || value === undefined) {
             if (Object.prototype.hasOwnProperty.call(next, key)) {
                 delete next[key];
@@ -191,9 +194,45 @@ const mergeTestControls = (current: KioskTestControls | null | undefined, update
             }
             return;
         }
-        if (next[key] !== value) {
-            next[key] = value as KioskTestControls[typeof key];
-            changed = true;
+        switch (key) {
+            case 'statusOverride':
+                if (next.statusOverride !== value) {
+                    next.statusOverride = value as StatusOverride;
+                    changed = true;
+                }
+                break;
+            case 'statusMessage':
+                if (next.statusMessage !== value) {
+                    next.statusMessage = value as string;
+                    changed = true;
+                }
+                break;
+            case 'statusNextOpen':
+                if (next.statusNextOpen !== value) {
+                    next.statusNextOpen = value as string;
+                    changed = true;
+                }
+                break;
+            case 'inventoryTrackingEnabled':
+                if (next.inventoryTrackingEnabled !== value) {
+                    next.inventoryTrackingEnabled = value as boolean;
+                    changed = true;
+                }
+                break;
+            case 'cartTimeoutMs':
+                if (next.cartTimeoutMs !== value) {
+                    next.cartTimeoutMs = value as number;
+                    changed = true;
+                }
+                break;
+            case 'cartWarningLeadMs':
+                if (next.cartWarningLeadMs !== value) {
+                    next.cartWarningLeadMs = value as number;
+                    changed = true;
+                }
+                break;
+            default:
+                break;
         }
     });
 
@@ -236,7 +275,7 @@ const readTestControls = (): KioskTestControls => {
             return {};
         }
         const sanitized: KioskTestControls = {};
-        if (Object.prototype.hasOwnProperty.call(normalized, 'statusOverride')) {
+        if (normalized.statusOverride !== null && normalized.statusOverride !== undefined) {
             sanitized.statusOverride = normalized.statusOverride;
         }
         if (normalized.statusMessage) {
@@ -366,6 +405,18 @@ const formatConfirmationTimeoutLabel = (milliseconds: number) => {
     return totalSeconds === 1 ? '1 second' : `${totalSeconds} seconds`;
 };
 
+const createBasketHash = (items: CartItem[]) => {
+    const payload = items
+        .map((item) => `${item.id}:${item.quantity}:${item.price}`)
+        .sort()
+        .join('|');
+    let hash = 5381;
+    for (let i = 0; i < payload.length; i += 1) {
+        hash = (hash * 33) ^ payload.charCodeAt(i);
+    }
+    return `basket-${Math.abs(hash)}`;
+};
+
 const createConfirmationReference = () => {
     const compactTimestamp = new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14);
     const suffix = Math.random().toString(36).slice(2, 6).toUpperCase();
@@ -418,26 +469,28 @@ const normalizeProduct = (product: ProductFeedProduct): NormalizedProduct => {
         : categories.map((category) => category.id).filter((id): id is string => Boolean(id));
 
     const resolvedId = typeof product.id === 'string' && product.id.trim() ? product.id : product.name || 'product';
+    const statusValue = product.available === false ? 'inactive' : 'active';
 
     return {
         id: resolvedId,
         name: product.name || 'Product',
         price: Number(product.price ?? 0),
-        purchaseLimit: Number.isFinite(limit) && limit > 0 ? limit : null,
+        purchaseLimit: typeof limit === 'number' && Number.isFinite(limit) && limit > 0 ? limit : null,
         stockQuantity,
         lowStockThreshold,
         isOutOfStock,
         isLowStock,
-        status: product.status || 'active',
+        status: statusValue,
         imageUrl: product.primaryMedia?.url || null,
         imageAlt: product.primaryMedia?.alt || product.name || 'Product image',
-        description: product.description || metadataDescription || '',
-        allergens: typeof product.allergens === 'string' && product.allergens.trim()
-            ? product.allergens.trim()
-            : metadataAllergens || '',
+        description: metadataDescription || '',
+        allergens: metadataAllergens || '',
         categoryId: categoryIds[0] || null,
         categoryIds,
-        categories,
+        categories: categories.map((category) => ({
+            ...category,
+            name: category.name ?? null
+        })),
         available: product.available !== false
     };
 };
@@ -560,7 +613,7 @@ const parsePurchaseLimitDetails = (details: unknown): { limit?: number } | null 
     }
 
     const limit = typeof candidate.limit === 'number' ? candidate.limit : Number.parseInt(String(candidate.limit), 10);
-    return Number.isFinite(limit) ? { limit } : { limit: undefined };
+    return Number.isFinite(limit) ? { limit } : null;
 };
 
 const KioskApp = () => {
@@ -695,7 +748,7 @@ const KioskApp = () => {
         }
         const windows = Array.isArray(statusPayload?.windows) ? statusPayload.windows : [];
         if (windows.length > 0) {
-            const window = windows[0];
+            const window = windows[0] as { start?: string; end?: string } | undefined;
             if (window?.start && window?.end) {
                 return `${window.start}–${window.end}`;
             }
@@ -837,10 +890,14 @@ const KioskApp = () => {
     const [toastMessage, setToastMessage] = useState('');
     const [limitMessage, setLimitMessage] = useState('');
     const [cartTimeoutWarning, setCartTimeoutWarning] = useState(false);
+    const [checkoutTransactionId, setCheckoutTransactionId] = useState<string | null>(null);
+    const [checkoutTransactionNumber, setCheckoutTransactionNumber] = useState<string | null>(null);
+    const [confirmationErrorMessage, setConfirmationErrorMessage] = useState<string | null>(null);
     const cartTimeoutRef = useRef<number | null>(null);
     const cartWarningRef = useRef<number | null>(null);
     const cartDeadlineRef = useRef<number | null>(null);
     const confirmationDeadlineRef = useRef<number | null>(null);
+    const confirmationTimeoutTriggeredRef = useRef(false);
     const ignoreActivityUntilRef = useRef<number>(0);
     const {
         cart,
@@ -848,13 +905,23 @@ const KioskApp = () => {
         setItemQuantity,
         removeItem: removeCartItem,
         clearCart: clearCartItems,
-        hydrateFromProducts
+        hydrateFromProducts,
+        sessionKey
     } = useCart();
     const hasCartItems = cart.length > 0;
     const cartCount = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart]);
     const cartTotalCents = useMemo(
         () => cart.reduce((sum, item) => sum + toCents(item.price) * item.quantity, 0),
         [cart]
+    );
+    const safeCartTotalCents = Number.isFinite(cartTotalCents) ? cartTotalCents : 0;
+    const cartTotalFormatted = useMemo(
+        () => formatPriceFromCents(safeCartTotalCents),
+        [safeCartTotalCents]
+    );
+    const cartTotalLabel = useMemo(
+        () => `Total: ${cartTotalFormatted}`,
+        [cartTotalFormatted]
     );
     const [outOfStockPrompt, setOutOfStockPrompt] = useState<NormalizedProduct | null>(null);
     const [selectedProduct, setSelectedProduct] = useState<NormalizedProduct | null>(null);
@@ -892,6 +959,125 @@ const KioskApp = () => {
 
         logKioskEvent('kiosk.manual_confirmation_uncertain', basePayload);
     }, [cart.length, cartTotalCents, checkoutReferenceCode]);
+
+    const createPendingTransaction = useCallback(async () => {
+        if (typeof window !== 'undefined'
+            && window.localStorage.getItem('snackbar-force-offline-feed') === '1') {
+            return;
+        }
+        const items = cart.map((item) => ({
+            productId: item.id,
+            quantity: item.quantity
+        }));
+
+        if (!items.length) {
+            return;
+        }
+
+        const response = await apiRequest<{
+            data?: {
+                transaction?: { id?: string; transaction_number?: string; payment_status?: string };
+                confirmationTimeoutSeconds?: number;
+            };
+        }>({
+            path: '/transactions',
+            method: 'POST',
+            body: {
+                items,
+                paymentStatus: 'PENDING',
+                paymentMethod: 'manual',
+                confirmationChannel: 'kiosk',
+                confirmationReference: checkoutReferenceCode,
+                confirmationMetadata: {
+                    kioskSessionId: sessionKey,
+                    cartTotal: Number((cartTotalCents / 100).toFixed(2)),
+                    basketHash: createBasketHash(cart),
+                    promptShownAt: new Date().toISOString()
+                }
+            }
+        });
+
+        const transaction = response?.data?.transaction;
+        if (transaction?.id) {
+            setCheckoutTransactionId(transaction.id);
+        }
+        if (transaction?.transaction_number) {
+            setCheckoutTransactionNumber(transaction.transaction_number);
+        }
+
+        if (response?.data?.confirmationTimeoutSeconds) {
+            const timeoutMs = response.data.confirmationTimeoutSeconds * 1000;
+            confirmationDeadlineRef.current = Date.now() + timeoutMs;
+            setConfirmationCountdownMs(timeoutMs);
+        }
+    }, [cart, cartTotalCents, checkoutReferenceCode, sessionKey]);
+
+    const submitConfirmation = useCallback(
+        async (
+            outcome: 'COMPLETED' | 'FAILED' | 'PAYMENT_UNCERTAIN',
+            metadata?: Record<string, unknown>
+        ) => {
+            if (typeof window !== 'undefined'
+                && window.localStorage.getItem('snackbar-force-offline-feed') === '1') {
+                return;
+            }
+            if (!checkoutTransactionId) {
+                setConfirmationErrorMessage(
+                    'Confirmation service is temporarily unavailable. Please contact staff.'
+                );
+                finalizeManualConfirmationState('failure');
+                return;
+            }
+
+            try {
+                const response = await apiRequest<{
+                    data?: {
+                        transaction?: { payment_status?: string; paymentStatus?: string };
+                    };
+                }>({
+                    path: `/transactions/${checkoutTransactionId}/confirm`,
+                    method: 'POST',
+                    body: {
+                        declaredOutcome: outcome,
+                        declaredTender: 'manual',
+                        confirmationChannel: 'kiosk',
+                        confirmationReference: checkoutReferenceCode,
+                        confirmationMetadata: {
+                            kioskSessionId: sessionKey,
+                            ...metadata
+                        }
+                    }
+                });
+
+                const paymentStatus =
+                    response?.data?.transaction?.payment_status ||
+                    response?.data?.transaction?.paymentStatus ||
+                    outcome;
+
+                if (paymentStatus === 'COMPLETED') {
+                    finalizeManualConfirmationState('success');
+                } else if (paymentStatus === 'FAILED') {
+                    finalizeManualConfirmationState('failure');
+                } else {
+                    finalizeManualConfirmationState('uncertain');
+                }
+            } catch (error) {
+                const apiError = error as ApiError;
+                const details = apiError?.details as { code?: string } | null | undefined;
+                if (details?.code === 'confirmation_unavailable') {
+                    setConfirmationErrorMessage(
+                        'Confirmation service is temporarily unavailable. Please contact staff.'
+                    );
+                } else if (details?.code === 'confirmation_persist_failed') {
+                    setConfirmationErrorMessage(
+                        'Payment confirmation could not be recorded. Please contact staff.'
+                    );
+                }
+                finalizeManualConfirmationState('failure');
+            }
+        },
+        [checkoutReferenceCode, checkoutTransactionId, finalizeManualConfirmationState, sessionKey]
+    );
 
     const markCategoryFilterSelection = (category: string) => {
         if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
@@ -1005,7 +1191,20 @@ const KioskApp = () => {
         if (primaryButton && !primaryButton.disabled && typeof primaryButton.focus === 'function') {
             primaryButton.focus({ preventScroll: true });
         }
+        if (primaryButton && typeof primaryButton.scrollIntoView === 'function') {
+            primaryButton.scrollIntoView({ block: 'center', inline: 'center' });
+        }
     }, [checkoutPromptReady, checkoutVisible, manualConfirmationState]);
+
+    useEffect(() => {
+        if (typeof document === 'undefined') {
+            return;
+        }
+        const node = document.getElementById('cart-total');
+        if (node && node.textContent !== cartTotalLabel) {
+            node.textContent = cartTotalLabel;
+        }
+    }, [cartTotalLabel]);
 
     useEffect(() => {
         if (trackingDisabled && !inventoryWarningLoggedRef.current) {
@@ -1056,12 +1255,14 @@ const KioskApp = () => {
         const dialogNode = outOfStockDialogRef.current;
         const confirmButton = outOfStockConfirmRef.current;
         const cancelButton = outOfStockCancelRef.current;
-        const focusables = [confirmButton, cancelButton].filter((node) => node && typeof node.focus === 'function');
+        const focusables = [confirmButton, cancelButton].filter(
+            (node): node is HTMLButtonElement => Boolean(node && typeof node.focus === 'function')
+        );
 
         previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
         if (focusables.length > 0) {
-            focusables[0].focus({ preventScroll: true });
+            focusables[0]?.focus({ preventScroll: true });
         } else if (dialogNode && typeof dialogNode.focus === 'function') {
             dialogNode.focus({ preventScroll: true });
         }
@@ -1082,8 +1283,10 @@ const KioskApp = () => {
                 return;
             }
 
-            const activeElement = document.activeElement;
-            const currentIndex = focusables.indexOf(activeElement);
+            const activeElement = document.activeElement instanceof HTMLButtonElement
+                ? document.activeElement
+                : null;
+            const currentIndex = focusables.indexOf(activeElement as HTMLButtonElement);
             const fallbackIndex = event.shiftKey ? focusables.length - 1 : 0;
             const nextIndex = currentIndex === -1
                 ? fallbackIndex
@@ -1180,7 +1383,8 @@ const KioskApp = () => {
                     id: product.id,
                     name: product.name,
                     price: product.price,
-                    purchaseLimit: product.purchaseLimit
+                    purchaseLimit: product.purchaseLimit,
+                    imageUrl: product.imageUrl ?? null
                 },
                 nextQuantity
             );
@@ -1337,7 +1541,8 @@ const KioskApp = () => {
                     id: target.id,
                     name: target.name,
                     price: target.price,
-                    purchaseLimit: target.purchaseLimit
+                    purchaseLimit: target.purchaseLimit,
+                    imageUrl: target.imageUrl ?? null
                 },
                 target.quantity + 1
             );
@@ -1358,7 +1563,8 @@ const KioskApp = () => {
                     id: target.id,
                     name: target.name,
                     price: target.price,
-                    purchaseLimit: target.purchaseLimit
+                    purchaseLimit: target.purchaseLimit,
+                    imageUrl: target.imageUrl ?? null
                 },
                 target.quantity - 1
             );
@@ -1420,14 +1626,8 @@ const KioskApp = () => {
             return undefined;
         }
 
-        setCheckoutPromptReady(false);
-        const timer = window.setTimeout(() => {
-            setCheckoutPromptReady(true);
-        }, 150);
-
-        return () => {
-            window.clearTimeout(timer);
-        };
+        setCheckoutPromptReady(true);
+        return undefined;
     }, [checkoutVisible, checkoutReferenceCode]);
 
     useEffect(() => {
@@ -1485,8 +1685,14 @@ const KioskApp = () => {
             return;
         }
 
-        finalizeManualConfirmationState('uncertain');
-    }, [checkoutVisible, confirmationCountdownMs, finalizeManualConfirmationState, manualConfirmationState]);
+        if (!confirmationTimeoutTriggeredRef.current) {
+            confirmationTimeoutTriggeredRef.current = true;
+            setConfirmationErrorMessage(
+                'Waiting for confirmation. Please confirm payment or ask for assistance.'
+            );
+            void submitConfirmation('FAILED', { reason: 'timeout' });
+        }
+    }, [checkoutVisible, confirmationCountdownMs, manualConfirmationState, submitConfirmation]);
 
     const resetCartTimeout = useCallback(() => {
         if (cartTimeoutRef.current) {
@@ -1567,7 +1773,7 @@ const KioskApp = () => {
         };
     }, [hasCartItems, resetCartTimeout]);
 
-    const handleCheckout = () => {
+    const handleCheckout = async () => {
         if (!hasCartItems) {
             return;
         }
@@ -1584,14 +1790,29 @@ const KioskApp = () => {
         setManualConfirmationState('prompt');
         setCheckoutPromptReady(false);
         setCheckoutVisible(true);
+        setCheckoutTransactionId(null);
+        setCheckoutTransactionNumber(null);
+        setConfirmationErrorMessage(null);
+        confirmationTimeoutTriggeredRef.current = false;
         setCartOpen(false);
         setToastMessage('');
         resetCartTimeout();
         logKioskEvent('kiosk.checkout_started', {
             cartSize: cart.length,
-            totalEuros: Number.isFinite(cartTotalCents) ? Number((cartTotalCents / 100).toFixed(2)) : 0,
+            totalEuros: Number.isFinite(safeCartTotalCents) ? Number((safeCartTotalCents / 100).toFixed(2)) : 0,
             confirmationReference: referenceCode
         });
+
+        try {
+            await createPendingTransaction();
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Unable to start checkout.';
+            setToastMessage(message);
+            logKioskEvent('kiosk.checkout_transaction_failed', {
+                confirmationReference: referenceCode,
+                error: message
+            });
+        }
     };
 
     const dismissCheckoutPrompt = (reason: 'backdrop' | 'cancel') => {
@@ -1600,6 +1821,10 @@ const KioskApp = () => {
         setCheckoutPromptReady(false);
         confirmationDeadlineRef.current = null;
         setConfirmationCountdownMs(CONFIRMATION_TIMEOUT_MS);
+        setCheckoutTransactionId(null);
+        setCheckoutTransactionNumber(null);
+        setConfirmationErrorMessage(null);
+        confirmationTimeoutTriggeredRef.current = false;
         resetCartTimeout();
         logKioskEvent('kiosk.manual_confirmation_dismissed', {
             reason,
@@ -1609,13 +1834,19 @@ const KioskApp = () => {
     };
 
     const handleConfirmPayment = () => {
+        if (!checkoutPromptReady || manualConfirmationState === 'pending') {
+            return;
+        }
         setManualConfirmationState('pending');
         resetCartTimeout();
+        setConfirmationErrorMessage(null);
         logKioskEvent('kiosk.manual_confirmation_prompt_acknowledged', {
             confirmationReference: checkoutReferenceCode || null,
             cartSize: cart.length,
             totalEuros: Number.isFinite(cartTotalCents) ? Number((cartTotalCents / 100).toFixed(2)) : 0
         });
+
+        void submitConfirmation('COMPLETED');
     };
 
     const handleRetryPayment = () => {
@@ -1623,6 +1854,8 @@ const KioskApp = () => {
         setCheckoutPromptReady(true);
         confirmationDeadlineRef.current = Date.now() + CONFIRMATION_TIMEOUT_MS;
         setConfirmationCountdownMs(CONFIRMATION_TIMEOUT_MS);
+        setConfirmationErrorMessage(null);
+        confirmationTimeoutTriggeredRef.current = false;
         resetCartTimeout();
         logKioskEvent('kiosk.manual_confirmation_retry_requested', {
             confirmationReference: checkoutReferenceCode || null,
@@ -1651,6 +1884,9 @@ const KioskApp = () => {
             setCheckoutReferenceCode('');
             confirmationDeadlineRef.current = null;
             setConfirmationCountdownMs(CONFIRMATION_TIMEOUT_MS);
+            setCheckoutTransactionId(null);
+            setCheckoutTransactionNumber(null);
+            setConfirmationErrorMessage(null);
         }
     }, [hasCartItems]);
 
@@ -1690,6 +1926,8 @@ const KioskApp = () => {
         const timer = window.setTimeout(() => {
             confirmationDeadlineRef.current = null;
             setCheckoutReferenceCode('');
+            setCheckoutTransactionId(null);
+            setCheckoutTransactionNumber(null);
             void clearCart();
         }, SUCCESS_MESSAGE_MIN_DURATION_MS);
 
@@ -1718,6 +1956,60 @@ const KioskApp = () => {
         };
     }, [cartOpen, checkoutVisible, outOfStockPrompt]);
 
+    const selectedProductDetail = useMemo(() => {
+        if (!selectedProduct) {
+            return null;
+        }
+        const detail: {
+            id: string;
+            name: string;
+            price: number;
+            isOutOfStock: boolean;
+            isLowStock: boolean;
+            purchaseLimit: number | null;
+            description?: string;
+            imageUrl?: string;
+            imageAlt?: string;
+            allergens?: string;
+            categories?: Array<{ id?: string; name?: string }>;
+        } = {
+            id: selectedProduct.id,
+            name: selectedProduct.name,
+            price: selectedProduct.price,
+            isOutOfStock: selectedProduct.isOutOfStock,
+            isLowStock: selectedProduct.isLowStock,
+            purchaseLimit: selectedProduct.purchaseLimit
+        };
+        if (selectedProduct.description) {
+            detail.description = selectedProduct.description;
+        }
+        if (selectedProduct.imageUrl) {
+            detail.imageUrl = selectedProduct.imageUrl;
+        }
+        if (selectedProduct.imageAlt) {
+            detail.imageAlt = selectedProduct.imageAlt;
+        }
+        if (selectedProduct.allergens) {
+            detail.allergens = selectedProduct.allergens;
+        }
+        const categories = selectedProduct.categories
+            ?.map((category) => {
+                const entry: { id?: string; name?: string } = {};
+                if (category.id) {
+                    entry.id = category.id;
+                }
+                if (category.name) {
+                    entry.name = category.name;
+                }
+                return entry;
+            })
+            .filter((entry) => Boolean(entry.id || entry.name));
+        if (categories && categories.length > 0) {
+            detail.categories = categories;
+        }
+        return detail;
+    }, [selectedProduct]);
+
     return (
         <div className={`kiosk-app${overlayInfo.active ? ' kiosk-unavailable' : ''}`}>
             <header className="kiosk-header">
@@ -1738,6 +2030,9 @@ const KioskApp = () => {
                         {cartCount}
                     </span>
                 </button>
+                <div id="cart-total" className="cart-total-summary" aria-live="polite">
+                    {cartTotalLabel}
+                </div>
             </header>
 
             {trackingDisabled && (
@@ -2070,8 +2365,8 @@ const KioskApp = () => {
                             })}
                         </div>
                         <div className="cart-footer">
-                            <div id="cart-total" className="cart-total">
-                                Total: {formatPriceFromCents(cartTotalCents)}
+                            <div id="cart-total-panel" className="cart-total">
+                                Total: {cartTotalFormatted}
                             </div>
                             <button
                                 id="checkout-button"
@@ -2208,7 +2503,7 @@ const KioskApp = () => {
 
                                 <div className="checkout-summary manual-confirmation-summary">
                                     <span className="checkout-total-label">Total due</span>
-                                    <span className="checkout-total-amount">{formatPriceFromCents(cartTotalCents)}</span>
+                                    <span className="checkout-total-amount">{cartTotalFormatted}</span>
                                 </div>
 
                                 <div className="manual-confirmation-timers" role="status" aria-live="polite">
@@ -2234,7 +2529,7 @@ const KioskApp = () => {
                                         className="payment-action-button primary"
                                         ref={checkoutPrimaryActionRef}
                                         onClick={handleConfirmPayment}
-                                        disabled={!checkoutPromptReady || manualConfirmationState === 'pending'}
+                                        disabled={manualConfirmationState === 'pending'}
                                         aria-disabled={!checkoutPromptReady || manualConfirmationState === 'pending'}
                                     >
                                         {manualConfirmationState === 'pending' ? 'Checking payment…' : 'I have paid'}
@@ -2262,7 +2557,7 @@ const KioskApp = () => {
                                 <p>Your payment has been confirmed. You may take your items.</p>
                                 <div className="manual-confirmation-outcome-details">
                                     <span><strong>Items:</strong> {listPurchasedItems(cart)}</span>
-                                    <span><strong>Total:</strong> {formatPriceFromCents(cartTotalCents)}</span>
+                                    <span><strong>Total:</strong> {cartTotalFormatted}</span>
                                     <span><strong>Reference:</strong> {checkoutReferenceCode}</span>
                                 </div>
                             </div>
@@ -2277,10 +2572,14 @@ const KioskApp = () => {
                             >
                                 <div className="manual-confirmation-outcome-icon" aria-hidden="true">❌</div>
                                 <h3>Payment Failed</h3>
-                                <p>We could not verify your payment. Your cart is still intact and inventory has not been deducted.</p>
+                                <p>
+                                    {confirmationErrorMessage
+                                        ? confirmationErrorMessage
+                                        : 'We could not verify your payment. Your cart is still intact and inventory has not been deducted.'}
+                                </p>
                                 <div className="manual-confirmation-outcome-details">
                                     <span><strong>Items:</strong> {listPurchasedItems(cart)}</span>
-                                    <span><strong>Total:</strong> {formatPriceFromCents(cartTotalCents)}</span>
+                                    <span><strong>Total:</strong> {cartTotalFormatted}</span>
                                     <span><strong>Reference:</strong> {checkoutReferenceCode}</span>
                                 </div>
                                 <div className="checkout-actions manual-confirmation-actions">
@@ -2316,7 +2615,7 @@ const KioskApp = () => {
                                 <p>Payment processor error. If you were charged, you may take your items while staff reviews this purchase.</p>
                                 <div className="manual-confirmation-outcome-details">
                                     <span><strong>Reference:</strong> {checkoutReferenceCode}</span>
-                                    <span><strong>Total:</strong> {formatPriceFromCents(cartTotalCents)}</span>
+                                    <span><strong>Total:</strong> {cartTotalFormatted}</span>
                                     <span><strong>Contact:</strong> {ADMIN_SUPPORT_EMAIL}</span>
                                 </div>
                                 <div className="checkout-actions manual-confirmation-actions">
@@ -2336,9 +2635,13 @@ const KioskApp = () => {
 
             {selectedProduct && (
                 <ProductDetailModal
-                    product={selectedProduct}
+                    product={selectedProductDetail}
                     onDismiss={() => setSelectedProduct(null)}
-                    onAddToCart={(product) => handleAddToCart(product)}
+                    onAddToCart={() => {
+                        if (selectedProduct) {
+                            handleAddToCart(selectedProduct);
+                        }
+                    }}
                     connectionState={kioskConnectionState}
                 />
             )}

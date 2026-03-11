@@ -75,7 +75,17 @@ const AuditActions = {
     CART_TIMEOUT: 'CART_TIMEOUT',
 
     // Configuration
-    CONFIG_UPDATED: 'CONFIG_UPDATED'
+    CONFIG_UPDATED: 'CONFIG_UPDATED',
+
+    // Transaction confirmation
+    TRANSACTION_CREATED: 'TRANSACTION_CREATED',
+    TRANSACTION_CONFIRMATION_ATTEMPTED: 'TRANSACTION_CONFIRMATION_ATTEMPTED',
+    TRANSACTION_CONFIRMED: 'TRANSACTION_CONFIRMED',
+    TRANSACTION_FAILED: 'TRANSACTION_FAILED',
+    TRANSACTION_MARKED_UNCERTAIN: 'TRANSACTION_MARKED_UNCERTAIN',
+    TRANSACTION_RECONCILED_CONFIRMED: 'TRANSACTION_RECONCILED_CONFIRMED',
+    TRANSACTION_RECONCILED_REFUNDED: 'TRANSACTION_RECONCILED_REFUNDED',
+    CONFIRMATION_SERVICE_UNAVAILABLE: 'CONFIRMATION_SERVICE_UNAVAILABLE'
 } as const;
 
 /**
@@ -88,8 +98,15 @@ const EntityTypes = {
     INVENTORY: 'INVENTORY',
     CART_SESSION: 'CART_SESSION',
     CONFIG: 'CONFIG',
-    SESSION: 'SESSION'
+    SESSION: 'SESSION',
+    TRANSACTION: 'TRANSACTION',
+    CONFIRMATION_SERVICE: 'CONFIRMATION_SERVICE'
 } as const;
+
+const sleep = (ms: number) =>
+    new Promise<void>((resolve) => {
+        setTimeout(resolve, ms);
+    });
 
 /**
  * Create an audit log entry
@@ -124,6 +141,49 @@ const createAuditLog = async ({
     )) as DbQueryResult<AuditLogRecord>;
 
     return result.rows[0] || {};
+};
+
+const createAuditLogWithRetry = async (
+    params: AuditLogParams,
+    {
+        retryScheduleMs = [1000, 2000, 4000],
+        maxAttempts = 1 + retryScheduleMs.length
+    }: {
+        retryScheduleMs?: number[];
+        maxAttempts?: number;
+    } = {}
+) => {
+    const attemptTimestamps: string[] = [];
+    let lastError: unknown = null;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+        attemptTimestamps.push(new Date().toISOString());
+        try {
+            const record = await createAuditLog(params);
+            return {
+                record,
+                attempts: attempt,
+                timestamps: attemptTimestamps,
+                succeeded: true
+            };
+        } catch (error) {
+            lastError = error;
+            if (attempt < maxAttempts) {
+                const delay = retryScheduleMs[Math.min(attempt - 1, retryScheduleMs.length - 1)] ?? 0;
+                if (delay > 0) {
+                    await sleep(delay);
+                }
+            }
+        }
+    }
+
+    return {
+        record: null,
+        attempts: attemptTimestamps.length,
+        timestamps: attemptTimestamps,
+        succeeded: false,
+        error: lastError
+    };
 };
 
 /**
@@ -196,8 +256,15 @@ const auditService = {
     AuditActions,
     EntityTypes,
     createAuditLog,
+    createAuditLogWithRetry,
     getAuditLogs
 };
 
-export { AuditActions, EntityTypes, createAuditLog, getAuditLogs };
+export {
+    AuditActions,
+    EntityTypes,
+    createAuditLog,
+    createAuditLogWithRetry,
+    getAuditLogs
+};
 export default auditService;
