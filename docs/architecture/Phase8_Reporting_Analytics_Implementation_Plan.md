@@ -1,4 +1,4 @@
-<!-- markdownlint-disable MD013 -->
+<!-- markdownlint-disable MD013 MD036 -->
 # Phase 8 Implementation Plan - Reporting & Analytics
 
 ## Purpose
@@ -37,7 +37,7 @@ Deliver admin reporting, analytics, and exports for Issue #10 while staying alig
 - [x] Phase 0 - Readiness & Contract Alignment (completed 2026-03-11)
 - [x] Phase 1 - Data Model & Indexing for Reporting (completed 2026-03-11)
 - [x] Phase 2 - Transaction History API + Search/Filter (completed 2026-03-11)
-- [ ] Phase 3 - Uncertain Payment Resolution & Audit Trail
+- [x] Phase 3 - Uncertain Payment Resolution & Audit Trail (completed 2026-03-11)
 - [ ] Phase 4 - Analytics Aggregations + KPIs
 - [ ] Phase 5 - Admin Dashboard UI (Charts + Filters)
 - [ ] Phase 6 - CSV Export + Retention/Storage UI
@@ -73,17 +73,17 @@ Deliver admin reporting, analytics, and exports for Issue #10 while staying alig
 
 **Status:** Completed 2026-03-11
 
-**Tasks**
+#### Tasks
 
 1. Reconfirm transaction status enum and reconciliation expectations in SRS (FR-9.x, FR-10.x, FR-8.2.4) and Phase 7 handoff.
 2. Inventory existing transaction/list endpoints and schemas for gaps vs. reporting requirements.
 3. Confirm admin authorization middleware requirements for reporting endpoints.
 
-**Acceptance linkage**
+#### Acceptance linkage
 
 - US-039–US-047 (all depend on accurate transaction logging and admin-only access).
 
-**Tests**
+#### Tests
 
 - admin_transactions_statistics.robot (all suites) as final validation only.
 
@@ -145,6 +145,8 @@ Deliver admin reporting, analytics, and exports for Issue #10 while staying alig
 ### Phase 3 - Uncertain Payment Resolution & Audit Trail
 
 **Goal:** Provide admin UI + API to resolve `PAYMENT_UNCERTAIN` transactions.
+
+**Status:** Completed 2026-03-11
 
 **Tasks**
 

@@ -108,9 +108,10 @@ const reconcileValidation = [
         .isIn(['CONFIRMED', 'REFUNDED'])
         .withMessage('action must be CONFIRMED or REFUNDED'),
     body('notes')
-        .optional({ nullable: true })
         .isString()
-        .withMessage('notes must be a string'),
+        .withMessage('notes must be a string')
+        .isLength({ min: 10 })
+        .withMessage('Minimum 10 characters required'),
     body('metadata')
         .optional({ nullable: true })
         .isObject()

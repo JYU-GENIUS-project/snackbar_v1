@@ -118,6 +118,7 @@ const PAYMENT_STATUSES = new Set([
     'COMPLETED',
     'FAILED',
     'PAYMENT_UNCERTAIN',
+    'REFUNDED',
 ]);
 
 const CONFIRMATION_OUTCOMES = new Set([
@@ -1035,7 +1036,14 @@ const reconcileTransaction = async ({
         throw new ApiError(400, 'Invalid reconciliation action');
     }
 
-    const newStatus = normalizedAction === 'CONFIRMED' ? 'COMPLETED' : 'FAILED';
+    const normalizedNotes = notes ? notes.toString().trim() : '';
+    if (normalizedNotes.length < 10) {
+        throw new ApiError(400, 'Minimum 10 characters required', {
+            code: 'reconciliation_notes_required',
+        });
+    }
+
+    const newStatus = normalizedAction === 'CONFIRMED' ? 'COMPLETED' : 'REFUNDED';
 
     const dbWithTransaction = db as unknown as {
         transaction: <T>(
@@ -1106,7 +1114,7 @@ const reconcileTransaction = async ({
         const mergedMetadata = {
             ...(transaction.confirmation_metadata ?? {}),
             ...(metadata ?? {}),
-            reconciliationNotes: notes ?? null,
+            reconciliationNotes: normalizedNotes,
             reconciliationOutcome: normalizedAction,
             reconciledAt: new Date().toISOString(),
             reconciledBy: actor.id,
@@ -1229,7 +1237,7 @@ const reconcileTransaction = async ({
         newValues: {
             status: result.transaction.payment_status,
             reconciliationOutcome: normalizedAction,
-            reconciliationNotes: notes ?? null
+            reconciliationNotes: normalizedNotes
         }
     });
 
@@ -1245,7 +1253,7 @@ const reconcileTransaction = async ({
         transactionNumber: result.transaction.transaction_number,
         status: result.transaction.payment_status,
         reconciliationOutcome: normalizedAction,
-        reconciliationNotes: notes ?? null,
+        reconciliationNotes: normalizedNotes,
         reconciledBy: actor.id,
         auditAttempts: reconciliationAudit.attempts,
         inventoryApplied: result.shouldDeductInventory
