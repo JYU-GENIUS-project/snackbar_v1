@@ -11,6 +11,8 @@ import KioskPreview from './KioskPreview.js';
 import CategoryManager from './CategoryManager.js';
 import AdminAccountsManager from './AdminAccountsManager.js';
 import AuditTrailViewer from './AuditTrailViewer.js';
+import TransactionsPanel from './TransactionsPanel.js';
+import StatisticsPanel from './StatisticsPanel.js';
 import {
     normalizeProductPayload,
     productToFormState,
@@ -239,6 +241,8 @@ const toNullableNumber = (value: unknown): number | null => {
 };
 const SECTION_HASHES = Object.freeze({
     dashboard: '#/dashboard',
+    transactions: '#/transactions',
+    statistics: '#/statistics',
     products: '#/products',
     categories: '#/categories',
     'admin-accounts': '#/admin-accounts',
@@ -1178,6 +1182,14 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
         changeSection('dashboard');
     };
 
+    const handleShowTransactions = () => {
+        changeSection('transactions');
+    };
+
+    const handleShowStatistics = () => {
+        changeSection('statistics');
+    };
+
     const handleShowProducts = () => {
         changeSection('products');
     };
@@ -1515,6 +1527,22 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
                     Products
                 </button>
                 <button
+                    id="transactions-menu"
+                    className={`button secondary${activeSection === 'transactions' ? '' : ' muted'}`}
+                    type="button"
+                    onClick={handleShowTransactions}
+                >
+                    Transactions
+                </button>
+                <button
+                    id="statistics-menu"
+                    className={`button secondary${activeSection === 'statistics' ? '' : ' muted'}`}
+                    type="button"
+                    onClick={handleShowStatistics}
+                >
+                    Statistics
+                </button>
+                <button
                     id="categories-menu"
                     className={`button secondary${activeSection === 'categories' ? '' : ' muted'}`}
                     type="button"
@@ -1624,6 +1652,14 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
                         onManageMedia={handleManageMedia}
                     />
                 </section>
+            )}
+
+            {activeSection === 'transactions' && (
+                <TransactionsPanel token={auth.token} />
+            )}
+
+            {activeSection === 'statistics' && (
+                <StatisticsPanel token={auth.token} />
             )}
 
             {activeSection === 'products' && showForm && (
