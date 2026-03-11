@@ -36,7 +36,7 @@ Deliver admin reporting, analytics, and exports for Issue #10 while staying alig
 
 - [x] Phase 0 - Readiness & Contract Alignment (completed 2026-03-11)
 - [x] Phase 1 - Data Model & Indexing for Reporting (completed 2026-03-11)
-- [ ] Phase 2 - Transaction History API + Search/Filter
+- [x] Phase 2 - Transaction History API + Search/Filter (completed 2026-03-11)
 - [ ] Phase 3 - Uncertain Payment Resolution & Audit Trail
 - [ ] Phase 4 - Analytics Aggregations + KPIs
 - [ ] Phase 5 - Admin Dashboard UI (Charts + Filters)
@@ -121,6 +121,8 @@ Deliver admin reporting, analytics, and exports for Issue #10 while staying alig
 ### Phase 2 - Transaction History API + Search/Filter
 
 **Goal:** Provide admin endpoints that back the history table with all filters.
+
+**Status:** Completed 2026-03-11
 
 **Tasks**
 

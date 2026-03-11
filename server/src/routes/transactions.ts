@@ -237,6 +237,13 @@ router.get(
                 endDate?: string;
                 reference?: string;
                 kioskSessionId?: string;
+                productId?: string;
+                productName?: string;
+                amountMin?: number;
+                amountMax?: number;
+                sortBy?: 'date' | 'amount' | 'status';
+                sortDirection?: 'asc' | 'desc';
+                search?: string;
             }) => Promise<Record<string, unknown>>;
 
         const listPayload: {
@@ -247,6 +254,13 @@ router.get(
             endDate?: string;
             reference?: string;
             kioskSessionId?: string;
+            productId?: string;
+            productName?: string;
+            amountMin?: number;
+            amountMax?: number;
+            sortBy?: 'date' | 'amount' | 'status';
+            sortDirection?: 'asc' | 'desc';
+            search?: string;
         } = {};
 
         if (typeof req.query.status === 'string') {
@@ -269,6 +283,39 @@ router.get(
         }
         if (typeof req.query.kioskSessionId === 'string') {
             listPayload.kioskSessionId = req.query.kioskSessionId;
+        }
+        if (typeof req.query.productId === 'string') {
+            listPayload.productId = req.query.productId;
+        }
+        if (typeof req.query.productName === 'string') {
+            listPayload.productName = req.query.productName;
+        }
+        if (typeof req.query.amountMin === 'string') {
+            const parsed = Number(req.query.amountMin);
+            if (Number.isFinite(parsed)) {
+                listPayload.amountMin = parsed;
+            }
+        }
+        if (typeof req.query.amountMax === 'string') {
+            const parsed = Number(req.query.amountMax);
+            if (Number.isFinite(parsed)) {
+                listPayload.amountMax = parsed;
+            }
+        }
+        if (typeof req.query.sortBy === 'string') {
+            const sortBy = req.query.sortBy.toLowerCase();
+            if (sortBy === 'date' || sortBy === 'amount' || sortBy === 'status') {
+                listPayload.sortBy = sortBy as 'date' | 'amount' | 'status';
+            }
+        }
+        if (typeof req.query.sortDirection === 'string') {
+            const direction = req.query.sortDirection.toLowerCase();
+            if (direction === 'asc' || direction === 'desc') {
+                listPayload.sortDirection = direction as 'asc' | 'desc';
+            }
+        }
+        if (typeof req.query.search === 'string') {
+            listPayload.search = req.query.search;
         }
 
         const result = await listTransactions(listPayload);

@@ -95,6 +95,13 @@ type TransactionListFilters = {
     endDate?: string;
     reference?: string;
     kioskSessionId?: string;
+    productId?: string;
+    productName?: string;
+    amountMin?: number;
+    amountMax?: number;
+    sortBy?: 'date' | 'amount' | 'status';
+    sortDirection?: 'asc' | 'desc';
+    search?: string;
 };
 
 type TransactionListResult = {
@@ -509,8 +516,20 @@ const listTransactions = async (
         : 1;
     const pageSize = Number.isFinite(filters.pageSize)
         ? Math.min(100, Math.max(1, Number(filters.pageSize)))
-        : 25;
+        : 50;
     const offset = (page - 1) * pageSize;
+
+    const sortBy = filters.sortBy ?? 'date';
+    const sortDirection = (filters.sortDirection ?? 'desc')
+        .toString()
+        .toLowerCase();
+    const sortOrder = sortDirection === 'asc' ? 'ASC' : 'DESC';
+    const sortColumn =
+        sortBy === 'amount'
+            ? 't.total_amount'
+            : sortBy === 'status'
+                ? 't.payment_status'
+                : 't.created_at';
 
     const whereClause: string[] = [];
     const params: unknown[] = [];
@@ -518,23 +537,23 @@ const listTransactions = async (
 
     if (filters.status) {
         const normalizedStatus = normalizeStatus(filters.status);
-        whereClause.push(`payment_status = $${paramIndex++}`);
+        whereClause.push(`t.payment_status = $${paramIndex++}`);
         params.push(normalizedStatus);
     }
 
     if (filters.startDate) {
-        whereClause.push(`created_at >= $${paramIndex++}`);
+        whereClause.push(`t.created_at >= $${paramIndex++}`);
         params.push(new Date(filters.startDate));
     }
 
     if (filters.endDate) {
-        whereClause.push(`created_at <= $${paramIndex++}`);
+        whereClause.push(`t.created_at <= $${paramIndex++}`);
         params.push(new Date(filters.endDate));
     }
 
     if (filters.reference) {
         whereClause.push(
-            `(transaction_number ILIKE $${paramIndex} OR confirmation_reference ILIKE $${paramIndex})`,
+            `(t.transaction_number ILIKE $${paramIndex} OR t.confirmation_reference ILIKE $${paramIndex})`,
         );
         params.push(`%${filters.reference}%`);
         paramIndex += 1;
@@ -542,36 +561,105 @@ const listTransactions = async (
 
     if (filters.kioskSessionId) {
         whereClause.push(
-            `confirmation_metadata ->> 'kioskSessionId' = $${paramIndex++}`,
+            `t.confirmation_metadata ->> 'kioskSessionId' = $${paramIndex++}`,
         );
         params.push(filters.kioskSessionId);
+    }
+
+    if (typeof filters.amountMin === 'number') {
+        whereClause.push(`t.total_amount >= $${paramIndex++}`);
+        params.push(filters.amountMin);
+    }
+
+    if (typeof filters.amountMax === 'number') {
+        whereClause.push(`t.total_amount <= $${paramIndex++}`);
+        params.push(filters.amountMax);
+    }
+
+    if (filters.productId) {
+        whereClause.push(
+            `EXISTS (
+                SELECT 1
+                FROM transaction_items ti
+                WHERE ti.transaction_id = t.id
+                  AND ti.product_id = $${paramIndex++}
+            )`,
+        );
+        params.push(filters.productId);
+    }
+
+    if (filters.productName) {
+        whereClause.push(
+            `EXISTS (
+                SELECT 1
+                FROM transaction_items ti
+                WHERE ti.transaction_id = t.id
+                  AND LOWER(ti.product_name) LIKE $${paramIndex++}
+            )`,
+        );
+        params.push(`%${filters.productName.toLowerCase()}%`);
+    }
+
+    if (filters.search) {
+        whereClause.push(
+            `(
+                t.transaction_number ILIKE $${paramIndex}
+                OR t.confirmation_reference ILIKE $${paramIndex}
+                OR EXISTS (
+                    SELECT 1
+                    FROM transaction_items ti
+                    WHERE ti.transaction_id = t.id
+                      AND ti.product_name ILIKE $${paramIndex}
+                )
+            )`,
+        );
+        params.push(`%${filters.search}%`);
+        paramIndex += 1;
     }
 
     const whereString =
         whereClause.length > 0 ? `WHERE ${whereClause.join(' AND ')}` : '';
 
     const countResult = (await db.query(
-        `SELECT COUNT(*) as total FROM transactions ${whereString}`,
+        `SELECT COUNT(*) as total
+         FROM transactions t
+         ${whereString}`,
         params,
     )) as DbQueryResult<{ total: string }>;
 
     const total = parseInt(countResult.rows[0]?.total || '0', 10);
 
     const dataResult = (await db.query(
-        `SELECT id,
-                transaction_number,
-                total_amount,
-                payment_method,
-                payment_status,
-                confirmation_channel,
-                confirmation_reference,
-                confirmation_metadata,
-                completed_at,
-                created_at,
-                updated_at
-         FROM transactions
+        `SELECT t.id,
+                t.transaction_number,
+                t.total_amount,
+                t.payment_method,
+                t.payment_status,
+                t.confirmation_channel,
+                t.confirmation_reference,
+                t.confirmation_metadata,
+                t.completed_at,
+                t.created_at,
+                t.updated_at,
+                COALESCE(
+                    JSONB_AGG(
+                        JSONB_BUILD_OBJECT(
+                            'productId', ti.product_id,
+                            'productName', ti.product_name,
+                            'quantity', ti.quantity,
+                            'unitPrice', ti.unit_price,
+                            'subtotal', ti.subtotal
+                        )
+                        ORDER BY ti.product_name
+                    ) FILTER (WHERE ti.id IS NOT NULL),
+                    '[]'::JSONB
+                ) AS items
+         FROM transactions t
+         LEFT JOIN transaction_items ti
+           ON ti.transaction_id = t.id
          ${whereString}
-         ORDER BY created_at DESC
+         GROUP BY t.id
+         ORDER BY ${sortColumn} ${sortOrder}
          LIMIT $${paramIndex++} OFFSET $${paramIndex}`,
         [...params, pageSize, offset],
     )) as DbQueryResult<Record<string, unknown>>;
