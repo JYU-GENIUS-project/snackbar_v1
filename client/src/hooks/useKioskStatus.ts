@@ -169,6 +169,8 @@ const extractApiPayload = (response: unknown): KioskStatusPayload | null => {
 
 export const useKioskStatus = (options: UseKioskStatusOptions = {}) => {
     const offlineState = useMemo(() => readOfflineState(), []);
+    const forcedOffline = typeof window !== 'undefined'
+        && window.localStorage.getItem('snackbar-force-offline-feed') === '1';
     const [status, setStatus] = useState<KioskStatusPayload | null>(offlineState.status);
     const [statusFingerprint, setStatusFingerprint] = useState<string | null>(offlineState.statusFingerprint);
     const [inventoryTrackingEnabled, setInventoryTrackingEnabled] = useState(offlineState.inventoryTrackingEnabled);
@@ -245,6 +247,9 @@ export const useKioskStatus = (options: UseKioskStatusOptions = {}) => {
     const reconnectDelayBase = options.reconnectDelayBase ?? 2000;
 
     const startEventStream = useCallback(() => {
+        if (forcedOffline) {
+            return;
+        }
         if (typeof window === 'undefined' || typeof window.EventSource === 'undefined') {
             setConnectionState('unsupported');
             return;
@@ -310,9 +315,13 @@ export const useKioskStatus = (options: UseKioskStatusOptions = {}) => {
                 startEventStream();
             }, delay);
         };
-    }, [applyInventoryAvailability, applyStatusPayload, applyTrackingPayload, reconnectDelayBase]);
+    }, [applyInventoryAvailability, applyStatusPayload, applyTrackingPayload, forcedOffline, reconnectDelayBase]);
 
     useEffect(() => {
+        if (forcedOffline) {
+            setConnectionState('offline');
+            return () => undefined;
+        }
         if (options.sse !== false) {
             startEventStream();
         }
@@ -326,7 +335,7 @@ export const useKioskStatus = (options: UseKioskStatusOptions = {}) => {
                 reconnectTimerRef.current = null;
             }
         };
-    }, [options.sse, startEventStream]);
+    }, [forcedOffline, options.sse, startEventStream]);
 
     const fetchStatus = async ({ signal }: { signal?: AbortSignal }) => {
         const response = await apiRequest<unknown>({ path: '/status/kiosk', method: 'GET', signal });
@@ -336,7 +345,7 @@ export const useKioskStatus = (options: UseKioskStatusOptions = {}) => {
     const statusQuery = useQuery<KioskStatusPayload | null>({
         queryKey: STATUS_QUERY_KEY,
         queryFn: ({ signal }) => fetchStatus({ signal }),
-        enabled: options.enabled !== false,
+        enabled: options.enabled !== false && !forcedOffline,
         refetchInterval: options.refetchInterval ?? 45000,
         staleTime: options.staleTime ?? 30000,
         retry: options.retry ?? 1,
@@ -344,10 +353,17 @@ export const useKioskStatus = (options: UseKioskStatusOptions = {}) => {
     });
 
     useEffect(() => {
+        if (forcedOffline) {
+            setStatus(offlineState.status ?? null);
+            setStatusFingerprint(offlineState.statusFingerprint ?? null);
+            setInventoryTrackingEnabled(offlineState.inventoryTrackingEnabled);
+            setLastUpdatedAt(offlineState.lastUpdatedAt ?? null);
+            return;
+        }
         if (statusQuery.data) {
             applyStatusPayload(statusQuery.data as StatusEventPayload | null, 'poll');
         }
-    }, [applyStatusPayload, statusQuery.data]);
+    }, [applyStatusPayload, forcedOffline, offlineState, statusQuery.data]);
 
     const inventoryAvailability = useMemo(() => {
         const source = availabilityRef.current instanceof Map ? availabilityRef.current : null;

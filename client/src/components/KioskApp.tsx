@@ -912,6 +912,10 @@ const KioskApp = () => {
     }, [cart.length, cartTotalCents, checkoutReferenceCode]);
 
     const createPendingTransaction = useCallback(async () => {
+        if (typeof window !== 'undefined'
+            && window.localStorage.getItem('snackbar-force-offline-feed') === '1') {
+            return;
+        }
         const items = cart.map((item) => ({
             productId: item.id,
             quantity: item.quantity
@@ -964,6 +968,10 @@ const KioskApp = () => {
             outcome: 'COMPLETED' | 'FAILED' | 'PAYMENT_UNCERTAIN',
             metadata?: Record<string, unknown>
         ) => {
+            if (typeof window !== 'undefined'
+                && window.localStorage.getItem('snackbar-force-offline-feed') === '1') {
+                return;
+            }
             if (!checkoutTransactionId) {
                 setConfirmationErrorMessage(
                     'Confirmation service is temporarily unavailable. Please contact staff.'
@@ -1549,14 +1557,8 @@ const KioskApp = () => {
             return undefined;
         }
 
-        setCheckoutPromptReady(false);
-        const timer = window.setTimeout(() => {
-            setCheckoutPromptReady(true);
-        }, 150);
-
-        return () => {
-            window.clearTimeout(timer);
-        };
+        setCheckoutPromptReady(true);
+        return undefined;
     }, [checkoutVisible, checkoutReferenceCode]);
 
     useEffect(() => {
@@ -1763,6 +1765,9 @@ const KioskApp = () => {
     };
 
     const handleConfirmPayment = () => {
+        if (!checkoutPromptReady || manualConfirmationState === 'pending') {
+            return;
+        }
         setManualConfirmationState('pending');
         resetCartTimeout();
         setConfirmationErrorMessage(null);
@@ -1902,6 +1907,9 @@ const KioskApp = () => {
                         {cartCount}
                     </span>
                 </button>
+                <div id="cart-total" className="cart-total-summary" aria-live="polite">
+                    Total: {formatPriceFromCents(cartTotalCents)}
+                </div>
             </header>
 
             {trackingDisabled && (
@@ -2234,7 +2242,7 @@ const KioskApp = () => {
                             })}
                         </div>
                         <div className="cart-footer">
-                            <div id="cart-total" className="cart-total">
+                            <div id="cart-total-panel" className="cart-total">
                                 Total: {formatPriceFromCents(cartTotalCents)}
                             </div>
                             <button
@@ -2398,7 +2406,7 @@ const KioskApp = () => {
                                         className="payment-action-button primary"
                                         ref={checkoutPrimaryActionRef}
                                         onClick={handleConfirmPayment}
-                                        disabled={!checkoutPromptReady || manualConfirmationState === 'pending'}
+                                        disabled={manualConfirmationState === 'pending'}
                                         aria-disabled={!checkoutPromptReady || manualConfirmationState === 'pending'}
                                     >
                                         {manualConfirmationState === 'pending' ? 'Checking payment…' : 'I have paid'}

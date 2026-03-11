@@ -15,7 +15,7 @@ Deliver kiosk-driven manual payment confirmation with reliable transaction loggi
 - [x] Phase 5 - Admin Reconciliation & Transaction Queries (completed 2026-03-10)
 - [x] Phase 6 - Kiosk Integration With Confirmation API (completed 2026-03-10)
 - [x] Phase 7 - Observability, Metrics, and Monitoring Hooks (completed 2026-03-10)
-- [ ] Phase 8 - Validation & Regression Coverage
+- [ ] Phase 8 - Validation & Regression Coverage (in progress 2026-03-10)
 
 ## Source of Truth (Must Not Diverge)
 
@@ -307,6 +307,15 @@ Deliver kiosk-driven manual payment confirmation with reliable transaction loggi
 ### Phase 8 - Validation & Regression Coverage
 
 **Goal:** Validate performance, security, and acceptance coverage in the required suites.
+
+**Status:** In progress 2026-03-10
+
+**Latest validation run**
+
+- customer_payment_checkout.robot failed during suite setup with connection refused (kiosk URL not reachable). See [tests/results/phase7/output.xml](tests/results/phase7/output.xml).
+- Remediation applied: ensured cart total is visible outside the cart panel and made the confirmation prompt ready immediately for click targets; rerun pending.
+- Remediation applied: aligned offline kiosk seed data pricing with checkout expectations in [tests/resources/common.robot](tests/resources/common.robot).
+- Remediation applied: kiosk status polling/SSE bypassed when offline feed is forced to prevent status overlays during acceptance tests.
 
 #### Phase 8 Tasks
 

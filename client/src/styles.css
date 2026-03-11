@@ -348,6 +348,12 @@ textarea {
   justify-content: space-between;
 }
 
+.cart-total-summary {
+  font-weight: 600;
+  color: #f9fafb;
+  font-size: var(--kiosk-font-size-body);
+}
+
 .kiosk-header h1 {
   font-size: var(--kiosk-font-size-title);
   line-height: var(--kiosk-heading-line-height);
