@@ -14,7 +14,7 @@ const TEST_CONTROL_ALLOWED_STATUSES = new Set(['open', 'closed', 'maintenance'])
 const CART_TIMEOUT_MS = 5 * 60 * 1000;
 const CART_WARNING_MS = 30 * 1000;
 const CONFIRMATION_TIMEOUT_MS = 60 * 1000;
-const SUCCESS_MESSAGE_MIN_DURATION_MS = 3 * 1000;
+const SUCCESS_MESSAGE_MIN_DURATION_MS = 4 * 1000;
 const ADMIN_SUPPORT_EMAIL = 'support@snackbar.local';
 
 const TRUST_MODE_STORAGE_KEY = 'snackbar-trust-mode-disabled';
@@ -874,6 +874,15 @@ const KioskApp = () => {
         () => cart.reduce((sum, item) => sum + toCents(item.price) * item.quantity, 0),
         [cart]
     );
+    const safeCartTotalCents = Number.isFinite(cartTotalCents) ? cartTotalCents : 0;
+    const cartTotalFormatted = useMemo(
+        () => formatPriceFromCents(safeCartTotalCents),
+        [safeCartTotalCents]
+    );
+    const cartTotalLabel = useMemo(
+        () => `Total: ${cartTotalFormatted}`,
+        [cartTotalFormatted]
+    );
     const [outOfStockPrompt, setOutOfStockPrompt] = useState<NormalizedProduct | null>(null);
     const [selectedProduct, setSelectedProduct] = useState<NormalizedProduct | null>(null);
     const outOfStockDialogRef = useRef<HTMLDivElement | null>(null);
@@ -1142,7 +1151,20 @@ const KioskApp = () => {
         if (primaryButton && !primaryButton.disabled && typeof primaryButton.focus === 'function') {
             primaryButton.focus({ preventScroll: true });
         }
+        if (primaryButton && typeof primaryButton.scrollIntoView === 'function') {
+            primaryButton.scrollIntoView({ block: 'center', inline: 'center' });
+        }
     }, [checkoutPromptReady, checkoutVisible, manualConfirmationState]);
+
+    useEffect(() => {
+        if (typeof document === 'undefined') {
+            return;
+        }
+        const node = document.getElementById('cart-total');
+        if (node && node.textContent !== cartTotalLabel) {
+            node.textContent = cartTotalLabel;
+        }
+    }, [cartTotalLabel]);
 
     useEffect(() => {
         if (trackingDisabled && !inventoryWarningLoggedRef.current) {
@@ -1730,7 +1752,7 @@ const KioskApp = () => {
         resetCartTimeout();
         logKioskEvent('kiosk.checkout_started', {
             cartSize: cart.length,
-            totalEuros: Number.isFinite(cartTotalCents) ? Number((cartTotalCents / 100).toFixed(2)) : 0,
+            totalEuros: Number.isFinite(safeCartTotalCents) ? Number((safeCartTotalCents / 100).toFixed(2)) : 0,
             confirmationReference: referenceCode
         });
 
@@ -1908,7 +1930,7 @@ const KioskApp = () => {
                     </span>
                 </button>
                 <div id="cart-total" className="cart-total-summary" aria-live="polite">
-                    Total: {formatPriceFromCents(cartTotalCents)}
+                    {cartTotalLabel}
                 </div>
             </header>
 
@@ -2243,7 +2265,7 @@ const KioskApp = () => {
                         </div>
                         <div className="cart-footer">
                             <div id="cart-total-panel" className="cart-total">
-                                Total: {formatPriceFromCents(cartTotalCents)}
+                                Total: {cartTotalFormatted}
                             </div>
                             <button
                                 id="checkout-button"
@@ -2380,7 +2402,7 @@ const KioskApp = () => {
 
                                 <div className="checkout-summary manual-confirmation-summary">
                                     <span className="checkout-total-label">Total due</span>
-                                    <span className="checkout-total-amount">{formatPriceFromCents(cartTotalCents)}</span>
+                                    <span className="checkout-total-amount">{cartTotalFormatted}</span>
                                 </div>
 
                                 <div className="manual-confirmation-timers" role="status" aria-live="polite">
@@ -2434,7 +2456,7 @@ const KioskApp = () => {
                                 <p>Your payment has been confirmed. You may take your items.</p>
                                 <div className="manual-confirmation-outcome-details">
                                     <span><strong>Items:</strong> {listPurchasedItems(cart)}</span>
-                                    <span><strong>Total:</strong> {formatPriceFromCents(cartTotalCents)}</span>
+                                    <span><strong>Total:</strong> {cartTotalFormatted}</span>
                                     <span><strong>Reference:</strong> {checkoutReferenceCode}</span>
                                 </div>
                             </div>
@@ -2456,7 +2478,7 @@ const KioskApp = () => {
                                 </p>
                                 <div className="manual-confirmation-outcome-details">
                                     <span><strong>Items:</strong> {listPurchasedItems(cart)}</span>
-                                    <span><strong>Total:</strong> {formatPriceFromCents(cartTotalCents)}</span>
+                                    <span><strong>Total:</strong> {cartTotalFormatted}</span>
                                     <span><strong>Reference:</strong> {checkoutReferenceCode}</span>
                                 </div>
                                 <div className="checkout-actions manual-confirmation-actions">
@@ -2492,7 +2514,7 @@ const KioskApp = () => {
                                 <p>Payment processor error. If you were charged, you may take your items while staff reviews this purchase.</p>
                                 <div className="manual-confirmation-outcome-details">
                                     <span><strong>Reference:</strong> {checkoutReferenceCode}</span>
-                                    <span><strong>Total:</strong> {formatPriceFromCents(cartTotalCents)}</span>
+                                    <span><strong>Total:</strong> {cartTotalFormatted}</span>
                                     <span><strong>Contact:</strong> {ADMIN_SUPPORT_EMAIL}</span>
                                 </div>
                                 <div className="checkout-actions manual-confirmation-actions">

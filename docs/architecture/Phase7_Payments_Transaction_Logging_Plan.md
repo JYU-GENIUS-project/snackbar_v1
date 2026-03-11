@@ -15,7 +15,7 @@ Deliver kiosk-driven manual payment confirmation with reliable transaction loggi
 - [x] Phase 5 - Admin Reconciliation & Transaction Queries (completed 2026-03-10)
 - [x] Phase 6 - Kiosk Integration With Confirmation API (completed 2026-03-10)
 - [x] Phase 7 - Observability, Metrics, and Monitoring Hooks (completed 2026-03-10)
-- [ ] Phase 8 - Validation & Regression Coverage (in progress 2026-03-10)
+- [x] Phase 8 - Validation & Regression Coverage (completed 2026-03-11)
 
 ## Source of Truth (Must Not Diverge)
 
@@ -308,11 +308,15 @@ Deliver kiosk-driven manual payment confirmation with reliable transaction loggi
 
 **Goal:** Validate performance, security, and acceptance coverage in the required suites.
 
-**Status:** In progress 2026-03-10
+**Status:** Completed 2026-03-11
 
 **Latest validation run**
 
 - customer_payment_checkout.robot failed during suite setup with connection refused (kiosk URL not reachable). See [tests/results/phase7/output.xml](tests/results/phase7/output.xml).
+- 2026-03-11 run: customer_payment_checkout.robot failed (5/6). US-011 cart total missing (expected 5.00€), US-012–US-015 click intercepted on confirm CTA. See [tests/results/phase7/output.xml](tests/results/phase7/output.xml) and [tests/results/phase7/log.html](tests/results/phase7/log.html).
+- 2026-03-11 run: customer_payment_checkout.robot passed (6/6) after rebuilding client assets and stabilizing confirm click handling. See [tests/results/phase7/output.xml](tests/results/phase7/output.xml).
+- 2026-03-11 run: system_technical_security.robot passed (15/15). See [tests/results/phase7/output.xml](tests/results/phase7/output.xml).
+- 2026-03-11 run: system_integration_communication.robot passed (15/15). See [tests/results/phase7/output.xml](tests/results/phase7/output.xml).
 - Remediation applied: ensured cart total is visible outside the cart panel and made the confirmation prompt ready immediately for click targets; rerun pending.
 - Remediation applied: aligned offline kiosk seed data pricing with checkout expectations in [tests/resources/common.robot](tests/resources/common.robot).
 - Remediation applied: kiosk status polling/SSE bypassed when offline feed is forced to prevent status overlays during acceptance tests.

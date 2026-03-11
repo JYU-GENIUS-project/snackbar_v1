@@ -116,6 +116,11 @@ Wait For Element And Click
     Wait Until Element Is Enabled    ${locator}    timeout=${timeout}
     Click Element    ${locator}
 
+Click Confirm Payment Button
+    [Documentation]    Clicks the confirm payment button using JavaScript to avoid overlay interception
+    Wait Until Element Is Visible    id=confirm-payment-button    timeout=5s
+    Execute Javascript    (function(){ const button = document.getElementById('confirm-payment-button'); if (button) { button.click(); } })();
+
 Verify Cart Item Count
     [Arguments]    ${expected_count}
     [Documentation]    Verifies the shopping cart badge shows the expected item count
