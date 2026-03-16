@@ -30,7 +30,7 @@ services:
       - ./init-db:/docker-entrypoint-initdb.d:ro
       - backups:/backups
     ports:
-      - "5432:5432"
+      - "5433:5432"
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U ${DB_USER:-snackbar_app} -d ${DB_NAME:-snackbar_prod}" ]
       interval: 10s

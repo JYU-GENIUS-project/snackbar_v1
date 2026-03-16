@@ -46,10 +46,15 @@ router.get(
             throw new ApiError(400, 'Validation failed', { errors: errors.array() });
         }
 
-        const result = await analyticsService.getSummary({
-            startDate: typeof req.query.startDate === 'string' ? req.query.startDate : undefined,
-            endDate: typeof req.query.endDate === 'string' ? req.query.endDate : undefined
-        });
+        const summaryPayload: { startDate?: string; endDate?: string } = {};
+        if (typeof req.query.startDate === 'string') {
+            summaryPayload.startDate = req.query.startDate;
+        }
+        if (typeof req.query.endDate === 'string') {
+            summaryPayload.endDate = req.query.endDate;
+        }
+
+        const result = await analyticsService.getSummary(summaryPayload);
 
         res.status(200).json({
             success: true,
@@ -68,13 +73,21 @@ router.get(
             throw new ApiError(400, 'Validation failed', { errors: errors.array() });
         }
 
-        const limit = typeof req.query.limit === 'string' ? Number(req.query.limit) : undefined;
+        const topProductsPayload: { startDate?: string; endDate?: string; limit?: number } = {};
+        if (typeof req.query.startDate === 'string') {
+            topProductsPayload.startDate = req.query.startDate;
+        }
+        if (typeof req.query.endDate === 'string') {
+            topProductsPayload.endDate = req.query.endDate;
+        }
+        if (typeof req.query.limit === 'string') {
+            const limit = Number(req.query.limit);
+            if (Number.isFinite(limit)) {
+                topProductsPayload.limit = limit;
+            }
+        }
 
-        const result = await analyticsService.getTopProducts({
-            startDate: typeof req.query.startDate === 'string' ? req.query.startDate : undefined,
-            endDate: typeof req.query.endDate === 'string' ? req.query.endDate : undefined,
-            limit
-        });
+        const result = await analyticsService.getTopProducts(topProductsPayload);
 
         res.status(200).json({
             success: true,
@@ -93,13 +106,25 @@ router.get(
             throw new ApiError(400, 'Validation failed', { errors: errors.array() });
         }
 
-        const result = await analyticsService.getRevenueSeries({
-            startDate: typeof req.query.startDate === 'string' ? req.query.startDate : undefined,
-            endDate: typeof req.query.endDate === 'string' ? req.query.endDate : undefined,
-            period: typeof req.query.period === 'string'
-                ? (req.query.period as 'daily' | 'weekly' | 'monthly')
-                : undefined
-        });
+        const revenuePayload: {
+            startDate?: string;
+            endDate?: string;
+            period?: 'daily' | 'weekly' | 'monthly';
+        } = {};
+        if (typeof req.query.startDate === 'string') {
+            revenuePayload.startDate = req.query.startDate;
+        }
+        if (typeof req.query.endDate === 'string') {
+            revenuePayload.endDate = req.query.endDate;
+        }
+        if (typeof req.query.period === 'string') {
+            const period = req.query.period.toLowerCase();
+            if (period === 'daily' || period === 'weekly' || period === 'monthly') {
+                revenuePayload.period = period;
+            }
+        }
+
+        const result = await analyticsService.getRevenueSeries(revenuePayload);
 
         res.status(200).json({
             success: true,
