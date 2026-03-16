@@ -95,6 +95,13 @@ type TransactionListFilters = {
     endDate?: string;
     reference?: string;
     kioskSessionId?: string;
+    productId?: string;
+    productName?: string;
+    amountMin?: number;
+    amountMax?: number;
+    sortBy?: 'date' | 'amount' | 'status';
+    sortDirection?: 'asc' | 'desc';
+    search?: string;
 };
 
 type TransactionListResult = {
@@ -106,11 +113,22 @@ type TransactionListResult = {
     };
 };
 
+type TransactionExportRow = {
+    transaction_id: string;
+    transaction_number: string;
+    timestamp: string;
+    items: string | null;
+    quantities: string | null;
+    total_amount: number | string;
+    payment_status: string;
+};
+
 const PAYMENT_STATUSES = new Set([
     'PENDING',
     'COMPLETED',
     'FAILED',
     'PAYMENT_UNCERTAIN',
+    'REFUNDED',
 ]);
 
 const CONFIRMATION_OUTCOMES = new Set([
@@ -501,6 +519,99 @@ const createTransaction = async ({
     };
 };
 
+const buildTransactionWhere = (filters: TransactionListFilters) => {
+    const whereClause: string[] = [];
+    const params: unknown[] = [];
+    let paramIndex = 1;
+
+    if (filters.status) {
+        const normalizedStatus = normalizeStatus(filters.status);
+        whereClause.push(`t.payment_status = $${paramIndex++}`);
+        params.push(normalizedStatus);
+    }
+
+    if (filters.startDate) {
+        whereClause.push(`t.created_at >= $${paramIndex++}`);
+        params.push(new Date(filters.startDate));
+    }
+
+    if (filters.endDate) {
+        whereClause.push(`t.created_at <= $${paramIndex++}`);
+        params.push(new Date(filters.endDate));
+    }
+
+    if (filters.reference) {
+        whereClause.push(
+            `(t.transaction_number ILIKE $${paramIndex} OR t.confirmation_reference ILIKE $${paramIndex})`,
+        );
+        params.push(`%${filters.reference}%`);
+        paramIndex += 1;
+    }
+
+    if (filters.kioskSessionId) {
+        whereClause.push(
+            `t.confirmation_metadata ->> 'kioskSessionId' = $${paramIndex++}`,
+        );
+        params.push(filters.kioskSessionId);
+    }
+
+    if (typeof filters.amountMin === 'number') {
+        whereClause.push(`t.total_amount >= $${paramIndex++}`);
+        params.push(filters.amountMin);
+    }
+
+    if (typeof filters.amountMax === 'number') {
+        whereClause.push(`t.total_amount <= $${paramIndex++}`);
+        params.push(filters.amountMax);
+    }
+
+    if (filters.productId) {
+        whereClause.push(
+            `EXISTS (
+                SELECT 1
+                FROM transaction_items ti
+                WHERE ti.transaction_id = t.id
+                  AND ti.product_id = $${paramIndex++}
+            )`,
+        );
+        params.push(filters.productId);
+    }
+
+    if (filters.productName) {
+        whereClause.push(
+            `EXISTS (
+                SELECT 1
+                FROM transaction_items ti
+                WHERE ti.transaction_id = t.id
+                  AND LOWER(ti.product_name) LIKE $${paramIndex++}
+            )`,
+        );
+        params.push(`%${filters.productName.toLowerCase()}%`);
+    }
+
+    if (filters.search) {
+        whereClause.push(
+            `(
+                t.transaction_number ILIKE $${paramIndex}
+                OR t.confirmation_reference ILIKE $${paramIndex}
+                OR EXISTS (
+                    SELECT 1
+                    FROM transaction_items ti
+                    WHERE ti.transaction_id = t.id
+                      AND ti.product_name ILIKE $${paramIndex}
+                )
+            )`,
+        );
+        params.push(`%${filters.search}%`);
+        paramIndex += 1;
+    }
+
+    const whereString =
+        whereClause.length > 0 ? `WHERE ${whereClause.join(' AND ')}` : '';
+
+    return { whereString, params, paramIndex };
+};
+
 const listTransactions = async (
     filters: TransactionListFilters = {},
 ): Promise<TransactionListResult> => {
@@ -509,69 +620,65 @@ const listTransactions = async (
         : 1;
     const pageSize = Number.isFinite(filters.pageSize)
         ? Math.min(100, Math.max(1, Number(filters.pageSize)))
-        : 25;
+        : 50;
     const offset = (page - 1) * pageSize;
 
-    const whereClause: string[] = [];
-    const params: unknown[] = [];
-    let paramIndex = 1;
+    const sortBy = filters.sortBy ?? 'date';
+    const sortDirection = (filters.sortDirection ?? 'desc')
+        .toString()
+        .toLowerCase();
+    const sortOrder = sortDirection === 'asc' ? 'ASC' : 'DESC';
+    const sortColumn =
+        sortBy === 'amount'
+            ? 't.total_amount'
+            : sortBy === 'status'
+                ? 't.payment_status'
+                : 't.created_at';
 
-    if (filters.status) {
-        const normalizedStatus = normalizeStatus(filters.status);
-        whereClause.push(`payment_status = $${paramIndex++}`);
-        params.push(normalizedStatus);
-    }
-
-    if (filters.startDate) {
-        whereClause.push(`created_at >= $${paramIndex++}`);
-        params.push(new Date(filters.startDate));
-    }
-
-    if (filters.endDate) {
-        whereClause.push(`created_at <= $${paramIndex++}`);
-        params.push(new Date(filters.endDate));
-    }
-
-    if (filters.reference) {
-        whereClause.push(
-            `(transaction_number ILIKE $${paramIndex} OR confirmation_reference ILIKE $${paramIndex})`,
-        );
-        params.push(`%${filters.reference}%`);
-        paramIndex += 1;
-    }
-
-    if (filters.kioskSessionId) {
-        whereClause.push(
-            `confirmation_metadata ->> 'kioskSessionId' = $${paramIndex++}`,
-        );
-        params.push(filters.kioskSessionId);
-    }
-
-    const whereString =
-        whereClause.length > 0 ? `WHERE ${whereClause.join(' AND ')}` : '';
+    const { whereString, params, paramIndex: baseParamIndex } =
+        buildTransactionWhere(filters);
+    let paramIndex = baseParamIndex;
 
     const countResult = (await db.query(
-        `SELECT COUNT(*) as total FROM transactions ${whereString}`,
+        `SELECT COUNT(*) as total
+         FROM transactions t
+         ${whereString}`,
         params,
     )) as DbQueryResult<{ total: string }>;
 
     const total = parseInt(countResult.rows[0]?.total || '0', 10);
 
     const dataResult = (await db.query(
-        `SELECT id,
-                transaction_number,
-                total_amount,
-                payment_method,
-                payment_status,
-                confirmation_channel,
-                confirmation_reference,
-                confirmation_metadata,
-                completed_at,
-                created_at,
-                updated_at
-         FROM transactions
+        `SELECT t.id,
+                t.transaction_number,
+                t.total_amount,
+                t.payment_method,
+                t.payment_status,
+                t.confirmation_channel,
+                t.confirmation_reference,
+                t.confirmation_metadata,
+                t.completed_at,
+                t.created_at,
+                t.updated_at,
+                COALESCE(
+                    JSONB_AGG(
+                        JSONB_BUILD_OBJECT(
+                            'productId', ti.product_id,
+                            'productName', ti.product_name,
+                            'quantity', ti.quantity,
+                            'unitPrice', ti.unit_price,
+                            'subtotal', ti.subtotal
+                        )
+                        ORDER BY ti.product_name
+                    ) FILTER (WHERE ti.id IS NOT NULL),
+                    '[]'::JSONB
+                ) AS items
+         FROM transactions t
+         LEFT JOIN transaction_items ti
+           ON ti.transaction_id = t.id
          ${whereString}
-         ORDER BY created_at DESC
+         GROUP BY t.id
+         ORDER BY ${sortColumn} ${sortOrder}
          LIMIT $${paramIndex++} OFFSET $${paramIndex}`,
         [...params, pageSize, offset],
     )) as DbQueryResult<Record<string, unknown>>;
@@ -584,6 +691,43 @@ const listTransactions = async (
             total,
         },
     };
+};
+
+const exportTransactions = async (
+    filters: TransactionListFilters = {},
+): Promise<TransactionExportRow[]> => {
+    const sortBy = filters.sortBy ?? 'date';
+    const sortDirection = (filters.sortDirection ?? 'desc')
+        .toString()
+        .toLowerCase();
+    const sortOrder = sortDirection === 'asc' ? 'ASC' : 'DESC';
+    const sortColumn =
+        sortBy === 'amount'
+            ? 't.total_amount'
+            : sortBy === 'status'
+                ? 't.payment_status'
+                : 't.created_at';
+
+    const { whereString, params } = buildTransactionWhere(filters);
+
+    const result = (await db.query(
+        `SELECT t.id AS transaction_id,
+                t.transaction_number,
+                TO_CHAR(COALESCE(t.completed_at, t.created_at), 'YYYY-MM-DD HH24:MI:SS') AS timestamp,
+                STRING_AGG(ti.product_name, ', ' ORDER BY ti.product_name) AS items,
+                STRING_AGG(ti.quantity::text, ', ' ORDER BY ti.product_name) AS quantities,
+                t.total_amount,
+                t.payment_status
+         FROM transactions t
+         LEFT JOIN transaction_items ti
+           ON ti.transaction_id = t.id
+         ${whereString}
+         GROUP BY t.id
+         ORDER BY ${sortColumn} ${sortOrder}`,
+        params,
+    )) as DbQueryResult<TransactionExportRow>;
+
+    return result.rows;
 };
 
 const getTransactionAudit = async ({
@@ -947,7 +1091,14 @@ const reconcileTransaction = async ({
         throw new ApiError(400, 'Invalid reconciliation action');
     }
 
-    const newStatus = normalizedAction === 'CONFIRMED' ? 'COMPLETED' : 'FAILED';
+    const normalizedNotes = notes ? notes.toString().trim() : '';
+    if (normalizedNotes.length < 10) {
+        throw new ApiError(400, 'Minimum 10 characters required', {
+            code: 'reconciliation_notes_required',
+        });
+    }
+
+    const newStatus = normalizedAction === 'CONFIRMED' ? 'COMPLETED' : 'REFUNDED';
 
     const dbWithTransaction = db as unknown as {
         transaction: <T>(
@@ -1018,7 +1169,7 @@ const reconcileTransaction = async ({
         const mergedMetadata = {
             ...(transaction.confirmation_metadata ?? {}),
             ...(metadata ?? {}),
-            reconciliationNotes: notes ?? null,
+            reconciliationNotes: normalizedNotes,
             reconciliationOutcome: normalizedAction,
             reconciledAt: new Date().toISOString(),
             reconciledBy: actor.id,
@@ -1141,7 +1292,7 @@ const reconcileTransaction = async ({
         newValues: {
             status: result.transaction.payment_status,
             reconciliationOutcome: normalizedAction,
-            reconciliationNotes: notes ?? null
+            reconciliationNotes: normalizedNotes
         }
     });
 
@@ -1157,7 +1308,7 @@ const reconcileTransaction = async ({
         transactionNumber: result.transaction.transaction_number,
         status: result.transaction.payment_status,
         reconciliationOutcome: normalizedAction,
-        reconciliationNotes: notes ?? null,
+        reconciliationNotes: normalizedNotes,
         reconciledBy: actor.id,
         auditAttempts: reconciliationAudit.attempts,
         inventoryApplied: result.shouldDeductInventory
@@ -1183,6 +1334,7 @@ const reconcileTransaction = async ({
 const transactionService = {
     createTransaction,
     listTransactions,
+    exportTransactions,
     getTransactionAudit,
     confirmTransaction,
     reconcileTransaction,

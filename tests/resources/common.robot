@@ -94,6 +94,7 @@ Admin Logout
 
 Ensure Admin Login Page Is Visible
     [Documentation]    Guarantees the admin login form can be reached even after a prior session
+    Execute Javascript    document.querySelectorAll('.modal-overlay').forEach((el) => { try { el.click(); } catch (error) {} });
     ${login_present}=    Run Keyword And Return Status    Page Should Contain Element    id=login-form
     IF    ${login_present}
         RETURN

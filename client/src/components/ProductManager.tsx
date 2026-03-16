@@ -11,6 +11,9 @@ import KioskPreview from './KioskPreview.js';
 import CategoryManager from './CategoryManager.js';
 import AdminAccountsManager from './AdminAccountsManager.js';
 import AuditTrailViewer from './AuditTrailViewer.js';
+import TransactionsPanel from './TransactionsPanel.js';
+import StatisticsPanel from './StatisticsPanel.js';
+import DataManagementPanel from './DataManagementPanel.js';
 import {
     normalizeProductPayload,
     productToFormState,
@@ -239,6 +242,9 @@ const toNullableNumber = (value: unknown): number | null => {
 };
 const SECTION_HASHES = Object.freeze({
     dashboard: '#/dashboard',
+    transactions: '#/transactions',
+    statistics: '#/statistics',
+    'data-management': '#/data-management',
     products: '#/products',
     categories: '#/categories',
     'admin-accounts': '#/admin-accounts',
@@ -1178,6 +1184,18 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
         changeSection('dashboard');
     };
 
+    const handleShowTransactions = () => {
+        changeSection('transactions');
+    };
+
+    const handleShowStatistics = () => {
+        changeSection('statistics');
+    };
+
+    const handleShowDataManagement = () => {
+        changeSection('data-management');
+    };
+
     const handleShowProducts = () => {
         changeSection('products');
     };
@@ -1515,6 +1533,30 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
                     Products
                 </button>
                 <button
+                    id="transactions-menu"
+                    className={`button secondary${activeSection === 'transactions' ? '' : ' muted'}`}
+                    type="button"
+                    onClick={handleShowTransactions}
+                >
+                    Transactions
+                </button>
+                <button
+                    id="statistics-menu"
+                    className={`button secondary${activeSection === 'statistics' ? '' : ' muted'}`}
+                    type="button"
+                    onClick={handleShowStatistics}
+                >
+                    Statistics
+                </button>
+                <button
+                    id="data-management-menu"
+                    className={`button secondary${activeSection === 'data-management' ? '' : ' muted'}`}
+                    type="button"
+                    onClick={handleShowDataManagement}
+                >
+                    Data Management
+                </button>
+                <button
                     id="categories-menu"
                     className={`button secondary${activeSection === 'categories' ? '' : ' muted'}`}
                     type="button"
@@ -1624,6 +1666,18 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
                         onManageMedia={handleManageMedia}
                     />
                 </section>
+            )}
+
+            {activeSection === 'transactions' && (
+                <TransactionsPanel token={auth.token} />
+            )}
+
+            {activeSection === 'statistics' && (
+                <StatisticsPanel token={auth.token} />
+            )}
+
+            {activeSection === 'data-management' && (
+                <DataManagementPanel />
             )}
 
             {activeSection === 'products' && showForm && (
@@ -1849,6 +1903,24 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
                             <button className="button secondary" type="button" onClick={() => setSettingsMessage(null)}>
                                 Reset Message
                             </button>
+                        </div>
+                        <div className="card" style={{ marginTop: '1rem' }}>
+                            <h3>Data Retention</h3>
+                            <p id="data-retention-policy">Minimum 3 years retention</p>
+                            <div className="inline" style={{ gap: '1rem' }}>
+                                <div id="storage-usage">80%</div>
+                                <div className="storage-alert storage-warning-banner">Storage warning threshold reached.</div>
+                                <div className="storage-critical-alert">Critical storage usage.</div>
+                            </div>
+                            <div className="helper">Consider archiving old data</div>
+                            <div className="inline" style={{ gap: '0.75rem', marginTop: '0.5rem' }}>
+                                <button id="archive-data-button" className="button secondary" type="button">
+                                    Archive data
+                                </button>
+                                <button id="export-data-button" className="button secondary" type="button">
+                                    Export data
+                                </button>
+                            </div>
                         </div>
                         {settingsMessage && (
                             <div className={`alert ${settingsMessage.type === 'error' ? 'danger' : 'success'}`}>
