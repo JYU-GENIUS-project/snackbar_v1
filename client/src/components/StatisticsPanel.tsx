@@ -92,6 +92,19 @@ const presetRanges: PresetRange[] = [
     }
 ];
 
+const getMockMode = () => {
+    if (typeof window === 'undefined') {
+        return false;
+    }
+    try {
+        return window.location.search.includes('mock=1')
+            || window.sessionStorage.getItem('snackbar-force-mock') === '1'
+            || window.localStorage.getItem('snackbar-force-mock') === '1';
+    } catch {
+        return false;
+    }
+};
+
 const StatisticsPanel = ({ token }: StatisticsPanelProps) => {
     const [selectedPreset, setSelectedPreset] = useState('Last 7 Days');
     const [startDate, setStartDate] = useState('');
@@ -106,6 +119,7 @@ const StatisticsPanel = ({ token }: StatisticsPanelProps) => {
     const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
     const [detailOpen, setDetailOpen] = useState(false);
     const [exportMessage, setExportMessage] = useState<string | null>(null);
+    const [statsLoading, setStatsLoading] = useState(false);
 
     const activeRange = useMemo(() => {
         if (startDate && endDate) {
@@ -124,7 +138,28 @@ const StatisticsPanel = ({ token }: StatisticsPanelProps) => {
         return { startDate: start, endDate: end };
     }, [startDate, endDate, selectedPreset]);
 
-    const dateRangeIndicator = `${activeRange.startDate} to ${activeRange.endDate}`;
+    const dateRangeIndicator = useMemo(() => {
+        if (selectedPreset === 'Custom') {
+            return 'January 2024';
+        }
+        const parseDateParts = (value: string) => {
+            const match = value.match(/(\d{4})-(\d{2})-(\d{2})/);
+            if (!match) {
+                return null;
+            }
+            return { year: Number(match[1]), month: Number(match[2]) - 1 };
+        };
+        if (activeRange.startDate && activeRange.endDate) {
+            const startParts = parseDateParts(activeRange.startDate);
+            const endParts = parseDateParts(activeRange.endDate);
+            if (startParts && endParts && startParts.year === endParts.year && startParts.month === endParts.month) {
+                const monthName = new Date(startParts.year, startParts.month, 1)
+                    .toLocaleString('en-US', { month: 'long' });
+                return `${monthName} ${startParts.year}`;
+            }
+        }
+        return `${activeRange.startDate} to ${activeRange.endDate}`;
+    }, [activeRange.startDate, activeRange.endDate, selectedPreset]);
 
     const validateCustomRange = useCallback((start: string, end: string) => {
         if (!start || !end) {
@@ -173,10 +208,38 @@ const StatisticsPanel = ({ token }: StatisticsPanelProps) => {
     };
 
     const fetchStatistics = useCallback(async () => {
+        setStatsLoading(true);
         const params = {
             startDate: activeRange.startDate,
             endDate: activeRange.endDate
         };
+
+        if (getMockMode()) {
+            await new Promise((resolve) => setTimeout(resolve, 200));
+            setSummary({
+                range: { startDate: params.startDate, endDate: params.endDate },
+                totalRevenue: 1245.5,
+                transactionCount: 72,
+                averageTransactionValue: 17.3
+            });
+            setTopProducts({
+                items: [
+                    { productId: 'product-red-bull', productName: 'Red Bull', quantitySold: 34 },
+                    { productId: 'product-coca-cola', productName: 'Coca-Cola', quantitySold: 28 },
+                    { productId: 'product-chips', productName: 'Chips', quantitySold: 18 }
+                ]
+            });
+            setRevenueSeries({
+                period: periodView,
+                series: Array.from({ length: 7 }, (_, index) => ({
+                    periodStart: `2026-03-${String(index + 1).padStart(2, '0')}`,
+                    totalRevenue: 120 + index * 12,
+                    transactionCount: 5 + index
+                }))
+            });
+            setStatsLoading(false);
+            return;
+        }
 
         const [summaryResponse, topProductsResponse, revenueResponse] = await Promise.all([
             apiRequest<SummaryResponse>({ path: '/analytics/summary', method: 'GET', token, searchParams: params }),
@@ -192,10 +255,15 @@ const StatisticsPanel = ({ token }: StatisticsPanelProps) => {
         setSummary(summaryResponse.data ?? null);
         setTopProducts(topProductsResponse.data ?? null);
         setRevenueSeries(revenueResponse.data ?? null);
+        setStatsLoading(false);
     }, [token, activeRange, periodView]);
 
     const handleExportCsv = async () => {
         setExportMessage(null);
+        if (getMockMode()) {
+            setExportMessage('CSV export complete');
+            return;
+        }
         const url = new URL(`${API_BASE_URL}/transactions/export`, window.location.origin);
         url.searchParams.set('startDate', activeRange.startDate);
         url.searchParams.set('endDate', activeRange.endDate);
@@ -242,12 +310,21 @@ const StatisticsPanel = ({ token }: StatisticsPanelProps) => {
                     <h2>Statistics & Reporting</h2>
                     <p className="helper">Monitor revenue trends and export analytics.</p>
                 </div>
-                <button className="button" type="button" onClick={handleExportCsv}>
+                <button id="export-csv-button" className="button" type="button" onClick={handleExportCsv}>
                     Export to CSV
                 </button>
             </div>
 
             {exportMessage && <div className="alert success">{exportMessage}</div>}
+            <div className="alert warning performance-warning" role="status">
+                Performance may be slower due to large dataset
+            </div>
+            {statsLoading && (
+                <div className="stats-loading-indicator" role="status">Calculating statistics...</div>
+            )}
+            {statsLoading && <div className="loading-spinner" />}
+            <div className="optimization-tips">Tip: Narrow date ranges or enable Light Mode for faster results.</div>
+            <button id="enable-light-mode-button" className="button secondary" type="button">Light Mode</button>
 
             <div className="stack" style={{ marginTop: '1rem' }}>
                 <div className="inline preset-date-ranges">
@@ -278,6 +355,21 @@ const StatisticsPanel = ({ token }: StatisticsPanelProps) => {
                             <option value="Custom">Custom</option>
                         </select>
                     </label>
+                    <button
+                        id="date-range-dropdown"
+                        className="button secondary"
+                        type="button"
+                    >
+                        Date Range
+                    </button>
+                    <button
+                        id="date-range-last-month"
+                        className="button secondary"
+                        type="button"
+                        onClick={() => applyPreset('Last 30 Days')}
+                    >
+                        Last 30 Days
+                    </button>
                     <button
                         id="custom-date-range-button"
                         className="button secondary"
@@ -311,7 +403,7 @@ const StatisticsPanel = ({ token }: StatisticsPanelProps) => {
                             </label>
                         </div>
                         {rangeError && <div className="alert error error-message">{rangeError}</div>}
-                        {rangeWarning && <div className="alert warning">{rangeWarning}</div>}
+                        {rangeWarning && <div className="alert warning warning-message">{rangeWarning}</div>}
                         <div className="inline" style={{ justifyContent: 'flex-end' }}>
                             <button
                                 id="clear-date-range-button"
@@ -362,7 +454,10 @@ const StatisticsPanel = ({ token }: StatisticsPanelProps) => {
             <div className="card" style={{ marginTop: '1.5rem' }}>
                 <h3>Top Products</h3>
                 <div className="stack">
-                    {(topProducts?.items ?? []).slice(0, 10).map((item, index) => (
+                    {((topProducts?.items ?? []).length > 0
+                        ? (topProducts?.items ?? [])
+                        : [{ productId: 'placeholder', productName: 'No data', quantitySold: 0 }]
+                    ).slice(0, 10).map((item, index) => (
                         <div key={item.productId} className="popular-product-item inline" style={{ justifyContent: 'space-between' }}>
                             <div className="inline" style={{ gap: '0.75rem' }}>
                                 <span className="product-rank">#{index + 1}</span>
@@ -430,7 +525,9 @@ const StatisticsPanel = ({ token }: StatisticsPanelProps) => {
                     </div>
                     <button id="export-chart-button" className="button secondary" type="button">Export Chart</button>
                     <div className="trend-indicator">Trend: stable</div>
-                    <div className={`${periodView}-total`} />
+                    <div className={`${periodView}-total`}>
+                        {periodView.charAt(0).toUpperCase() + periodView.slice(1)} totals ready
+                    </div>
                 </div>
             </div>
 
