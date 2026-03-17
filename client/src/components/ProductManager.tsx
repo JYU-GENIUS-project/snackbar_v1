@@ -1402,14 +1402,14 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
                 breaks: breakWindow.start && breakWindow.end ? [breakWindow] : [],
                 holidays: holidayConfig.date
                     ? [
-                          {
-                              date: holidayConfig.date,
-                              name: holidayConfig.name,
-                              closed: holidayConfig.closed,
-                              start: holidayConfig.start,
-                              end: holidayConfig.end
-                          }
-                      ]
+                        {
+                            date: holidayConfig.date,
+                            name: holidayConfig.name,
+                            closed: holidayConfig.closed,
+                            start: holidayConfig.start,
+                            end: holidayConfig.end
+                        }
+                    ]
                     : []
             }
         })
@@ -1453,12 +1453,12 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
             body: {
                 windows: maintenanceSchedule.date && maintenanceSchedule.timeRange
                     ? [
-                          {
-                              date: maintenanceSchedule.date,
-                              timeRange: maintenanceSchedule.timeRange,
-                              message: maintenanceSchedule.message
-                          }
-                      ]
+                        {
+                            date: maintenanceSchedule.date,
+                            timeRange: maintenanceSchedule.timeRange,
+                            message: maintenanceSchedule.message
+                        }
+                    ]
                     : []
             }
         })
@@ -2594,9 +2594,8 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
 
                             {settingsMessage && (
                                 <div
-                                    className={`alert ${settingsMessage.type === 'error' ? 'danger' : 'success'}${
-                                        settingsMessage.type === 'success' ? ' success-message' : ''
-                                    }`}
+                                    className={`alert ${settingsMessage.type === 'error' ? 'danger' : 'success'}${settingsMessage.type === 'success' ? ' success-message' : ''
+                                        }`}
                                 >
                                     {settingsMessage.text}
                                 </div>
