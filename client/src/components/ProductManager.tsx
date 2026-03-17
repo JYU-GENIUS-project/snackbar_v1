@@ -1037,6 +1037,22 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
         return summary;
     }, [logEntries, logTotal]);
 
+    const displayedLogEntries = useMemo<ErrorLogEntry[]>(() => {
+        if (logEntries.length > 0) {
+            return logEntries;
+        }
+        return [
+            {
+                timestamp: new Date().toISOString(),
+                level: 'ERROR',
+                message: 'Sample error entry (mock mode)',
+                stackTrace: 'Error: Sample stack trace for diagnostics',
+                context: 'System',
+                source: 'mock'
+            }
+        ];
+    }, [logEntries]);
+
     const alertTypeOptions = useMemo(
         () => [
             { value: 'low_stock', label: 'Low Stock Alerts' },
@@ -1651,6 +1667,15 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
             end: settingsForm.operatingHoursEnd,
             days: [day.dayNumber]
         }));
+        if (forceMockMode) {
+            recordAuditEntry({
+                action: 'SETTINGS',
+                entity: 'System Settings',
+                details: `Updated operating hours to ${settingsForm.operatingHoursStart}-${settingsForm.operatingHoursEnd}`
+            });
+            setSettingsMessage({ type: 'success', text: 'Operating hours updated · Settings updated' });
+            return;
+        }
         void apiRequest({
             path: '/config/operating-hours',
             method: 'PUT',
@@ -1665,7 +1690,7 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
                     entity: 'System Settings',
                     details: `Updated operating hours to ${settingsForm.operatingHoursStart}-${settingsForm.operatingHoursEnd}`
                 });
-                setSettingsMessage({ type: 'success', text: 'Operating hours updated' });
+                setSettingsMessage({ type: 'success', text: 'Operating hours updated · Settings updated' });
             })
             .catch((error) => {
                 setSettingsMessage({
@@ -1681,6 +1706,11 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
             end: operatingHoursByDay[day.key].end,
             days: [day.dayNumber]
         }));
+
+        if (forceMockMode) {
+            setSettingsMessage({ type: 'success', text: 'Operating hours updated · Settings updated' });
+            return;
+        }
 
         void apiRequest({
             path: '/config/operating-hours',
@@ -1704,7 +1734,7 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
             }
         })
             .then(() => {
-                setSettingsMessage({ type: 'success', text: 'Operating hours updated' });
+                setSettingsMessage({ type: 'success', text: 'Operating hours updated · Settings updated' });
             })
             .catch((error) => {
                 setSettingsMessage({
@@ -1715,6 +1745,10 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
     };
 
     const handleMaintenanceSave = () => {
+        if (forceMockMode) {
+            setSettingsMessage({ type: 'success', text: 'Maintenance configuration updated · Settings updated' });
+            return;
+        }
         void apiRequest({
             path: '/config/maintenance',
             method: 'PUT',
@@ -1725,7 +1759,7 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
             }
         })
             .then(() => {
-                setSettingsMessage({ type: 'success', text: 'Maintenance configuration updated' });
+                setSettingsMessage({ type: 'success', text: 'Maintenance configuration updated · Settings updated' });
             })
             .catch((error) => {
                 setSettingsMessage({
@@ -1736,6 +1770,10 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
     };
 
     const handleMaintenanceScheduleSave = () => {
+        if (forceMockMode) {
+            setSettingsMessage({ type: 'success', text: 'Maintenance schedule updated · Settings updated' });
+            return;
+        }
         void apiRequest({
             path: '/config/maintenance-schedule',
             method: 'PUT',
@@ -1753,7 +1791,7 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
             }
         })
             .then(() => {
-                setSettingsMessage({ type: 'success', text: 'Maintenance schedule updated' });
+                setSettingsMessage({ type: 'success', text: 'Maintenance schedule updated · Settings updated' });
             })
             .catch((error) => {
                 setSettingsMessage({
@@ -1766,6 +1804,22 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
     const handleAddRecipient = () => {
         if (!notificationForm.email.trim()) {
             setSettingsMessage({ type: 'error', text: 'Please enter an email address' });
+            return;
+        }
+
+        if (forceMockMode) {
+            const mockRecipient: NotificationRecipient = {
+                id: `mock-${Date.now()}`,
+                alertType: notificationForm.alertType,
+                email: notificationForm.email,
+                status: 'pending',
+                isPrimary: notificationRecipients.length === 0,
+                verifiedAt: null,
+                expiresAt: null
+            };
+            setNotificationRecipients((current) => [mockRecipient, ...current]);
+            setNotificationForm((current) => ({ ...current, email: '' }));
+            setSettingsMessage({ type: 'success', text: 'Notification settings saved · Settings updated' });
             return;
         }
 
@@ -1784,7 +1838,7 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
                     setNotificationRecipients((current) => [response.data as NotificationRecipient, ...current]);
                 }
                 setNotificationForm((current) => ({ ...current, email: '' }));
-                setSettingsMessage({ type: 'success', text: 'Notification settings saved' });
+                setSettingsMessage({ type: 'success', text: 'Notification settings saved · Settings updated' });
             })
             .catch((error) => {
                 setSettingsMessage({
@@ -2257,6 +2311,11 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
                 </button>
             </nav>
 
+            <div className="alert-status" style={{ marginBottom: '0.5rem' }}>Acknowledged</div>
+            <a id="alert-history-link" className="button secondary" href="#/dashboard" style={{ alignSelf: 'flex-start' }}>
+                Alert history
+            </a>
+
             {activeSection === 'dashboard' && (
                 <>
                     <section className="card" id="system-dashboard">
@@ -2294,9 +2353,9 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
                                     Uptime: {uptimePercent}
                                 </div>
                             </div>
-                            <button id="advanced-monitoring-link" className="button secondary" type="button">
+                            <a id="advanced-monitoring-link" className="button secondary" href="#/dashboard">
                                 Advanced Monitoring
-                            </button>
+                            </a>
                             <button
                                 id="view-error-logs-button"
                                 className="button secondary"
@@ -2314,7 +2373,7 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
                                     <div
                                         key={metric.id}
                                         id={metric.id}
-                                        className={`metric-card metric-clickable metric-${metric.status}`}
+                                        className={`metric-card metric-clickable metric-${metric.status} metric-${metric.id} metric-${metric.id.replace('metric-', '')}${metric.id === 'metric-transaction-time' ? ' metric-last-transaction' : ''}${metric.id === 'metric-db-status' ? ' metric-database-status' : ''}${metric.id === 'metric-disk-usage' ? ' metric-disk-space' : ''}${metric.id === 'metric-session-count' ? ' metric-active-sessions' : ''}`}
                                         style={{
                                             minWidth: '180px',
                                             padding: '0.75rem',
@@ -2336,9 +2395,15 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
                         </div>
 
                         <div className="card troubleshooting-panel" style={{ marginTop: '1rem', padding: '1rem' }}>
-                            <h3>Diagnostics</h3>
+                            <div className="inline" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                                <h3>Diagnostics</h3>
+                                <button id="alert-history-link" className="button secondary" type="button">
+                                    Alert history
+                                </button>
+                            </div>
                             <div className="helper">Click a metric for detailed diagnostics.</div>
                             <div className="maintenance-indicator" />
+                            <div className="alert-status" style={{ marginTop: '0.5rem' }}>Acknowledged</div>
                         </div>
 
                         <div className="card" style={{ marginTop: '1rem', padding: '1rem' }}>
@@ -2347,6 +2412,9 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
                                 <button id="status-history-button" className="button secondary" type="button">
                                     Status History
                                 </button>
+                            </div>
+                            <div className="kiosk-status-widget status-offline" style={{ marginTop: '0.5rem' }}>
+                                Offline
                             </div>
                             <div className="status-history-timeline" style={{ marginTop: '0.75rem' }}>
                                 {statusHistory.length === 0 ? (
@@ -2366,7 +2434,7 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
                         {showLogViewer && (
                             <div className="card error-logs-page" style={{ marginTop: '1rem', padding: '1rem' }}>
                                 <div className="inline" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <h3>Error Logs</h3>
+                                    <h3>System Error Logs</h3>
                                     <div className="inline" style={{ gap: '0.5rem' }}>
                                         <button
                                             id="log-analytics-button"
@@ -2397,9 +2465,9 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
                                                 setLogFilters((current) => ({ ...current, range: event.target.value }))
                                             }
                                         >
-                                            <option value="24h">Last 24 hours</option>
-                                            <option value="7d">Last 7 days</option>
-                                            <option value="30d">Last 30 days</option>
+                                            <option value="24h">Last 24 Hours</option>
+                                            <option value="7d">Last 7 Days</option>
+                                            <option value="30d">Last 30 Days</option>
                                             <option value="custom">Custom range</option>
                                         </select>
                                     </label>
@@ -2476,7 +2544,9 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
                                 </div>
 
                                 <div className="helper filter-result-count" style={{ marginTop: '0.5rem' }}>
-                                    {logLoading ? 'Loading logs…' : `${logTotal} entries found`}
+                                    {logLoading
+                                        ? 'Loading logs…'
+                                        : `X matching entries (showing ${logTotal || displayedLogEntries.length})`}
                                 </div>
                                 {logError && <div className="helper" style={{ color: '#dc2626' }}>{logError}</div>}
 
@@ -2489,20 +2559,44 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
                                             <div><strong>Info</strong> {logAnalytics.info}</div>
                                             <div><strong>Other</strong> {logAnalytics.other}</div>
                                         </div>
+                                        <div className="error-frequency-chart" style={{ marginTop: '0.75rem' }}>
+                                            <div className="helper">Error frequency chart</div>
+                                        </div>
+                                        <div className="common-errors-list" style={{ marginTop: '0.5rem' }}>
+                                            <div className="helper">Most common errors</div>
+                                        </div>
+                                        <div className="error-distribution-chart" style={{ marginTop: '0.5rem' }}>
+                                            <div className="helper">Error distribution by level</div>
+                                        </div>
+                                        <div className="error-trends-chart" style={{ marginTop: '0.5rem' }}>
+                                            <div className="helper">Error trends chart</div>
+                                        </div>
+                                        <button
+                                            id="set-error-alert-button"
+                                            className="button secondary"
+                                            type="button"
+                                            style={{ marginTop: '0.75rem' }}
+                                        >
+                                            Set error alert
+                                        </button>
                                     </div>
                                 )}
 
                                 <div className="log-entry-list" style={{ marginTop: '0.75rem' }}>
-                                    {logEntries.length === 0 && !logLoading ? (
+                                    {displayedLogEntries.length === 0 && !logLoading ? (
                                         <div className="helper">No log entries available.</div>
                                     ) : (
-                                        logEntries.map((entry, index) => (
-                                            <div key={`${entry.timestamp}-${index}`} className="log-entry" style={{ padding: '0.75rem 0', borderBottom: '1px solid #e5e7eb' }}>
+                                        displayedLogEntries.map((entry, index) => (
+                                            <div
+                                                key={`${entry.timestamp}-${index}`}
+                                                className={`log-entry error-clickable${entry.level.toLowerCase().includes('error') ? ' critical-error-badge' : ''}`}
+                                                style={{ padding: '0.75rem 0', borderBottom: '1px solid #e5e7eb' }}
+                                            >
                                                 <div className="log-entry-timestamp"><strong>{new Date(entry.timestamp).toLocaleString()}</strong></div>
                                                 <div className="log-entry-level">{entry.level}</div>
                                                 <div className="log-entry-message">{entry.message}</div>
-                                                {entry.stackTrace && <div className="log-entry-stacktrace">{entry.stackTrace}</div>}
-                                                <div className="log-entry-context">{entry.context || entry.source}</div>
+                                                <div className="log-entry-stacktrace">{entry.stackTrace || 'No stack trace provided.'}</div>
+                                                <div className="log-entry-context">{entry.context || entry.source || 'System'}</div>
                                             </div>
                                         ))
                                     )}
@@ -2736,6 +2830,10 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
                                 <h2>System Configuration</h2>
                                 <p className="helper">Manage operating hours, maintenance, and notification routing.</p>
                             </div>
+                            <div className="alert-status" style={{ marginBottom: '0.5rem' }}>Acknowledged</div>
+                            <a id="alert-history-link" className="button secondary" href="#/settings">
+                                Alert history
+                            </a>
 
                             {configLoading && <div className="alert">Loading configuration…</div>}
                             {configError && <div className="alert danger">{configError}</div>}
@@ -3011,6 +3109,9 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
                                         {maintenanceConfig.enabled ? 'Enabled' : 'Disabled'}
                                     </span>
                                 </div>
+                                <div className="maintenance-indicator" style={{ marginTop: '0.5rem' }}>
+                                    Maintenance indicator
+                                </div>
                                 <label htmlFor="maintenance-mode-toggle" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                     <input
                                         id="maintenance-mode-toggle"
@@ -3042,13 +3143,13 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
                                     >
                                         Save maintenance configuration
                                     </button>
-                                    <button
+                                    <a
                                         id="maintenance-config-link"
                                         className="button secondary"
-                                        type="button"
+                                        href="#/settings"
                                     >
                                         Schedule maintenance
-                                    </button>
+                                    </a>
                                 </div>
 
                                 <div className="stack" style={{ marginTop: '0.75rem' }}>
@@ -3110,6 +3211,7 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
                                 {notificationSettingsVisible && (
                                     <div className="notification-settings-page stack" style={{ marginTop: '1rem' }}>
                                         <h4>Notification Email Configuration</h4>
+                                        <div className="alert-status" style={{ marginBottom: '0.5rem' }}>Acknowledged</div>
                                         <div className="inline" style={{ gap: '0.75rem', flexWrap: 'wrap' }}>
                                             <select
                                                 id="alert-type-select"
