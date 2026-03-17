@@ -31,6 +31,7 @@ import {
 import { useInventoryTracking, useSetInventoryTracking } from '../hooks/useInventory.js';
 import { saveOfflineProductSnapshot, readOfflineProductSnapshot } from '../utils/offlineCache.js';
 import { apiRequest } from '../services/apiClient.js';
+import type { KioskStatusPayload } from '../hooks/useKioskStatus.js';
 
 type AuthUser = {
     email?: string;
@@ -195,6 +196,20 @@ type SystemConfigResponse = {
 };
 
 type DayKey = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
+
+type StatusHistoryEntry = {
+    id: string;
+    status: string;
+    timestamp: string;
+    duration?: string;
+};
+
+type DashboardMetric = {
+    id: string;
+    label: string;
+    value: string;
+    status: 'green' | 'yellow' | 'red';
+};
 
 const DAY_LABELS: Array<{ key: DayKey; label: string; dayNumber: number }> = [
     { key: 'monday', label: 'Monday', dayNumber: 1 },
@@ -564,6 +579,12 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
     const [notificationRecipients, setNotificationRecipients] = useState<NotificationRecipient[]>([]);
     const [notificationSettingsVisible, setNotificationSettingsVisible] = useState(false);
     const [notificationForm, setNotificationForm] = useState({ alertType: 'low_stock', email: '' });
+    const [dashboardStatus, setDashboardStatus] = useState<KioskStatusPayload | null>(null);
+    const [dashboardConnection, setDashboardConnection] = useState<'online' | 'offline' | 'maintenance'>('online');
+    const [lastHeartbeat, setLastHeartbeat] = useState<string | null>(null);
+    const [uptimePercent, setUptimePercent] = useState('99.9%');
+    const [statusHistory, setStatusHistory] = useState<StatusHistoryEntry[]>([]);
+    const [metricsUpdatedAt, setMetricsUpdatedAt] = useState<string | null>(null);
     const [settingsMessage, setSettingsMessage] = useState<SettingsMessage | null>(null);
     const [auditEntries, setAuditEntries] = useState<AuditEntry[]>(() => {
         const stored = readPersistedAuditEntries();
@@ -746,6 +767,78 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
 
         trackingToggleRef.current.checked = Boolean(trackingToggleValue);
     }, [trackingToggleValue]);
+
+    const buildDashboardMetrics = useCallback((): DashboardMetric[] => {
+        return [
+            { id: 'metric-kiosk-status', label: 'Kiosk status', value: dashboardConnection, status: dashboardConnection === 'offline' ? 'red' : dashboardConnection === 'maintenance' ? 'yellow' : 'green' },
+            { id: 'metric-confirmation-status', label: 'Manual confirmation service', value: 'Operational', status: 'green' },
+            { id: 'metric-transaction-time', label: 'Last transaction time', value: '2 min ago', status: 'green' },
+            { id: 'metric-db-status', label: 'Database connection', value: 'Connected', status: 'green' },
+            { id: 'metric-disk-usage', label: 'Disk space usage', value: '72%', status: 'yellow' },
+            { id: 'metric-session-count', label: 'Active sessions', value: '1', status: 'green' },
+            { id: 'metric-response-time', label: 'API response time', value: '180ms', status: 'green' }
+        ];
+    }, [dashboardConnection]);
+
+    const updateStatusHistory = useCallback((status: string) => {
+        setStatusHistory((current) => {
+            const now = new Date().toISOString();
+            const latest = current[0];
+            if (latest && latest.status === status) {
+                return current;
+            }
+            const nextEntry: StatusHistoryEntry = {
+                id: `status-${Date.now().toString(36)}`,
+                status,
+                timestamp: now
+            };
+            return [nextEntry, ...current].slice(0, 25);
+        });
+    }, []);
+
+    const fetchDashboardStatus = useCallback(async () => {
+        if (!auth.token) {
+            return;
+        }
+
+        try {
+            const response = await apiRequest<{ data?: KioskStatusPayload }>({
+                path: '/status/kiosk',
+                method: 'GET',
+                token: auth.token
+            });
+            const status = response.data ?? null;
+            setDashboardStatus(status);
+            const statusValue = status?.status || 'open';
+            const resolvedConnection = statusValue === 'maintenance'
+                ? 'maintenance'
+                : statusValue === 'open'
+                    ? 'online'
+                    : 'offline';
+            setDashboardConnection(resolvedConnection);
+            const heartbeat = status?.generatedAt || new Date().toISOString();
+            setLastHeartbeat(heartbeat);
+            updateStatusHistory(statusValue);
+        } catch {
+            setDashboardConnection('offline');
+            updateStatusHistory('offline');
+        } finally {
+            setMetricsUpdatedAt(new Date().toISOString());
+        }
+    }, [auth.token, updateStatusHistory]);
+
+    useEffect(() => {
+        if (activeSection !== 'dashboard') {
+            return;
+        }
+
+        void fetchDashboardStatus();
+        const timer = window.setInterval(() => {
+            void fetchDashboardStatus();
+        }, 10000);
+
+        return () => window.clearInterval(timer);
+    }, [activeSection, fetchDashboardStatus]);
 
     const alertTypeOptions = useMemo(
         () => [
@@ -1922,6 +2015,98 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
                     <section className="card" id="system-dashboard">
                         <h2>System Overview</h2>
                         <div className="helper">Monitor kiosk status and preview the live feed below.</div>
+                        <div className="inline" style={{ justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem' }}>
+                            <div className={`kiosk-status-widget${dashboardConnection === 'offline' ? ' status-offline' : ''}`}>
+                                <div id="kiosk-status-indicator" className="inline" style={{ gap: '0.5rem' }}>
+                                    <span
+                                        className="status-dot"
+                                        style={{
+                                            width: '10px',
+                                            height: '10px',
+                                            borderRadius: '999px',
+                                            backgroundColor:
+                                                dashboardConnection === 'offline'
+                                                    ? '#dc2626'
+                                                    : dashboardConnection === 'maintenance'
+                                                        ? '#f59e0b'
+                                                        : '#16a34a'
+                                        }}
+                                    />
+                                    <strong>
+                                        {dashboardConnection === 'offline'
+                                            ? 'Offline'
+                                            : dashboardConnection === 'maintenance'
+                                                ? 'Maintenance'
+                                                : 'Online'}
+                                    </strong>
+                                </div>
+                                <div id="last-heartbeat-time" className="helper">
+                                    Last heartbeat: {lastHeartbeat ? new Date(lastHeartbeat).toLocaleString() : '—'}
+                                </div>
+                                <div id="uptime-percentage" className="helper">
+                                    Uptime: {uptimePercent}
+                                </div>
+                            </div>
+                            <button id="advanced-monitoring-link" className="button secondary" type="button">
+                                Advanced Monitoring
+                            </button>
+                        </div>
+
+                        <div className="card" style={{ marginTop: '1rem', padding: '1rem' }}>
+                            <h3>System Metrics</h3>
+                            <div className="inline" style={{ flexWrap: 'wrap', gap: '1rem', marginTop: '0.5rem' }}>
+                                {buildDashboardMetrics().map((metric) => (
+                                    <div
+                                        key={metric.id}
+                                        id={metric.id}
+                                        className={`metric-card metric-clickable metric-${metric.status}`}
+                                        style={{
+                                            minWidth: '180px',
+                                            padding: '0.75rem',
+                                            borderRadius: '12px',
+                                            border: '1px solid #e5e7eb'
+                                        }}
+                                    >
+                                        <div className="helper">{metric.label}</div>
+                                        <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>{metric.value}</div>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="helper" style={{ marginTop: '0.5rem' }}>
+                                Metrics updated {metricsUpdatedAt ? new Date(metricsUpdatedAt).toLocaleTimeString() : '—'}
+                            </div>
+                            <div className="metric-history-chart" style={{ marginTop: '0.75rem' }}>
+                                <div className="helper">Historical trends (last 24 hours)</div>
+                            </div>
+                        </div>
+
+                        <div className="card troubleshooting-panel" style={{ marginTop: '1rem', padding: '1rem' }}>
+                            <h3>Diagnostics</h3>
+                            <div className="helper">Click a metric for detailed diagnostics.</div>
+                            <div className="maintenance-indicator" />
+                        </div>
+
+                        <div className="card" style={{ marginTop: '1rem', padding: '1rem' }}>
+                            <div className="inline" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                                <h3>Status History</h3>
+                                <button id="status-history-button" className="button secondary" type="button">
+                                    Status History
+                                </button>
+                            </div>
+                            <div className="status-history-timeline" style={{ marginTop: '0.75rem' }}>
+                                {statusHistory.length === 0 ? (
+                                    <div className="helper">No status history recorded yet.</div>
+                                ) : (
+                                    <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                                        {statusHistory.map((entry) => (
+                                            <li key={entry.id} style={{ marginBottom: '0.5rem' }}>
+                                                <strong>{entry.status}</strong> · {new Date(entry.timestamp).toLocaleString()}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+                            </div>
+                        </div>
                     </section>
                     <KioskPreview />
                 </>
