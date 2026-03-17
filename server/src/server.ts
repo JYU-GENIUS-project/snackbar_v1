@@ -27,6 +27,7 @@ import notificationRoutes from './routes/notifications';
 import transactionRoutes from './routes/transactions';
 import statusRoutes from './routes/status';
 import configRoutes from './routes/config';
+import logRoutes from './routes/logs';
 import cartRoutes from './routes/cart';
 import analyticsRoutes from './routes/analytics';
 import mediaStorage from './utils/mediaStorage';
@@ -203,6 +204,9 @@ app.use('/api/config', apiLimiter, configRoutes);
 // Notification log routes
 app.use('/api/notifications', apiLimiter, notificationRoutes);
 
+// Log viewer routes
+app.use('/api/logs', apiLimiter, logRoutes);
+
 // Customer transaction routes
 app.use('/api/transactions', apiLimiter, transactionRoutes);
 
@@ -255,6 +259,10 @@ const gracefulShutdown = (signal: ShutdownSignal) => {
 
     if (notificationWorkerHandle) {
         void notificationWorkerHandle.stop();
+    }
+
+    if (monitoringWorkerHandle) {
+        void monitoringWorkerHandle.stop();
     }
 
     server.close(() => {

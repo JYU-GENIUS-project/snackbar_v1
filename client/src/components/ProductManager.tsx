@@ -30,7 +30,7 @@ import {
 } from '../hooks/useCategories.js';
 import { useInventoryTracking, useSetInventoryTracking } from '../hooks/useInventory.js';
 import { saveOfflineProductSnapshot, readOfflineProductSnapshot } from '../utils/offlineCache.js';
-import { apiRequest } from '../services/apiClient.js';
+import { apiRequest, API_BASE_URL } from '../services/apiClient.js';
 import type { KioskStatusPayload } from '../hooks/useKioskStatus.js';
 
 type AuthUser = {
@@ -204,6 +204,20 @@ type StatusHistoryEntry = {
     duration?: string;
 };
 
+type ErrorLogEntry = {
+    timestamp: string;
+    level: string;
+    message: string;
+    stackTrace?: string | null;
+    context?: string | null;
+    source?: string;
+};
+
+type LogResponse = {
+    total: number;
+    entries: ErrorLogEntry[];
+};
+
 type DashboardMetric = {
     id: string;
     label: string;
@@ -295,6 +309,7 @@ type ProductManagerProps = {
 };
 
 const DEFAULT_LIMIT = 50;
+const LOG_PAGE_SIZE = 100;
 const toOptionalNumber = (value: unknown): number | undefined => {
     const numeric = Number(value);
     return Number.isFinite(numeric) ? numeric : undefined;
@@ -585,6 +600,20 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
     const [uptimePercent, setUptimePercent] = useState('99.9%');
     const [statusHistory, setStatusHistory] = useState<StatusHistoryEntry[]>([]);
     const [metricsUpdatedAt, setMetricsUpdatedAt] = useState<string | null>(null);
+    const [logEntries, setLogEntries] = useState<ErrorLogEntry[]>([]);
+    const [logTotal, setLogTotal] = useState(0);
+    const [logPage, setLogPage] = useState(0);
+    const [logFilters, setLogFilters] = useState({
+        level: 'all',
+        keyword: '',
+        range: '24h',
+        customStart: '',
+        customEnd: ''
+    });
+    const [logLoading, setLogLoading] = useState(false);
+    const [logError, setLogError] = useState<string | null>(null);
+    const [showLogViewer, setShowLogViewer] = useState(false);
+    const [showLogAnalytics, setShowLogAnalytics] = useState(false);
     const [settingsMessage, setSettingsMessage] = useState<SettingsMessage | null>(null);
     const [auditEntries, setAuditEntries] = useState<AuditEntry[]>(() => {
         const stored = readPersistedAuditEntries();
@@ -839,6 +868,172 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
 
         return () => window.clearInterval(timer);
     }, [activeSection, fetchDashboardStatus]);
+
+    const resolveLogDateRange = useCallback(() => {
+        const now = new Date();
+        if (logFilters.range === 'custom') {
+            return {
+                start: logFilters.customStart ? new Date(logFilters.customStart).toISOString() : null,
+                end: logFilters.customEnd ? new Date(logFilters.customEnd).toISOString() : null
+            };
+        }
+        const start = new Date(now);
+        if (logFilters.range === '7d') {
+            start.setDate(start.getDate() - 7);
+        } else if (logFilters.range === '30d') {
+            start.setDate(start.getDate() - 30);
+        } else {
+            start.setHours(start.getHours() - 24);
+        }
+        return { start: start.toISOString(), end: now.toISOString() };
+    }, [logFilters.customEnd, logFilters.customStart, logFilters.range]);
+
+    const fetchLogs = useCallback(async () => {
+        if (!auth.token) {
+            return;
+        }
+        setLogLoading(true);
+        setLogError(null);
+
+        try {
+            const range = resolveLogDateRange();
+            const params = new URLSearchParams();
+            if (logFilters.level !== 'all') {
+                params.set('level', logFilters.level);
+            }
+            if (logFilters.keyword.trim()) {
+                params.set('keyword', logFilters.keyword.trim());
+            }
+            if (range.start) {
+                params.set('startDate', range.start);
+            }
+            if (range.end) {
+                params.set('endDate', range.end);
+            }
+            params.set('limit', String(LOG_PAGE_SIZE));
+            params.set('offset', String(logPage * LOG_PAGE_SIZE));
+
+            const response = await apiRequest<LogResponse>({
+                path: `/logs?${params.toString()}`,
+                method: 'GET',
+                token: auth.token
+            });
+
+            setLogEntries(response.entries ?? []);
+            setLogTotal(response.total ?? 0);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Unable to load error logs.';
+            setLogError(message);
+        } finally {
+            setLogLoading(false);
+        }
+    }, [auth.token, logFilters.keyword, logFilters.level, logPage, resolveLogDateRange]);
+
+    const handleExportLogs = useCallback(async () => {
+        if (!auth.token || typeof window === 'undefined') {
+            return;
+        }
+        try {
+            const range = resolveLogDateRange();
+            const params = new URLSearchParams();
+            if (logFilters.level !== 'all') {
+                params.set('level', logFilters.level);
+            }
+            if (logFilters.keyword.trim()) {
+                params.set('keyword', logFilters.keyword.trim());
+            }
+            if (range.start) {
+                params.set('startDate', range.start);
+            }
+            if (range.end) {
+                params.set('endDate', range.end);
+            }
+            const exportUrl = new URL(`${API_BASE_URL}/logs/export?${params.toString()}`, window.location.origin);
+            const response = await fetch(exportUrl.toString(), {
+                headers: {
+                    Authorization: `Bearer ${auth.token}`
+                }
+            });
+            if (!response.ok) {
+                throw new Error('Unable to export logs.');
+            }
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'error-logs.csv';
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Unable to export logs.';
+            setLogError(message);
+        }
+    }, [auth.token, logFilters.keyword, logFilters.level, resolveLogDateRange]);
+
+    const handleCleanupLogs = useCallback(async () => {
+        if (!auth.token) {
+            return;
+        }
+        setLogLoading(true);
+        setLogError(null);
+        try {
+            await apiRequest<{ success: boolean }>(
+                {
+                    path: '/logs/cleanup',
+                    method: 'POST',
+                    token: auth.token
+                }
+            );
+            await fetchLogs();
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Unable to clean old logs.';
+            setLogError(message);
+        } finally {
+            setLogLoading(false);
+        }
+    }, [auth.token, fetchLogs]);
+
+    useEffect(() => {
+        if (activeSection !== 'dashboard' || !showLogViewer) {
+            return;
+        }
+
+        void fetchLogs();
+        const timer = window.setInterval(() => {
+            void fetchLogs();
+        }, 30000);
+
+        return () => window.clearInterval(timer);
+    }, [activeSection, fetchLogs, showLogViewer]);
+
+    useEffect(() => {
+        setLogPage(0);
+    }, [logFilters.keyword, logFilters.level, logFilters.range, logFilters.customEnd, logFilters.customStart]);
+
+    const logAnalytics = useMemo(() => {
+        const summary = {
+            total: logTotal,
+            error: 0,
+            warn: 0,
+            info: 0,
+            other: 0
+        };
+        logEntries.forEach((entry) => {
+            const level = entry.level.toLowerCase();
+            if (level.includes('error')) {
+                summary.error += 1;
+            } else if (level.includes('warn')) {
+                summary.warn += 1;
+            } else if (level.includes('info')) {
+                summary.info += 1;
+            } else {
+                summary.other += 1;
+            }
+        });
+        return summary;
+    }, [logEntries, logTotal]);
 
     const alertTypeOptions = useMemo(
         () => [
@@ -2050,6 +2245,14 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
                             <button id="advanced-monitoring-link" className="button secondary" type="button">
                                 Advanced Monitoring
                             </button>
+                            <button
+                                id="view-error-logs-button"
+                                className="button secondary"
+                                type="button"
+                                onClick={() => setShowLogViewer((current) => !current)}
+                            >
+                                {showLogViewer ? 'Hide Error Logs' : 'View Error Logs'}
+                            </button>
                         </div>
 
                         <div className="card" style={{ marginTop: '1rem', padding: '1rem' }}>
@@ -2107,6 +2310,173 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
                                 )}
                             </div>
                         </div>
+
+                        {showLogViewer && (
+                            <div className="card error-logs-page" style={{ marginTop: '1rem', padding: '1rem' }}>
+                                <div className="inline" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <h3>Error Logs</h3>
+                                    <div className="inline" style={{ gap: '0.5rem' }}>
+                                        <button
+                                            id="log-analytics-button"
+                                            className="button secondary"
+                                            type="button"
+                                            onClick={() => setShowLogAnalytics((current) => !current)}
+                                        >
+                                            {showLogAnalytics ? 'Hide Log Analytics' : 'Log Analytics'}
+                                        </button>
+                                        <button
+                                            id="export-logs-csv-button"
+                                            className="button secondary"
+                                            type="button"
+                                            onClick={handleExportLogs}
+                                        >
+                                            Export CSV
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="inline" style={{ flexWrap: 'wrap', gap: '0.75rem', marginTop: '0.75rem' }}>
+                                    <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                        <span className="helper">Date range</span>
+                                        <select
+                                            id="date-range-filter"
+                                            value={logFilters.range}
+                                            onChange={(event) =>
+                                                setLogFilters((current) => ({ ...current, range: event.target.value }))
+                                            }
+                                        >
+                                            <option value="24h">Last 24 hours</option>
+                                            <option value="7d">Last 7 days</option>
+                                            <option value="30d">Last 30 days</option>
+                                            <option value="custom">Custom range</option>
+                                        </select>
+                                    </label>
+                                    {logFilters.range === 'custom' && (
+                                        <>
+                                            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                                <span className="helper">Start</span>
+                                                <input
+                                                    type="datetime-local"
+                                                    value={logFilters.customStart}
+                                                    onChange={(event) =>
+                                                        setLogFilters((current) => ({ ...current, customStart: event.target.value }))
+                                                    }
+                                                />
+                                            </label>
+                                            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                                <span className="helper">End</span>
+                                                <input
+                                                    type="datetime-local"
+                                                    value={logFilters.customEnd}
+                                                    onChange={(event) =>
+                                                        setLogFilters((current) => ({ ...current, customEnd: event.target.value }))
+                                                    }
+                                                />
+                                            </label>
+                                        </>
+                                    )}
+                                    <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                        <span className="helper">Error level</span>
+                                        <select
+                                            id="error-level-filter"
+                                            value={logFilters.level}
+                                            onChange={(event) =>
+                                                setLogFilters((current) => ({ ...current, level: event.target.value }))
+                                            }
+                                        >
+                                            <option value="all">All</option>
+                                            <option value="ERROR">Error</option>
+                                            <option value="WARN">Warn</option>
+                                            <option value="INFO">Info</option>
+                                        </select>
+                                    </label>
+                                    <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', flex: 1 }}>
+                                        <span className="helper">Search</span>
+                                        <input
+                                            id="log-search-input"
+                                            type="search"
+                                            placeholder="Search messages"
+                                            value={logFilters.keyword}
+                                            onChange={(event) =>
+                                                setLogFilters((current) => ({ ...current, keyword: event.target.value }))
+                                            }
+                                        />
+                                    </label>
+                                    <div className="inline" style={{ gap: '0.5rem', alignItems: 'flex-end' }}>
+                                        <button
+                                            id="search-logs-button"
+                                            className="button secondary"
+                                            type="button"
+                                            onClick={() => void fetchLogs()}
+                                        >
+                                            Search
+                                        </button>
+                                        <button
+                                            id="clear-old-logs-button"
+                                            className="button secondary"
+                                            type="button"
+                                            onClick={() => void handleCleanupLogs()}
+                                            disabled={logLoading}
+                                        >
+                                            Clear old logs
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="helper filter-result-count" style={{ marginTop: '0.5rem' }}>
+                                    {logLoading ? 'Loading logs…' : `${logTotal} entries found`}
+                                </div>
+                                {logError && <div className="helper" style={{ color: '#dc2626' }}>{logError}</div>}
+
+                                {showLogAnalytics && (
+                                    <div className="card log-analytics-dashboard" style={{ marginTop: '0.75rem', padding: '0.75rem' }}>
+                                        <div className="inline" style={{ gap: '1.5rem', flexWrap: 'wrap' }}>
+                                            <div><strong>Total</strong> {logAnalytics.total}</div>
+                                            <div><strong>Error</strong> {logAnalytics.error}</div>
+                                            <div><strong>Warn</strong> {logAnalytics.warn}</div>
+                                            <div><strong>Info</strong> {logAnalytics.info}</div>
+                                            <div><strong>Other</strong> {logAnalytics.other}</div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="log-entry-list" style={{ marginTop: '0.75rem' }}>
+                                    {logEntries.length === 0 && !logLoading ? (
+                                        <div className="helper">No log entries available.</div>
+                                    ) : (
+                                        logEntries.map((entry, index) => (
+                                            <div key={`${entry.timestamp}-${index}`} className="log-entry" style={{ padding: '0.75rem 0', borderBottom: '1px solid #e5e7eb' }}>
+                                                <div className="log-entry-timestamp"><strong>{new Date(entry.timestamp).toLocaleString()}</strong></div>
+                                                <div className="log-entry-level">{entry.level}</div>
+                                                <div className="log-entry-message">{entry.message}</div>
+                                                {entry.stackTrace && <div className="log-entry-stacktrace">{entry.stackTrace}</div>}
+                                                <div className="log-entry-context">{entry.context || entry.source}</div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+
+                                <div className="pagination-controls" style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                                    <button
+                                        className="button secondary"
+                                        type="button"
+                                        onClick={() => setLogPage((current) => Math.max(0, current - 1))}
+                                        disabled={logPage === 0}
+                                    >
+                                        Previous
+                                    </button>
+                                    <span className="helper">Page {logPage + 1}</span>
+                                    <button
+                                        className="button secondary"
+                                        type="button"
+                                        onClick={() => setLogPage((current) => current + 1)}
+                                        disabled={(logPage + 1) * LOG_PAGE_SIZE >= logTotal}
+                                    >
+                                        Next
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </section>
                     <KioskPreview />
                 </>
