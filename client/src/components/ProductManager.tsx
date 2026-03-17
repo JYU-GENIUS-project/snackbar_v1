@@ -30,6 +30,7 @@ import {
 } from '../hooks/useCategories.js';
 import { useInventoryTracking, useSetInventoryTracking } from '../hooks/useInventory.js';
 import { saveOfflineProductSnapshot, readOfflineProductSnapshot } from '../utils/offlineCache.js';
+import { apiRequest } from '../services/apiClient.js';
 
 type AuthUser = {
     email?: string;
@@ -156,6 +157,54 @@ type SettingsFormState = {
     operatingHoursEnd: string;
     lowStockThreshold: number | string;
 };
+
+type OperatingHoursWindow = {
+    start: string;
+    end: string;
+    days: number[];
+};
+
+type OperatingHoursConfig = {
+    timezone?: string | null;
+    windows?: OperatingHoursWindow[];
+};
+
+type MaintenanceConfig = {
+    enabled: boolean;
+    message?: string | null;
+    since?: string | null;
+};
+
+type NotificationRecipient = {
+    id: string;
+    alertType: string;
+    email: string;
+    status: string;
+    isPrimary: boolean;
+    verifiedAt?: string | null;
+    expiresAt?: string | null;
+};
+
+type SystemConfigResponse = {
+    data?: {
+        operatingHours?: OperatingHoursConfig;
+        maintenance?: MaintenanceConfig;
+        maintenanceSchedule?: Record<string, unknown>;
+        notificationRecipients?: NotificationRecipient[];
+    };
+};
+
+type DayKey = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
+
+const DAY_LABELS: Array<{ key: DayKey; label: string; dayNumber: number }> = [
+    { key: 'monday', label: 'Monday', dayNumber: 1 },
+    { key: 'tuesday', label: 'Tuesday', dayNumber: 2 },
+    { key: 'wednesday', label: 'Wednesday', dayNumber: 3 },
+    { key: 'thursday', label: 'Thursday', dayNumber: 4 },
+    { key: 'friday', label: 'Friday', dayNumber: 5 },
+    { key: 'saturday', label: 'Saturday', dayNumber: 6 },
+    { key: 'sunday', label: 'Sunday', dayNumber: 7 }
+];
 
 type SettingsMessage = {
     type: 'success' | 'error';
@@ -495,6 +544,26 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
         operatingHoursEnd: '18:00',
         lowStockThreshold: 5
     });
+    const [configLoading, setConfigLoading] = useState(false);
+    const [configError, setConfigError] = useState<string | null>(null);
+    const [operatingHoursByDay, setOperatingHoursByDay] = useState<Record<DayKey, { start: string; end: string }>>({
+        monday: { start: '08:00', end: '18:00' },
+        tuesday: { start: '08:00', end: '18:00' },
+        wednesday: { start: '08:00', end: '18:00' },
+        thursday: { start: '08:00', end: '18:00' },
+        friday: { start: '08:00', end: '18:00' },
+        saturday: { start: '10:00', end: '16:00' },
+        sunday: { start: '10:00', end: '16:00' }
+    });
+    const [operatingHoursVisible, setOperatingHoursVisible] = useState(false);
+    const [enable247, setEnable247] = useState(false);
+    const [breakWindow, setBreakWindow] = useState({ start: '12:00', end: '13:00' });
+    const [holidayConfig, setHolidayConfig] = useState({ date: '', name: '', closed: false, start: '08:00', end: '18:00' });
+    const [maintenanceConfig, setMaintenanceConfig] = useState<MaintenanceConfig>({ enabled: false, message: '' });
+    const [maintenanceSchedule, setMaintenanceSchedule] = useState({ date: '', timeRange: '', message: '' });
+    const [notificationRecipients, setNotificationRecipients] = useState<NotificationRecipient[]>([]);
+    const [notificationSettingsVisible, setNotificationSettingsVisible] = useState(false);
+    const [notificationForm, setNotificationForm] = useState({ alertType: 'low_stock', email: '' });
     const [settingsMessage, setSettingsMessage] = useState<SettingsMessage | null>(null);
     const [auditEntries, setAuditEntries] = useState<AuditEntry[]>(() => {
         const stored = readPersistedAuditEntries();
@@ -677,6 +746,75 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
 
         trackingToggleRef.current.checked = Boolean(trackingToggleValue);
     }, [trackingToggleValue]);
+
+    const alertTypeOptions = useMemo(
+        () => [
+            { value: 'low_stock', label: 'Low Stock Alerts' },
+            { value: 'payment_issues', label: 'Payment Issues' },
+            { value: 'system_errors', label: 'System Errors' }
+        ],
+        []
+    );
+
+    const hydrateOperatingHours = useCallback((operatingHours?: OperatingHoursConfig) => {
+        if (!operatingHours?.windows || operatingHours.windows.length === 0) {
+            return;
+        }
+
+        const nextHours: Record<DayKey, { start: string; end: string }> = { ...operatingHoursByDay };
+        operatingHours.windows.forEach((window) => {
+            window.days.forEach((day) => {
+                const match = DAY_LABELS.find((item) => item.dayNumber === day);
+                if (!match) {
+                    return;
+                }
+                nextHours[match.key] = { start: window.start, end: window.end };
+            });
+        });
+        setOperatingHoursByDay(nextHours);
+    }, [operatingHoursByDay]);
+
+    const loadSystemConfig = useCallback(async () => {
+        if (!auth.token) {
+            return;
+        }
+
+        setConfigLoading(true);
+        setConfigError(null);
+        try {
+            const response = await apiRequest<SystemConfigResponse>({
+                path: '/config',
+                method: 'GET',
+                token: auth.token
+            });
+            const data = response.data;
+            if (data?.operatingHours) {
+                hydrateOperatingHours(data.operatingHours);
+            }
+            if (data?.maintenance) {
+                setMaintenanceConfig({
+                    enabled: Boolean(data.maintenance.enabled),
+                    message: data.maintenance.message ?? ''
+                });
+            }
+            if (Array.isArray(data?.notificationRecipients)) {
+                setNotificationRecipients(data.notificationRecipients);
+            }
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Unable to load system configuration.';
+            setConfigError(message);
+        } finally {
+            setConfigLoading(false);
+        }
+    }, [auth.token, hydrateOperatingHours]);
+
+    useEffect(() => {
+        if (activeSection !== 'settings') {
+            return;
+        }
+
+        void loadSystemConfig();
+    }, [activeSection, loadSystemConfig]);
 
     const hasApiProducts = useMemo(() => {
         if (error) {
@@ -1218,12 +1356,185 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
 
     const handleSettingsSave = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
-        recordAuditEntry({
-            action: 'SETTINGS',
-            entity: 'System Settings',
-            details: `Updated operating hours to ${settingsForm.operatingHoursStart}-${settingsForm.operatingHoursEnd}`
-        });
-        setSettingsMessage({ type: 'success', text: 'Settings updated successfully' });
+        const windows = DAY_LABELS.map((day) => ({
+            start: settingsForm.operatingHoursStart,
+            end: settingsForm.operatingHoursEnd,
+            days: [day.dayNumber]
+        }));
+        void apiRequest({
+            path: '/config/operating-hours',
+            method: 'PUT',
+            token: auth.token,
+            body: {
+                windows
+            }
+        })
+            .then(() => {
+                recordAuditEntry({
+                    action: 'SETTINGS',
+                    entity: 'System Settings',
+                    details: `Updated operating hours to ${settingsForm.operatingHoursStart}-${settingsForm.operatingHoursEnd}`
+                });
+                setSettingsMessage({ type: 'success', text: 'Operating hours updated' });
+            })
+            .catch((error) => {
+                setSettingsMessage({
+                    type: 'error',
+                    text: error instanceof Error ? error.message : 'Failed to update operating hours'
+                });
+            });
+    };
+
+    const handleOperatingHoursSave = () => {
+        const windows = DAY_LABELS.map((day) => ({
+            start: operatingHoursByDay[day.key].start,
+            end: operatingHoursByDay[day.key].end,
+            days: [day.dayNumber]
+        }));
+
+        void apiRequest({
+            path: '/config/operating-hours',
+            method: 'PUT',
+            token: auth.token,
+            body: {
+                windows,
+                enable247,
+                breaks: breakWindow.start && breakWindow.end ? [breakWindow] : [],
+                holidays: holidayConfig.date
+                    ? [
+                          {
+                              date: holidayConfig.date,
+                              name: holidayConfig.name,
+                              closed: holidayConfig.closed,
+                              start: holidayConfig.start,
+                              end: holidayConfig.end
+                          }
+                      ]
+                    : []
+            }
+        })
+            .then(() => {
+                setSettingsMessage({ type: 'success', text: 'Operating hours updated' });
+            })
+            .catch((error) => {
+                setSettingsMessage({
+                    type: 'error',
+                    text: error instanceof Error ? error.message : 'Failed to update operating hours'
+                });
+            });
+    };
+
+    const handleMaintenanceSave = () => {
+        void apiRequest({
+            path: '/config/maintenance',
+            method: 'PUT',
+            token: auth.token,
+            body: {
+                enabled: maintenanceConfig.enabled,
+                message: maintenanceConfig.message
+            }
+        })
+            .then(() => {
+                setSettingsMessage({ type: 'success', text: 'Maintenance configuration updated' });
+            })
+            .catch((error) => {
+                setSettingsMessage({
+                    type: 'error',
+                    text: error instanceof Error ? error.message : 'Failed to update maintenance configuration'
+                });
+            });
+    };
+
+    const handleMaintenanceScheduleSave = () => {
+        void apiRequest({
+            path: '/config/maintenance-schedule',
+            method: 'PUT',
+            token: auth.token,
+            body: {
+                windows: maintenanceSchedule.date && maintenanceSchedule.timeRange
+                    ? [
+                          {
+                              date: maintenanceSchedule.date,
+                              timeRange: maintenanceSchedule.timeRange,
+                              message: maintenanceSchedule.message
+                          }
+                      ]
+                    : []
+            }
+        })
+            .then(() => {
+                setSettingsMessage({ type: 'success', text: 'Maintenance schedule updated' });
+            })
+            .catch((error) => {
+                setSettingsMessage({
+                    type: 'error',
+                    text: error instanceof Error ? error.message : 'Failed to update maintenance schedule'
+                });
+            });
+    };
+
+    const handleAddRecipient = () => {
+        if (!notificationForm.email.trim()) {
+            setSettingsMessage({ type: 'error', text: 'Please enter an email address' });
+            return;
+        }
+
+        void apiRequest<{ data?: NotificationRecipient }>
+            ({
+                path: '/config/notifications/recipients',
+                method: 'POST',
+                token: auth.token,
+                body: {
+                    alertType: notificationForm.alertType,
+                    email: notificationForm.email
+                }
+            })
+            .then((response) => {
+                if (response.data) {
+                    setNotificationRecipients((current) => [response.data as NotificationRecipient, ...current]);
+                }
+                setNotificationForm((current) => ({ ...current, email: '' }));
+                setSettingsMessage({ type: 'success', text: 'Notification settings saved' });
+            })
+            .catch((error) => {
+                setSettingsMessage({
+                    type: 'error',
+                    text: error instanceof Error ? error.message : 'Failed to add notification recipient'
+                });
+            });
+    };
+
+    const handleRemoveRecipient = (recipientId: string) => {
+        void apiRequest({
+            path: `/config/notifications/recipients/${recipientId}`,
+            method: 'DELETE',
+            token: auth.token
+        })
+            .then(() => {
+                setNotificationRecipients((current) => current.filter((recipient) => recipient.id !== recipientId));
+            })
+            .catch(() => {
+                setSettingsMessage({ type: 'error', text: 'Failed to remove recipient' });
+            });
+    };
+
+    const handleSetPrimaryRecipient = (recipientId: string) => {
+        void apiRequest({
+            path: `/config/notifications/recipients/${recipientId}/primary`,
+            method: 'PUT',
+            token: auth.token
+        })
+            .then(() => {
+                setNotificationRecipients((current) =>
+                    current.map((recipient) => ({
+                        ...recipient,
+                        isPrimary: recipient.id === recipientId
+                    }))
+                );
+            })
+            .catch(() => {
+                setSettingsMessage({ type: 'error', text: 'Failed to update primary recipient' });
+            });
     };
 
     const handleCreate = async (values: ProductFormSubmitPayload): Promise<void> => {
@@ -1589,6 +1900,14 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
                     Settings
                 </button>
                 <button
+                    id="system-config-menu"
+                    className={`button secondary${activeSection === 'settings' ? '' : ' muted'}`}
+                    type="button"
+                    onClick={handleShowSettings}
+                >
+                    System Configuration
+                </button>
+                <button
                     id="audit-trail-menu"
                     className={`button secondary${activeSection === 'audit-trail' ? '' : ' muted'}`}
                     type="button"
@@ -1799,135 +2118,491 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
 
             {activeSection === 'settings' && (
                 <section className="card" id="system-config">
-                    <form
-                        id="system-configuration-page"
-                        className="stack"
-                        style={{ gap: '1rem' }}
-                        onSubmit={handleSettingsSave}
-                    >
-                        <div>
-                            <h2>System Configuration</h2>
-                            <p className="helper">Toggle system-wide inventory policies and kiosk settings.</p>
-                        </div>
-                        <label htmlFor="inventory-tracking-toggle" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <input
-                                id="inventory-tracking-toggle"
-                                type="checkbox"
-                                ref={trackingToggleRef}
-                                checked={trackingToggleValue}
-                                onChange={(event: ChangeEvent<HTMLInputElement>) => {
-                                    const nextValue = event.target.checked;
-                                    if (nextValue) {
-                                        event.target.setAttribute('checked', 'true');
-                                    } else {
-                                        event.target.removeAttribute('checked');
-                                    }
-                                    setTrackingToggleValue(nextValue);
-                                    setSettingsMessage(null);
-                                    setInventoryTracking(
-                                        { enabled: nextValue },
-                                        {
-                                            onSuccess: () => {
-                                                setSettingsMessage({ type: 'success', text: 'Inventory tracking preference saved' });
-                                            },
-                                            onError: () => {
-                                                setSettingsMessage({ type: 'error', text: 'Failed to update inventory tracking preference' });
-                                            }
+                    <div id="system-config-page">
+                        <form
+                            id="system-configuration-page"
+                            className="stack"
+                            style={{ gap: '1rem' }}
+                            onSubmit={handleSettingsSave}
+                        >
+                            <div>
+                                <h2>System Configuration</h2>
+                                <p className="helper">Manage operating hours, maintenance, and notification routing.</p>
+                            </div>
+
+                            {configLoading && <div className="alert">Loading configuration…</div>}
+                            {configError && <div className="alert danger">{configError}</div>}
+
+                            <label htmlFor="inventory-tracking-toggle" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <input
+                                    id="inventory-tracking-toggle"
+                                    type="checkbox"
+                                    ref={trackingToggleRef}
+                                    checked={trackingToggleValue}
+                                    onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                                        const nextValue = event.target.checked;
+                                        if (nextValue) {
+                                            event.target.setAttribute('checked', 'true');
+                                        } else {
+                                            event.target.removeAttribute('checked');
                                         }
-                                    );
-                                }}
-                                disabled={inventoryTrackingMutationPending || inventoryTrackingQuery.isLoading}
-                            />
-                            Enable inventory tracking
-                        </label>
-                        {inventoryTrackingQuery.isError && (
-                            <p className="helper" role="status" style={{ color: '#dc2626' }}>
-                                Unable to load inventory tracking status. Try refreshing the page.
-                            </p>
-                        )}
-                        <div className="inline" style={{ gap: '1rem', flexWrap: 'wrap' }}>
-                            <label className="stack" style={{ gap: '0.25rem' }}>
-                                <span>Operating hours start</span>
-                                <input
-                                    id="operating-hours-start"
-                                    type="time"
-                                    value={settingsForm.operatingHoursStart}
-                                    onChange={(event: ChangeEvent<HTMLInputElement>) => {
-                                        const value = event.target.value;
-                                        setSettingsForm((current) => ({ ...current, operatingHoursStart: value }));
+                                        setTrackingToggleValue(nextValue);
                                         setSettingsMessage(null);
+                                        setInventoryTracking(
+                                            { enabled: nextValue },
+                                            {
+                                                onSuccess: () => {
+                                                    setSettingsMessage({ type: 'success', text: 'Inventory tracking preference saved' });
+                                                },
+                                                onError: () => {
+                                                    setSettingsMessage({ type: 'error', text: 'Failed to update inventory tracking preference' });
+                                                }
+                                            }
+                                        );
                                     }}
+                                    disabled={inventoryTrackingMutationPending || inventoryTrackingQuery.isLoading}
                                 />
+                                Enable inventory tracking
                             </label>
-                            <label className="stack" style={{ gap: '0.25rem' }}>
-                                <span>Operating hours end</span>
-                                <input
-                                    id="operating-hours-end"
-                                    type="time"
-                                    value={settingsForm.operatingHoursEnd}
-                                    onChange={(event: ChangeEvent<HTMLInputElement>) => {
-                                        const value = event.target.value;
-                                        setSettingsForm((current) => ({ ...current, operatingHoursEnd: value }));
-                                        setSettingsMessage(null);
-                                    }}
-                                />
-                            </label>
-                            <label className="stack" style={{ gap: '0.25rem' }}>
-                                <span>Low-stock threshold</span>
-                                <input
-                                    id="low-stock-threshold"
-                                    type="number"
-                                    min="0"
-                                    value={settingsForm.lowStockThreshold}
-                                    onChange={(event: ChangeEvent<HTMLInputElement>) => {
-                                        const value = event.target.value;
-                                        setSettingsForm((current) => ({ ...current, lowStockThreshold: value }));
-                                        setSettingsMessage(null);
-                                    }}
-                                />
-                            </label>
-                        </div>
-                        <label className="stack" style={{ gap: '0.25rem' }}>
-                            <span>Notification email</span>
-                            <input
-                                id="notification-email"
-                                type="email"
-                                placeholder="admin@example.com"
-                                onChange={() => setSettingsMessage(null)}
-                            />
-                        </label>
-                        <div className="inline" style={{ gap: '0.75rem' }}>
-                            <button id="save-settings-button" className="button" type="submit">
-                                Save Settings
-                            </button>
-                            <button className="button secondary" type="button" onClick={() => setSettingsMessage(null)}>
-                                Reset Message
-                            </button>
-                        </div>
-                        <div className="card" style={{ marginTop: '1rem' }}>
-                            <h3>Data Retention</h3>
-                            <p id="data-retention-policy">Minimum 3 years retention</p>
-                            <div className="inline" style={{ gap: '1rem' }}>
-                                <div id="storage-usage">80%</div>
-                                <div className="storage-alert storage-warning-banner">Storage warning threshold reached.</div>
-                                <div className="storage-critical-alert">Critical storage usage.</div>
+
+                            <div className="card" style={{ padding: '1rem' }}>
+                                <div className="inline" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div>
+                                        <h3>Operating Hours</h3>
+                                        <p className="helper">Configure daily hours, breaks, and holidays.</p>
+                                    </div>
+                                    <button
+                                        id="configure-hours-button"
+                                        className="button secondary"
+                                        type="button"
+                                        onClick={() => setOperatingHoursVisible((current) => !current)}
+                                    >
+                                        Configure Operating Hours
+                                    </button>
+                                </div>
+
+                                {operatingHoursVisible && (
+                                    <div className="operating-hours-form stack" style={{ marginTop: '1rem' }}>
+                                        <div className="inline" style={{ gap: '0.75rem', flexWrap: 'wrap' }}>
+                                            <button
+                                                id="enable-247-mode"
+                                                className="button secondary"
+                                                type="button"
+                                                onClick={() => setEnable247(true)}
+                                            >
+                                                Enable 24/7 Operation
+                                            </button>
+                                            <button
+                                                id="disable-247-mode"
+                                                className="button secondary"
+                                                type="button"
+                                                onClick={() => setEnable247(false)}
+                                            >
+                                                Disable 24/7 Operation
+                                            </button>
+                                            <button
+                                                id="copy-monday-to-weekdays-button"
+                                                className="button secondary"
+                                                type="button"
+                                                onClick={() => {
+                                                    const monday = operatingHoursByDay.monday;
+                                                    setOperatingHoursByDay((current) => ({
+                                                        ...current,
+                                                        tuesday: { ...monday },
+                                                        wednesday: { ...monday },
+                                                        thursday: { ...monday },
+                                                        friday: { ...monday }
+                                                    }));
+                                                }}
+                                            >
+                                                Copy Monday hours to all weekdays
+                                            </button>
+                                        </div>
+
+                                        {DAY_LABELS.map((day) => (
+                                            <div key={day.key} className="inline" style={{ gap: '0.75rem', alignItems: 'center' }}>
+                                                <span style={{ minWidth: '90px' }}>{day.label}</span>
+                                                <input
+                                                    id={`${day.key}-opening-time`}
+                                                    type="time"
+                                                    value={operatingHoursByDay[day.key].start}
+                                                    onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                                                        const value = event.target.value;
+                                                        setOperatingHoursByDay((current) => ({
+                                                            ...current,
+                                                            [day.key]: { ...current[day.key], start: value }
+                                                        }));
+                                                        setSettingsMessage(null);
+                                                    }}
+                                                />
+                                                <input
+                                                    id={`${day.key}-closing-time`}
+                                                    type="time"
+                                                    value={operatingHoursByDay[day.key].end}
+                                                    onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                                                        const value = event.target.value;
+                                                        setOperatingHoursByDay((current) => ({
+                                                            ...current,
+                                                            [day.key]: { ...current[day.key], end: value }
+                                                        }));
+                                                        setSettingsMessage(null);
+                                                    }}
+                                                />
+                                            </div>
+                                        ))}
+
+                                        <div className="inline" style={{ gap: '0.75rem', alignItems: 'center' }}>
+                                            <button
+                                                id="add-break-button"
+                                                className="button secondary"
+                                                type="button"
+                                                onClick={() => setBreakWindow({ start: '12:00', end: '13:00' })}
+                                            >
+                                                Add Break
+                                            </button>
+                                            <input
+                                                id="break-start-time"
+                                                type="time"
+                                                value={breakWindow.start}
+                                                onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                                                    setBreakWindow((current) => ({ ...current, start: event.target.value }))
+                                                }
+                                            />
+                                            <input
+                                                id="break-end-time"
+                                                type="time"
+                                                value={breakWindow.end}
+                                                onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                                                    setBreakWindow((current) => ({ ...current, end: event.target.value }))
+                                                }
+                                            />
+                                        </div>
+
+                                        <div className="stack" style={{ gap: '0.5rem' }}>
+                                            <button
+                                                id="add-holiday-button"
+                                                className="button secondary"
+                                                type="button"
+                                                onClick={() => setHolidayConfig((current) => ({ ...current }))}
+                                            >
+                                                Add Holiday
+                                            </button>
+                                            <div className="inline" style={{ gap: '0.75rem', alignItems: 'center' }}>
+                                                <input
+                                                    id="holiday-date"
+                                                    type="date"
+                                                    value={holidayConfig.date}
+                                                    onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                                                        setHolidayConfig((current) => ({ ...current, date: event.target.value }))
+                                                    }
+                                                />
+                                                <input
+                                                    id="holiday-name"
+                                                    type="text"
+                                                    placeholder="Holiday name"
+                                                    value={holidayConfig.name}
+                                                    onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                                                        setHolidayConfig((current) => ({ ...current, name: event.target.value }))
+                                                    }
+                                                />
+                                            </div>
+                                            <div className="inline" style={{ gap: '0.75rem' }}>
+                                                <label htmlFor="holiday-hours-option" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                                    <input
+                                                        id="holiday-hours-option"
+                                                        type="radio"
+                                                        name="holiday-mode"
+                                                        checked={!holidayConfig.closed}
+                                                        onChange={() => setHolidayConfig((current) => ({ ...current, closed: false }))}
+                                                    />
+                                                    Custom hours
+                                                </label>
+                                                <label htmlFor="holiday-closed-option" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                                    <input
+                                                        id="holiday-closed-option"
+                                                        type="radio"
+                                                        name="holiday-mode"
+                                                        checked={holidayConfig.closed}
+                                                        onChange={() => setHolidayConfig((current) => ({ ...current, closed: true }))}
+                                                    />
+                                                    Closed all day
+                                                </label>
+                                            </div>
+                                            {!holidayConfig.closed && (
+                                                <div className="inline" style={{ gap: '0.75rem' }}>
+                                                    <input
+                                                        type="time"
+                                                        value={holidayConfig.start}
+                                                        onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                                                            setHolidayConfig((current) => ({ ...current, start: event.target.value }))
+                                                        }
+                                                    />
+                                                    <input
+                                                        type="time"
+                                                        value={holidayConfig.end}
+                                                        onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                                                            setHolidayConfig((current) => ({ ...current, end: event.target.value }))
+                                                        }
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div className="inline" style={{ gap: '0.75rem' }}>
+                                            <button
+                                                id="save-operating-hours-button"
+                                                className="button"
+                                                type="button"
+                                                onClick={handleOperatingHoursSave}
+                                            >
+                                                Save operating hours
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="inline" style={{ gap: '1rem', flexWrap: 'wrap', marginTop: '1rem' }}>
+                                    <label className="stack" style={{ gap: '0.25rem' }}>
+                                        <span>Operating hours start</span>
+                                        <input
+                                            id="operating-hours-start"
+                                            type="time"
+                                            value={settingsForm.operatingHoursStart}
+                                            onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                                                const value = event.target.value;
+                                                setSettingsForm((current) => ({ ...current, operatingHoursStart: value }));
+                                                setSettingsMessage(null);
+                                            }}
+                                        />
+                                    </label>
+                                    <label className="stack" style={{ gap: '0.25rem' }}>
+                                        <span>Operating hours end</span>
+                                        <input
+                                            id="operating-hours-end"
+                                            type="time"
+                                            value={settingsForm.operatingHoursEnd}
+                                            onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                                                const value = event.target.value;
+                                                setSettingsForm((current) => ({ ...current, operatingHoursEnd: value }));
+                                                setSettingsMessage(null);
+                                            }}
+                                        />
+                                    </label>
+                                </div>
                             </div>
-                            <div className="helper">Consider archiving old data</div>
-                            <div className="inline" style={{ gap: '0.75rem', marginTop: '0.5rem' }}>
-                                <button id="archive-data-button" className="button secondary" type="button">
-                                    Archive data
+
+                            <div className="card" style={{ padding: '1rem' }}>
+                                <div className="inline" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div>
+                                        <h3>Maintenance Mode</h3>
+                                        <p className="helper">Toggle maintenance mode and schedule windows.</p>
+                                    </div>
+                                    <span
+                                        id="maintenance-status"
+                                        className={maintenanceConfig.enabled ? 'maintenance-mode-active' : undefined}
+                                    >
+                                        {maintenanceConfig.enabled ? 'Enabled' : 'Disabled'}
+                                    </span>
+                                </div>
+                                <label htmlFor="maintenance-mode-toggle" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <input
+                                        id="maintenance-mode-toggle"
+                                        type="checkbox"
+                                        checked={maintenanceConfig.enabled}
+                                        onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                                            setMaintenanceConfig((current) => ({ ...current, enabled: event.target.checked }))
+                                        }
+                                    />
+                                    Maintenance Mode
+                                </label>
+                                <label className="stack" style={{ gap: '0.25rem' }}>
+                                    <span>Maintenance message</span>
+                                    <input
+                                        id="maintenance-custom-message"
+                                        type="text"
+                                        value={maintenanceConfig.message ?? ''}
+                                        onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                                            setMaintenanceConfig((current) => ({ ...current, message: event.target.value }))
+                                        }
+                                    />
+                                </label>
+                                <div className="inline" style={{ gap: '0.75rem' }}>
+                                    <button
+                                        id="save-maintenance-config"
+                                        className="button"
+                                        type="button"
+                                        onClick={handleMaintenanceSave}
+                                    >
+                                        Save maintenance configuration
+                                    </button>
+                                    <button
+                                        id="maintenance-config-link"
+                                        className="button secondary"
+                                        type="button"
+                                    >
+                                        Schedule maintenance
+                                    </button>
+                                </div>
+
+                                <div className="stack" style={{ marginTop: '0.75rem' }}>
+                                    <div className="inline" style={{ gap: '0.75rem' }}>
+                                        <input
+                                            id="maintenance-schedule-date"
+                                            type="date"
+                                            value={maintenanceSchedule.date}
+                                            onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                                                setMaintenanceSchedule((current) => ({ ...current, date: event.target.value }))
+                                            }
+                                        />
+                                        <input
+                                            id="maintenance-schedule-time"
+                                            type="text"
+                                            placeholder="02:00-06:00"
+                                            value={maintenanceSchedule.timeRange}
+                                            onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                                                setMaintenanceSchedule((current) => ({ ...current, timeRange: event.target.value }))
+                                            }
+                                        />
+                                    </div>
+                                    <input
+                                        id="scheduled-maintenance-message"
+                                        type="text"
+                                        placeholder="Scheduled maintenance message"
+                                        value={maintenanceSchedule.message}
+                                        onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                                            setMaintenanceSchedule((current) => ({ ...current, message: event.target.value }))
+                                        }
+                                    />
+                                    <button
+                                        id="save-maintenance-schedule"
+                                        className="button secondary"
+                                        type="button"
+                                        onClick={handleMaintenanceScheduleSave}
+                                    >
+                                        Save schedule
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="card" style={{ padding: '1rem' }}>
+                                <div className="inline" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div>
+                                        <h3>Notification Email Configuration</h3>
+                                        <p className="helper">Route alerts to the right recipients.</p>
+                                    </div>
+                                    <button
+                                        id="configure-notifications-button"
+                                        className="button secondary"
+                                        type="button"
+                                        onClick={() => setNotificationSettingsVisible((current) => !current)}
+                                    >
+                                        Configure Notifications
+                                    </button>
+                                </div>
+
+                                {notificationSettingsVisible && (
+                                    <div className="notification-settings-page stack" style={{ marginTop: '1rem' }}>
+                                        <h4>Notification Email Configuration</h4>
+                                        <div className="inline" style={{ gap: '0.75rem', flexWrap: 'wrap' }}>
+                                            <select
+                                                id="alert-type-select"
+                                                value={notificationForm.alertType}
+                                                onChange={(event: ChangeEvent<HTMLSelectElement>) =>
+                                                    setNotificationForm((current) => ({ ...current, alertType: event.target.value }))
+                                                }
+                                            >
+                                                {alertTypeOptions.map((option) => (
+                                                    <option key={option.value} value={option.value}>
+                                                        {option.label}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <input
+                                                id="notification-email-input"
+                                                type="email"
+                                                placeholder="admin@example.com"
+                                                value={notificationForm.email}
+                                                onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                                                    setNotificationForm((current) => ({ ...current, email: event.target.value }))
+                                                }
+                                            />
+                                            <button id="add-email-button" className="button secondary" type="button" onClick={handleAddRecipient}>
+                                                Add email
+                                            </button>
+                                        </div>
+                                        <div className="inline" style={{ gap: '0.75rem' }}>
+                                            <input
+                                                id="new-email-input"
+                                                type="email"
+                                                placeholder="newadmin@example.com"
+                                                value={notificationForm.email}
+                                                onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                                                    setNotificationForm((current) => ({ ...current, email: event.target.value }))
+                                                }
+                                            />
+                                            <button id="add-new-email-button" className="button secondary" type="button" onClick={handleAddRecipient}>
+                                                Add new email
+                                            </button>
+                                        </div>
+                                        <button id="save-notification-config" className="button" type="button" onClick={() => setSettingsMessage({ type: 'success', text: 'Notification settings saved' })}>
+                                            Save notification settings
+                                        </button>
+                                        <div className="stack" style={{ marginTop: '0.75rem' }}>
+                                            {notificationRecipients.length === 0 && (
+                                                <div className="helper">No notification recipients configured.</div>
+                                            )}
+                                            {notificationRecipients.map((recipient) => (
+                                                <div key={recipient.id} className="inline" style={{ justifyContent: 'space-between', gap: '0.75rem' }}>
+                                                    <div className="stack" style={{ gap: '0.15rem' }}>
+                                                        <strong>{recipient.email}</strong>
+                                                        <span className="helper">
+                                                            {alertTypeOptions.find((option) => option.value === recipient.alertType)?.label || recipient.alertType}
+                                                        </span>
+                                                        <span className="email-status">{recipient.status === 'verified' ? 'Verified' : 'Pending Verification'}</span>
+                                                    </div>
+                                                    <div className="inline" style={{ gap: '0.5rem' }}>
+                                                        <button
+                                                            className="button secondary set-primary-button"
+                                                            type="button"
+                                                            onClick={() => handleSetPrimaryRecipient(recipient.id)}
+                                                        >
+                                                            Set Primary
+                                                        </button>
+                                                        <button
+                                                            className="button secondary remove-recipient-button"
+                                                            type="button"
+                                                            onClick={() => handleRemoveRecipient(recipient.id)}
+                                                        >
+                                                            Remove
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="inline" style={{ gap: '0.75rem' }}>
+                                <button id="save-settings-button" className="button" type="submit">
+                                    Save Settings
                                 </button>
-                                <button id="export-data-button" className="button secondary" type="button">
-                                    Export data
+                                <button className="button secondary" type="button" onClick={() => setSettingsMessage(null)}>
+                                    Reset Message
                                 </button>
                             </div>
-                        </div>
-                        {settingsMessage && (
-                            <div className={`alert ${settingsMessage.type === 'error' ? 'danger' : 'success'}`}>
-                                {settingsMessage.text}
-                            </div>
-                        )}
-                    </form>
+
+                            {settingsMessage && (
+                                <div
+                                    className={`alert ${settingsMessage.type === 'error' ? 'danger' : 'success'}${
+                                        settingsMessage.type === 'success' ? ' success-message' : ''
+                                    }`}
+                                >
+                                    {settingsMessage.text}
+                                </div>
+                            )}
+                        </form>
+                    </div>
                 </section>
             )}
 

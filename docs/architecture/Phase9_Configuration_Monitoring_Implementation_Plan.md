@@ -79,7 +79,7 @@ Deliver operational controls and observability for Phase 9, aligned with the arc
 
 **Goal:** Expose operating hours, maintenance scheduling, and notification management screens in the admin portal.
 
-**Status:** Not started
+**Status:** Complete ✅
 
 #### Key tasks (Phase 9.3)
 
