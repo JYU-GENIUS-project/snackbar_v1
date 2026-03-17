@@ -26,6 +26,7 @@ import inventoryRoutes from './routes/inventory';
 import notificationRoutes from './routes/notifications';
 import transactionRoutes from './routes/transactions';
 import statusRoutes from './routes/status';
+import configRoutes from './routes/config';
 import cartRoutes from './routes/cart';
 import analyticsRoutes from './routes/analytics';
 import mediaStorage from './utils/mediaStorage';
@@ -189,6 +190,9 @@ app.use('/api/status', apiLimiter, statusRoutes);
 
 // Inventory management routes
 app.use('/api/inventory', apiLimiter, inventoryRoutes);
+
+// System configuration routes
+app.use('/api/config', apiLimiter, configRoutes);
 
 // Notification log routes
 app.use('/api/notifications', apiLimiter, notificationRoutes);

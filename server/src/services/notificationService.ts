@@ -6,6 +6,10 @@ const NOTIFICATION_TYPES = {
     LOW_STOCK: 'inventory.low_stock'
 } as const;
 
+const ALERT_TYPE_MAP: Record<string, string> = {
+    [NOTIFICATION_TYPES.LOW_STOCK]: 'low_stock'
+};
+
 const NOTIFICATION_WORKER_LOCK_ID = 90210;
 
 let transport: Transporter | null = null;
@@ -121,19 +125,38 @@ const parseConfigValue = (value: unknown) => {
     return value;
 };
 
-const getNotificationRecipients = async (): Promise<NotificationRecipient[]> => {
-    const result = (await database.query('SELECT value FROM system_config WHERE key = $1 LIMIT 1', [
+const getNotificationRecipients = async (alertType?: string): Promise<NotificationRecipient[]> => {
+    const params: unknown[] = [];
+    let where = "WHERE status = 'verified'";
+    if (alertType) {
+        params.push(alertType);
+        where += ' AND alert_type = $1';
+    }
+
+    const tableResult = (await database.query(
+        `SELECT email FROM notification_recipients ${where}`,
+        params
+    )) as DbQueryResult<{ email: string }>;
+
+    const tableRecipients = tableResult.rows
+        .map((row) => row.email)
+        .filter((entry): entry is string => typeof entry === 'string' && entry.includes('@'));
+
+    if (tableRecipients.length) {
+        return tableRecipients;
+    }
+
+    const legacyResult = (await database.query('SELECT value FROM system_config WHERE key = $1 LIMIT 1', [
         'notification_recipients'
     ])) as DbQueryResult<{ value: unknown }>;
 
-    if (result.rows.length === 0) {
+    if (legacyResult.rows.length === 0) {
         return [];
     }
 
-    const value = parseConfigValue(result.rows[0]?.value);
+    const value = parseConfigValue(legacyResult.rows[0]?.value);
     if (Array.isArray(value)) {
-        const recipients = value.filter((entry): entry is string => typeof entry === 'string' && entry.includes('@'));
-        return recipients;
+        return value.filter((entry): entry is string => typeof entry === 'string' && entry.includes('@'));
     }
 
     if (typeof value === 'string') {
@@ -211,7 +234,7 @@ const queueLowStockAlerts = async ({
     snapshot: LowStockSnapshot;
     context?: Record<string, unknown>;
 }) => {
-    const recipients = await getNotificationRecipients();
+    const recipients = await getNotificationRecipients(ALERT_TYPE_MAP[NOTIFICATION_TYPES.LOW_STOCK]);
     if (!recipients.length) {
         return { queued: 0, reason: 'no-recipients-configured' };
     }

@@ -24,6 +24,8 @@ Deliver operational controls and observability for Phase 9, aligned with the arc
 
 **Goal:** Extend configuration and notification storage to support operating hours, maintenance scheduling, notification recipients, and system flags.
 
+**Status:** Complete ✅
+
 #### Key tasks (Phase 9.1)
 
 1. Add/extend configuration storage for:
@@ -51,6 +53,8 @@ Deliver operational controls and observability for Phase 9, aligned with the arc
 
 **Goal:** Provide secure admin APIs to manage operating hours, maintenance, and notification recipients with validation and audit logging.
 
+**Status:** Complete ✅
+
 #### Key tasks (Phase 9.2)
 
 1. Implement configuration endpoints for:
@@ -75,6 +79,8 @@ Deliver operational controls and observability for Phase 9, aligned with the arc
 
 **Goal:** Expose operating hours, maintenance scheduling, and notification management screens in the admin portal.
 
+**Status:** Not started
+
 #### Key tasks (Phase 9.3)
 
 1. Build admin UI flows:
@@ -96,6 +102,8 @@ Deliver operational controls and observability for Phase 9, aligned with the arc
 ### Phase 9.4 — Real-Time Status & Health Dashboard
 
 **Goal:** Deliver real-time kiosk status with heartbeat, outage detection, and multi-metric health dashboard.
+
+**Status:** Not started
 
 #### Key tasks (Phase 9.4)
 
@@ -125,6 +133,8 @@ Deliver operational controls and observability for Phase 9, aligned with the arc
 
 **Goal:** Implement automated monitoring jobs for storage thresholds and backup confirmations with alerts and email routing.
 
+**Status:** Not started
+
 #### Key tasks (Phase 9.5)
 
 1. Storage monitoring job:
@@ -152,6 +162,8 @@ Deliver operational controls and observability for Phase 9, aligned with the arc
 
 **Goal:** Provide secured access to PM2 and Nginx logs with filtering, search, export, and analytics.
 
+**Status:** Not started
+
 #### Key tasks (Phase 9.6)
 
 1. Implement log access API (admin-only) to read PM2 and Nginx logs safely.
@@ -174,6 +186,8 @@ Deliver operational controls and observability for Phase 9, aligned with the arc
 
 **Goal:** Provide admin-triggered email tests with detailed results and diagnostics.
 
+**Status:** Not started
+
 #### Key tasks (Phase 9.7)
 
 1. Implement test email endpoint that allows selecting alert types and recipients.
@@ -193,6 +207,8 @@ Deliver operational controls and observability for Phase 9, aligned with the arc
 ### Phase 9.8 — End-to-End Verification
 
 **Goal:** Validate Phase 9 functionality against acceptance criteria and ensure compatibility with existing integrations.
+
+**Status:** Not started
 
 #### Key tasks (Phase 9.8)
 
