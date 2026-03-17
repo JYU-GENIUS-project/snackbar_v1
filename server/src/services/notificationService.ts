@@ -3,11 +3,21 @@ import db from '../utils/database';
 
 const RETRY_SCHEDULE_SECONDS = [30, 60, 120];
 const NOTIFICATION_TYPES = {
-    LOW_STOCK: 'inventory.low_stock'
+    LOW_STOCK: 'inventory.low_stock',
+    STORAGE_INFO: 'storage.info',
+    STORAGE_WARNING: 'storage.warning',
+    STORAGE_CRITICAL: 'storage.critical',
+    BACKUP_SUCCESS: 'backup.success',
+    BACKUP_FAILURE: 'backup.failure'
 } as const;
 
 const ALERT_TYPE_MAP: Record<string, string> = {
-    [NOTIFICATION_TYPES.LOW_STOCK]: 'low_stock'
+    [NOTIFICATION_TYPES.LOW_STOCK]: 'low_stock',
+    [NOTIFICATION_TYPES.STORAGE_INFO]: 'storage_info',
+    [NOTIFICATION_TYPES.STORAGE_WARNING]: 'storage_warning',
+    [NOTIFICATION_TYPES.STORAGE_CRITICAL]: 'storage_critical',
+    [NOTIFICATION_TYPES.BACKUP_SUCCESS]: 'backup_confirmation',
+    [NOTIFICATION_TYPES.BACKUP_FAILURE]: 'backup_failure'
 };
 
 const NOTIFICATION_WORKER_LOCK_ID = 90210;
@@ -41,7 +51,7 @@ type NotificationLogRow = {
 };
 
 type NotificationPayload = {
-    productId: string;
+    productId?: string;
     productName?: string;
     currentStock?: number | null;
     lowStockThreshold?: number | null;
@@ -225,6 +235,37 @@ const markLowStockResolved = async (productId: string) => {
            AND payload ->> 'resolvedAt' IS NULL`,
         [NOTIFICATION_TYPES.LOW_STOCK, productId]
     );
+};
+
+const queueSystemAlert = async ({
+    notificationType,
+    alertType,
+    subject,
+    payload
+}: {
+    notificationType: string;
+    alertType?: string;
+    subject: string;
+    payload: NotificationPayload;
+}) => {
+    const targetAlertType = alertType || ALERT_TYPE_MAP[notificationType] || undefined;
+    const recipients = await getNotificationRecipients(targetAlertType);
+    if (!recipients.length) {
+        return { queued: 0, reason: 'no-recipients-configured' };
+    }
+
+    await Promise.all(
+        recipients.map((recipient) =>
+            createNotificationLogEntry({
+                notificationType,
+                recipient,
+                subject,
+                payload
+            })
+        )
+    );
+
+    return { queued: recipients.length };
 };
 
 const queueLowStockAlerts = async ({
@@ -648,6 +689,7 @@ const notificationService = {
     NOTIFICATION_TYPES,
     getNotificationRecipients,
     queueLowStockAlerts,
+    queueSystemAlert,
     evaluateLowStockState,
     markLowStockResolved,
     processPendingNotifications,
@@ -659,6 +701,7 @@ export {
     NOTIFICATION_TYPES,
     getNotificationRecipients,
     queueLowStockAlerts,
+    queueSystemAlert,
     evaluateLowStockState,
     markLowStockResolved,
     processPendingNotifications,

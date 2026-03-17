@@ -31,6 +31,7 @@ import cartRoutes from './routes/cart';
 import analyticsRoutes from './routes/analytics';
 import mediaStorage from './utils/mediaStorage';
 import notificationService from './services/notificationService';
+import monitoringService from './services/monitoringService';
 import db from './utils/database';
 
 // Load environment variables from project root (fallback to local .env)
@@ -158,6 +159,11 @@ if (process.env.NODE_ENV !== 'test') {
     notificationWorkerHandle = notificationService.startNotificationWorker({
         workerId: 'api-process',
     }) as NotificationWorkerHandle | null;
+}
+
+let monitoringWorkerHandle: NotificationWorkerHandle | null = null;
+if (process.env.NODE_ENV !== 'test') {
+    monitoringWorkerHandle = monitoringService.startMonitoringWorker() as NotificationWorkerHandle | null;
 }
 
 // =============================================================================
