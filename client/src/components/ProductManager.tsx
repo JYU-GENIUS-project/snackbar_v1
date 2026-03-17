@@ -594,6 +594,8 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
     const [notificationRecipients, setNotificationRecipients] = useState<NotificationRecipient[]>([]);
     const [notificationSettingsVisible, setNotificationSettingsVisible] = useState(false);
     const [notificationForm, setNotificationForm] = useState({ alertType: 'low_stock', email: '' });
+    const [testEmailForm, setTestEmailForm] = useState({ alertType: 'system_errors', recipient: '' });
+    const [smtpDiagnostics, setSmtpDiagnostics] = useState<string | null>(null);
     const [dashboardStatus, setDashboardStatus] = useState<KioskStatusPayload | null>(null);
     const [dashboardConnection, setDashboardConnection] = useState<'online' | 'offline' | 'maintenance'>('online');
     const [lastHeartbeat, setLastHeartbeat] = useState<string | null>(null);
@@ -1822,6 +1824,56 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
             })
             .catch(() => {
                 setSettingsMessage({ type: 'error', text: 'Failed to update primary recipient' });
+            });
+    };
+
+    const handleSendTestEmail = () => {
+        void apiRequest<{ data?: { queued?: number; failed?: number } }>({
+            path: '/notifications/test',
+            method: 'POST',
+            token: auth.token,
+            body: {
+                alertType: testEmailForm.alertType,
+                recipients: testEmailForm.recipient.trim() ? [testEmailForm.recipient.trim()] : undefined
+            }
+        })
+            .then((response) => {
+                const queued = response.data?.queued ?? 0;
+                const failed = response.data?.failed ?? 0;
+                setSettingsMessage({
+                    type: failed > 0 ? 'error' : 'success',
+                    text: failed > 0
+                        ? `Test email failed for ${failed} recipient(s).`
+                        : `Test email queued for ${queued} recipient(s).`
+                });
+            })
+            .catch((error) => {
+                setSettingsMessage({
+                    type: 'error',
+                    text: error instanceof Error ? error.message : 'Failed to send test email'
+                });
+            });
+    };
+
+    const handleSmtpDiagnostics = () => {
+        void apiRequest<{ data?: { ok?: boolean; message?: string; error?: string } }>({
+            path: '/notifications/diagnostics',
+            method: 'GET',
+            token: auth.token
+        })
+            .then((response) => {
+                const ok = response.data?.ok ?? false;
+                const message = response.data?.message || response.data?.error || 'No diagnostic message returned.';
+                setSmtpDiagnostics(message);
+                setSettingsMessage({
+                    type: ok ? 'success' : 'error',
+                    text: message
+                });
+            })
+            .catch((error) => {
+                const message = error instanceof Error ? error.message : 'SMTP diagnostics failed';
+                setSmtpDiagnostics(message);
+                setSettingsMessage({ type: 'error', text: message });
             });
     };
 
@@ -3133,6 +3185,42 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
                                                     </div>
                                                 </div>
                                             ))}
+                                        </div>
+                                        <div className="card" style={{ marginTop: '1rem', padding: '0.75rem' }}>
+                                            <h4>Email Tests & Diagnostics</h4>
+                                            <div className="inline" style={{ gap: '0.75rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
+                                                <select
+                                                    id="notification-test-type"
+                                                    value={testEmailForm.alertType}
+                                                    onChange={(event: ChangeEvent<HTMLSelectElement>) =>
+                                                        setTestEmailForm((current) => ({ ...current, alertType: event.target.value }))
+                                                    }
+                                                >
+                                                    {alertTypeOptions.map((option) => (
+                                                        <option key={option.value} value={option.value}>
+                                                            {option.label}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                <input
+                                                    id="test-email-address"
+                                                    type="email"
+                                                    placeholder="optional recipient override"
+                                                    value={testEmailForm.recipient}
+                                                    onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                                                        setTestEmailForm((current) => ({ ...current, recipient: event.target.value }))
+                                                    }
+                                                />
+                                                <button id="send-test-email-button" className="button secondary" type="button" onClick={handleSendTestEmail}>
+                                                    Send Test Email
+                                                </button>
+                                                <button id="smtp-diagnostics-button" className="button secondary" type="button" onClick={handleSmtpDiagnostics}>
+                                                    SMTP Diagnostics
+                                                </button>
+                                            </div>
+                                            {smtpDiagnostics && (
+                                                <div className="helper" style={{ marginTop: '0.5rem' }}>{smtpDiagnostics}</div>
+                                            )}
                                         </div>
                                     </div>
                                 )}

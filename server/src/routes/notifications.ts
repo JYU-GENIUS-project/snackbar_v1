@@ -1,5 +1,5 @@
 import { Router, type NextFunction, type Request, type Response, type RequestHandler } from 'express';
-import { query, validationResult } from 'express-validator';
+import { body, query, validationResult } from 'express-validator';
 
 import { authenticate } from '../middleware/auth';
 import { ApiError } from '../middleware/errorHandler';
@@ -56,6 +56,49 @@ router.get(
             success: true,
             data: result.data,
             meta: result.meta
+        });
+    })
+);
+
+router.post(
+    '/test',
+    [
+        body('alertType').optional().isString().withMessage('alertType must be a string'),
+        body('recipients')
+            .optional()
+            .isArray({ max: 10 })
+            .withMessage('recipients must be an array of up to 10 emails'),
+        body('recipients.*')
+            .optional()
+            .isEmail()
+            .withMessage('recipient email must be valid')
+    ],
+    asyncHandler(async (req, res) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            throw new ApiError(400, 'Validation failed', { errors: errors.array() });
+        }
+
+        const payload = req.body as { alertType?: string; recipients?: string[] };
+        const result = await notificationService.sendTestEmail({
+            alertType: payload.alertType ?? null,
+            recipients: payload.recipients ?? null
+        });
+
+        res.status(200).json({
+            success: true,
+            data: result
+        });
+    })
+);
+
+router.get(
+    '/diagnostics',
+    asyncHandler(async (_req, res) => {
+        const diagnostics = await notificationService.getSmtpDiagnostics();
+        res.status(200).json({
+            success: true,
+            data: diagnostics
         });
     })
 );

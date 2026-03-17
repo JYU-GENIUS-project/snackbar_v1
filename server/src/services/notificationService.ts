@@ -8,7 +8,8 @@ const NOTIFICATION_TYPES = {
     STORAGE_WARNING: 'storage.warning',
     STORAGE_CRITICAL: 'storage.critical',
     BACKUP_SUCCESS: 'backup.success',
-    BACKUP_FAILURE: 'backup.failure'
+    BACKUP_FAILURE: 'backup.failure',
+    TEST_EMAIL: 'system.test_email'
 } as const;
 
 const ALERT_TYPE_MAP: Record<string, string> = {
@@ -69,6 +70,12 @@ type NotificationSendRecord = NotificationLogRow & {
 };
 
 type NotificationOutcome = { id: string; status: string; error?: unknown };
+
+type TestEmailResult = {
+    recipient: string;
+    status: 'sent' | 'failed';
+    error?: string;
+};
 
 type LowStockSnapshot = {
     productId: string;
@@ -359,6 +366,110 @@ const sendNotification = async ({ notification }: { notification: NotificationSe
         text: textBody,
         html: htmlBody
     });
+};
+
+const sendTestEmail = async ({
+    alertType,
+    recipients
+}: {
+    alertType?: string | null;
+    recipients?: string[] | null;
+}) => {
+    const targetRecipients = recipients?.length
+        ? recipients
+        : await getNotificationRecipients(alertType || undefined);
+    if (!targetRecipients.length) {
+        return { results: [] as TestEmailResult[], queued: 0, failed: 0, reason: 'no-recipients-configured' };
+    }
+
+    const smtpConfig = getSmtpConfig();
+    const mailTransport = getTransport();
+    const subject = `[Snackbar] Test email${alertType ? ` (${alertType})` : ''}`;
+    const payload: NotificationPayload = {
+        triggeredAt: new Date().toISOString(),
+        text: 'This is a test email generated from the Snackbar admin console.',
+        html: '<p>This is a test email generated from the Snackbar admin console.</p>',
+        context: {
+            alertType: alertType || 'general',
+            test: true
+        }
+    };
+
+    const results: TestEmailResult[] = [];
+    for (const recipient of targetRecipients) {
+        try {
+            await mailTransport.sendMail({
+                from: smtpConfig.from,
+                to: recipient,
+                subject,
+                text: payload.text,
+                html: payload.html
+            });
+            await database.query(
+                `INSERT INTO email_notification_log (
+                    notification_type,
+                    recipient,
+                    subject,
+                    payload,
+                    status,
+                    attempt_count,
+                    last_error,
+                    last_attempt_at
+                ) VALUES ($1, $2, $3, $4::jsonb, 'sent', 1, NULL, CURRENT_TIMESTAMP)`,
+                [NOTIFICATION_TYPES.TEST_EMAIL, recipient, subject, JSON.stringify(payload)]
+            );
+            results.push({ recipient, status: 'sent' });
+        } catch (error) {
+            const message = (error as Error)?.message?.slice(0, 512) || 'Unknown error';
+            await database.query(
+                `INSERT INTO email_notification_log (
+                    notification_type,
+                    recipient,
+                    subject,
+                    payload,
+                    status,
+                    attempt_count,
+                    last_error,
+                    last_attempt_at
+                ) VALUES ($1, $2, $3, $4::jsonb, 'failed', 1, $5, CURRENT_TIMESTAMP)`,
+                [NOTIFICATION_TYPES.TEST_EMAIL, recipient, subject, JSON.stringify(payload), message]
+            );
+            results.push({ recipient, status: 'failed', error: message });
+        }
+    }
+
+    return {
+        results,
+        queued: results.filter((item) => item.status === 'sent').length,
+        failed: results.filter((item) => item.status === 'failed').length
+    };
+};
+
+const getSmtpDiagnostics = async () => {
+    const config = getSmtpConfig();
+    const mailTransport = getTransport();
+
+    try {
+        await mailTransport.verify();
+        return {
+            ok: true,
+            message: 'SMTP connection verified',
+            host: config.transport.host,
+            port: config.transport.port,
+            secure: config.transport.secure,
+            from: config.from
+        };
+    } catch (error) {
+        return {
+            ok: false,
+            message: 'SMTP verification failed',
+            error: (error as Error)?.message || 'Unknown error',
+            host: config.transport.host,
+            port: config.transport.port,
+            secure: config.transport.secure,
+            from: config.from
+        };
+    }
 };
 
 const scheduleNextAttempt = (attemptNumber: number) => {
@@ -694,7 +805,9 @@ const notificationService = {
     markLowStockResolved,
     processPendingNotifications,
     startNotificationWorker,
-    getNotificationLog
+    getNotificationLog,
+    sendTestEmail,
+    getSmtpDiagnostics
 };
 
 export {
@@ -706,7 +819,9 @@ export {
     markLowStockResolved,
     processPendingNotifications,
     startNotificationWorker,
-    getNotificationLog
+    getNotificationLog,
+    sendTestEmail,
+    getSmtpDiagnostics
 };
 
 export default notificationService;
