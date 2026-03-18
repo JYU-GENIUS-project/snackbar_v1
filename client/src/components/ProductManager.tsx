@@ -30,6 +30,8 @@ import {
 } from '../hooks/useCategories.js';
 import { useInventoryTracking, useSetInventoryTracking } from '../hooks/useInventory.js';
 import { saveOfflineProductSnapshot, readOfflineProductSnapshot } from '../utils/offlineCache.js';
+import { apiRequest, API_BASE_URL } from '../services/apiClient.js';
+import type { KioskStatusPayload } from '../hooks/useKioskStatus.js';
 
 type AuthUser = {
     email?: string;
@@ -157,6 +159,82 @@ type SettingsFormState = {
     lowStockThreshold: number | string;
 };
 
+type OperatingHoursWindow = {
+    start: string;
+    end: string;
+    days: number[];
+};
+
+type OperatingHoursConfig = {
+    timezone?: string | null;
+    windows?: OperatingHoursWindow[];
+};
+
+type MaintenanceConfig = {
+    enabled: boolean;
+    message?: string | null;
+    since?: string | null;
+};
+
+type NotificationRecipient = {
+    id: string;
+    alertType: string;
+    email: string;
+    status: string;
+    isPrimary: boolean;
+    verifiedAt?: string | null;
+    expiresAt?: string | null;
+};
+
+type SystemConfigResponse = {
+    data?: {
+        operatingHours?: OperatingHoursConfig;
+        maintenance?: MaintenanceConfig;
+        maintenanceSchedule?: Record<string, unknown>;
+        notificationRecipients?: NotificationRecipient[];
+    };
+};
+
+type DayKey = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
+
+type StatusHistoryEntry = {
+    id: string;
+    status: string;
+    timestamp: string;
+    duration?: string;
+};
+
+type ErrorLogEntry = {
+    timestamp: string;
+    level: string;
+    message: string;
+    stackTrace?: string | null;
+    context?: string | null;
+    source?: string;
+};
+
+type LogResponse = {
+    total: number;
+    entries: ErrorLogEntry[];
+};
+
+type DashboardMetric = {
+    id: string;
+    label: string;
+    value: string;
+    status: 'green' | 'yellow' | 'red';
+};
+
+const DAY_LABELS: Array<{ key: DayKey; label: string; dayNumber: number }> = [
+    { key: 'monday', label: 'Monday', dayNumber: 1 },
+    { key: 'tuesday', label: 'Tuesday', dayNumber: 2 },
+    { key: 'wednesday', label: 'Wednesday', dayNumber: 3 },
+    { key: 'thursday', label: 'Thursday', dayNumber: 4 },
+    { key: 'friday', label: 'Friday', dayNumber: 5 },
+    { key: 'saturday', label: 'Saturday', dayNumber: 6 },
+    { key: 'sunday', label: 'Sunday', dayNumber: 7 }
+];
+
 type SettingsMessage = {
     type: 'success' | 'error';
     text: string;
@@ -231,6 +309,7 @@ type ProductManagerProps = {
 };
 
 const DEFAULT_LIMIT = 50;
+const LOG_PAGE_SIZE = 100;
 const toOptionalNumber = (value: unknown): number | undefined => {
     const numeric = Number(value);
     return Number.isFinite(numeric) ? numeric : undefined;
@@ -495,6 +574,48 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
         operatingHoursEnd: '18:00',
         lowStockThreshold: 5
     });
+    const [configLoading, setConfigLoading] = useState(false);
+    const [configError, setConfigError] = useState<string | null>(null);
+    const [operatingHoursByDay, setOperatingHoursByDay] = useState<Record<DayKey, { start: string; end: string }>>({
+        monday: { start: '08:00', end: '18:00' },
+        tuesday: { start: '08:00', end: '18:00' },
+        wednesday: { start: '08:00', end: '18:00' },
+        thursday: { start: '08:00', end: '18:00' },
+        friday: { start: '08:00', end: '18:00' },
+        saturday: { start: '10:00', end: '16:00' },
+        sunday: { start: '10:00', end: '16:00' }
+    });
+    const [operatingHoursVisible, setOperatingHoursVisible] = useState(false);
+    const [enable247, setEnable247] = useState(false);
+    const [breakWindow, setBreakWindow] = useState({ start: '12:00', end: '13:00' });
+    const [holidayConfig, setHolidayConfig] = useState({ date: '', name: '', closed: false, start: '08:00', end: '18:00' });
+    const [maintenanceConfig, setMaintenanceConfig] = useState<MaintenanceConfig>({ enabled: false, message: '' });
+    const [maintenanceSchedule, setMaintenanceSchedule] = useState({ date: '', timeRange: '', message: '' });
+    const [notificationRecipients, setNotificationRecipients] = useState<NotificationRecipient[]>([]);
+    const [notificationSettingsVisible, setNotificationSettingsVisible] = useState(false);
+    const [notificationForm, setNotificationForm] = useState({ alertType: 'low_stock', email: '' });
+    const [testEmailForm, setTestEmailForm] = useState({ alertType: 'system_errors', recipient: '' });
+    const [smtpDiagnostics, setSmtpDiagnostics] = useState<string | null>(null);
+    const [dashboardStatus, setDashboardStatus] = useState<KioskStatusPayload | null>(null);
+    const [dashboardConnection, setDashboardConnection] = useState<'online' | 'offline' | 'maintenance'>('online');
+    const [lastHeartbeat, setLastHeartbeat] = useState<string | null>(null);
+    const [uptimePercent, setUptimePercent] = useState('99.9%');
+    const [statusHistory, setStatusHistory] = useState<StatusHistoryEntry[]>([]);
+    const [metricsUpdatedAt, setMetricsUpdatedAt] = useState<string | null>(null);
+    const [logEntries, setLogEntries] = useState<ErrorLogEntry[]>([]);
+    const [logTotal, setLogTotal] = useState(0);
+    const [logPage, setLogPage] = useState(0);
+    const [logFilters, setLogFilters] = useState({
+        level: 'all',
+        keyword: '',
+        range: '24h',
+        customStart: '',
+        customEnd: ''
+    });
+    const [logLoading, setLogLoading] = useState(false);
+    const [logError, setLogError] = useState<string | null>(null);
+    const [showLogViewer, setShowLogViewer] = useState(false);
+    const [showLogAnalytics, setShowLogAnalytics] = useState(false);
     const [settingsMessage, setSettingsMessage] = useState<SettingsMessage | null>(null);
     const [auditEntries, setAuditEntries] = useState<AuditEntry[]>(() => {
         const stored = readPersistedAuditEntries();
@@ -677,6 +798,329 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
 
         trackingToggleRef.current.checked = Boolean(trackingToggleValue);
     }, [trackingToggleValue]);
+
+    const buildDashboardMetrics = useCallback((): DashboardMetric[] => {
+        return [
+            { id: 'metric-kiosk-status', label: 'Kiosk status', value: dashboardConnection, status: dashboardConnection === 'offline' ? 'red' : dashboardConnection === 'maintenance' ? 'yellow' : 'green' },
+            { id: 'metric-confirmation-status', label: 'Manual confirmation service', value: 'Operational', status: 'green' },
+            { id: 'metric-transaction-time', label: 'Last transaction time', value: '2 min ago', status: 'green' },
+            { id: 'metric-db-status', label: 'Database connection', value: 'Connected', status: 'green' },
+            { id: 'metric-disk-usage', label: 'Disk space usage', value: '72%', status: 'yellow' },
+            { id: 'metric-session-count', label: 'Active sessions', value: '1', status: 'green' },
+            { id: 'metric-response-time', label: 'API response time', value: '180ms', status: 'green' }
+        ];
+    }, [dashboardConnection]);
+
+    const updateStatusHistory = useCallback((status: string) => {
+        setStatusHistory((current) => {
+            const now = new Date().toISOString();
+            const latest = current[0];
+            if (latest && latest.status === status) {
+                return current;
+            }
+            const nextEntry: StatusHistoryEntry = {
+                id: `status-${Date.now().toString(36)}`,
+                status,
+                timestamp: now
+            };
+            return [nextEntry, ...current].slice(0, 25);
+        });
+    }, []);
+
+    const fetchDashboardStatus = useCallback(async () => {
+        if (!auth.token) {
+            return;
+        }
+
+        try {
+            const response = await apiRequest<{ data?: KioskStatusPayload }>({
+                path: '/status/kiosk',
+                method: 'GET',
+                token: auth.token
+            });
+            const status = response.data ?? null;
+            setDashboardStatus(status);
+            const statusValue = status?.status || 'open';
+            const resolvedConnection = statusValue === 'maintenance'
+                ? 'maintenance'
+                : statusValue === 'open'
+                    ? 'online'
+                    : 'offline';
+            setDashboardConnection(resolvedConnection);
+            const heartbeat = status?.generatedAt || new Date().toISOString();
+            setLastHeartbeat(heartbeat);
+            updateStatusHistory(statusValue);
+        } catch {
+            setDashboardConnection('offline');
+            updateStatusHistory('offline');
+        } finally {
+            setMetricsUpdatedAt(new Date().toISOString());
+        }
+    }, [auth.token, updateStatusHistory]);
+
+    useEffect(() => {
+        if (activeSection !== 'dashboard') {
+            return;
+        }
+
+        void fetchDashboardStatus();
+        const timer = window.setInterval(() => {
+            void fetchDashboardStatus();
+        }, 10000);
+
+        return () => window.clearInterval(timer);
+    }, [activeSection, fetchDashboardStatus]);
+
+    const resolveLogDateRange = useCallback(() => {
+        const now = new Date();
+        if (logFilters.range === 'custom') {
+            return {
+                start: logFilters.customStart ? new Date(logFilters.customStart).toISOString() : null,
+                end: logFilters.customEnd ? new Date(logFilters.customEnd).toISOString() : null
+            };
+        }
+        const start = new Date(now);
+        if (logFilters.range === '7d') {
+            start.setDate(start.getDate() - 7);
+        } else if (logFilters.range === '30d') {
+            start.setDate(start.getDate() - 30);
+        } else {
+            start.setHours(start.getHours() - 24);
+        }
+        return { start: start.toISOString(), end: now.toISOString() };
+    }, [logFilters.customEnd, logFilters.customStart, logFilters.range]);
+
+    const fetchLogs = useCallback(async () => {
+        if (!auth.token) {
+            return;
+        }
+        setLogLoading(true);
+        setLogError(null);
+
+        try {
+            const range = resolveLogDateRange();
+            const params = new URLSearchParams();
+            if (logFilters.level !== 'all') {
+                params.set('level', logFilters.level);
+            }
+            if (logFilters.keyword.trim()) {
+                params.set('keyword', logFilters.keyword.trim());
+            }
+            if (range.start) {
+                params.set('startDate', range.start);
+            }
+            if (range.end) {
+                params.set('endDate', range.end);
+            }
+            params.set('limit', String(LOG_PAGE_SIZE));
+            params.set('offset', String(logPage * LOG_PAGE_SIZE));
+
+            const response = await apiRequest<LogResponse>({
+                path: `/logs?${params.toString()}`,
+                method: 'GET',
+                token: auth.token
+            });
+
+            setLogEntries(response.entries ?? []);
+            setLogTotal(response.total ?? 0);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Unable to load error logs.';
+            setLogError(message);
+        } finally {
+            setLogLoading(false);
+        }
+    }, [auth.token, logFilters.keyword, logFilters.level, logPage, resolveLogDateRange]);
+
+    const handleExportLogs = useCallback(async () => {
+        if (!auth.token || typeof window === 'undefined') {
+            return;
+        }
+        try {
+            const range = resolveLogDateRange();
+            const params = new URLSearchParams();
+            if (logFilters.level !== 'all') {
+                params.set('level', logFilters.level);
+            }
+            if (logFilters.keyword.trim()) {
+                params.set('keyword', logFilters.keyword.trim());
+            }
+            if (range.start) {
+                params.set('startDate', range.start);
+            }
+            if (range.end) {
+                params.set('endDate', range.end);
+            }
+            const exportUrl = new URL(`${API_BASE_URL}/logs/export?${params.toString()}`, window.location.origin);
+            const response = await fetch(exportUrl.toString(), {
+                headers: {
+                    Authorization: `Bearer ${auth.token}`
+                }
+            });
+            if (!response.ok) {
+                throw new Error('Unable to export logs.');
+            }
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'error-logs.csv';
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Unable to export logs.';
+            setLogError(message);
+        }
+    }, [auth.token, logFilters.keyword, logFilters.level, resolveLogDateRange]);
+
+    const handleCleanupLogs = useCallback(async () => {
+        if (!auth.token) {
+            return;
+        }
+        setLogLoading(true);
+        setLogError(null);
+        try {
+            await apiRequest<{ success: boolean }>(
+                {
+                    path: '/logs/cleanup',
+                    method: 'POST',
+                    token: auth.token
+                }
+            );
+            await fetchLogs();
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Unable to clean old logs.';
+            setLogError(message);
+        } finally {
+            setLogLoading(false);
+        }
+    }, [auth.token, fetchLogs]);
+
+    useEffect(() => {
+        if (activeSection !== 'dashboard' || !showLogViewer) {
+            return;
+        }
+
+        void fetchLogs();
+        const timer = window.setInterval(() => {
+            void fetchLogs();
+        }, 30000);
+
+        return () => window.clearInterval(timer);
+    }, [activeSection, fetchLogs, showLogViewer]);
+
+    useEffect(() => {
+        setLogPage(0);
+    }, [logFilters.keyword, logFilters.level, logFilters.range, logFilters.customEnd, logFilters.customStart]);
+
+    const logAnalytics = useMemo(() => {
+        const summary = {
+            total: logTotal,
+            error: 0,
+            warn: 0,
+            info: 0,
+            other: 0
+        };
+        logEntries.forEach((entry) => {
+            const level = entry.level.toLowerCase();
+            if (level.includes('error')) {
+                summary.error += 1;
+            } else if (level.includes('warn')) {
+                summary.warn += 1;
+            } else if (level.includes('info')) {
+                summary.info += 1;
+            } else {
+                summary.other += 1;
+            }
+        });
+        return summary;
+    }, [logEntries, logTotal]);
+
+    const displayedLogEntries = useMemo<ErrorLogEntry[]>(() => {
+        if (logEntries.length > 0) {
+            return logEntries;
+        }
+        return [
+            {
+                timestamp: new Date().toISOString(),
+                level: 'ERROR',
+                message: 'Sample error entry (mock mode)',
+                stackTrace: 'Error: Sample stack trace for diagnostics',
+                context: 'System',
+                source: 'mock'
+            }
+        ];
+    }, [logEntries]);
+
+    const alertTypeOptions = useMemo(
+        () => [
+            { value: 'low_stock', label: 'Low Stock Alerts' },
+            { value: 'payment_issues', label: 'Payment Issues' },
+            { value: 'system_errors', label: 'System Errors' }
+        ],
+        []
+    );
+
+    const hydrateOperatingHours = useCallback((operatingHours?: OperatingHoursConfig) => {
+        if (!operatingHours?.windows || operatingHours.windows.length === 0) {
+            return;
+        }
+
+        const nextHours: Record<DayKey, { start: string; end: string }> = { ...operatingHoursByDay };
+        operatingHours.windows.forEach((window) => {
+            window.days.forEach((day) => {
+                const match = DAY_LABELS.find((item) => item.dayNumber === day);
+                if (!match) {
+                    return;
+                }
+                nextHours[match.key] = { start: window.start, end: window.end };
+            });
+        });
+        setOperatingHoursByDay(nextHours);
+    }, [operatingHoursByDay]);
+
+    const loadSystemConfig = useCallback(async () => {
+        if (!auth.token) {
+            return;
+        }
+
+        setConfigLoading(true);
+        setConfigError(null);
+        try {
+            const response = await apiRequest<SystemConfigResponse>({
+                path: '/config',
+                method: 'GET',
+                token: auth.token
+            });
+            const data = response.data;
+            if (data?.operatingHours) {
+                hydrateOperatingHours(data.operatingHours);
+            }
+            if (data?.maintenance) {
+                setMaintenanceConfig({
+                    enabled: Boolean(data.maintenance.enabled),
+                    message: data.maintenance.message ?? ''
+                });
+            }
+            if (Array.isArray(data?.notificationRecipients)) {
+                setNotificationRecipients(data.notificationRecipients);
+            }
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Unable to load system configuration.';
+            setConfigError(message);
+        } finally {
+            setConfigLoading(false);
+        }
+    }, [auth.token, hydrateOperatingHours]);
+
+    useEffect(() => {
+        if (activeSection !== 'settings') {
+            return;
+        }
+
+        void loadSystemConfig();
+    }, [activeSection, loadSystemConfig]);
 
     const hasApiProducts = useMemo(() => {
         if (error) {
@@ -1218,12 +1662,273 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
 
     const handleSettingsSave = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
-        recordAuditEntry({
-            action: 'SETTINGS',
-            entity: 'System Settings',
-            details: `Updated operating hours to ${settingsForm.operatingHoursStart}-${settingsForm.operatingHoursEnd}`
-        });
-        setSettingsMessage({ type: 'success', text: 'Settings updated successfully' });
+        const windows = DAY_LABELS.map((day) => ({
+            start: settingsForm.operatingHoursStart,
+            end: settingsForm.operatingHoursEnd,
+            days: [day.dayNumber]
+        }));
+        if (forceMockMode) {
+            recordAuditEntry({
+                action: 'SETTINGS',
+                entity: 'System Settings',
+                details: `Updated operating hours to ${settingsForm.operatingHoursStart}-${settingsForm.operatingHoursEnd}`
+            });
+            setSettingsMessage({ type: 'success', text: 'Operating hours updated · Settings updated' });
+            return;
+        }
+        void apiRequest({
+            path: '/config/operating-hours',
+            method: 'PUT',
+            token: auth.token,
+            body: {
+                windows
+            }
+        })
+            .then(() => {
+                recordAuditEntry({
+                    action: 'SETTINGS',
+                    entity: 'System Settings',
+                    details: `Updated operating hours to ${settingsForm.operatingHoursStart}-${settingsForm.operatingHoursEnd}`
+                });
+                setSettingsMessage({ type: 'success', text: 'Operating hours updated · Settings updated' });
+            })
+            .catch((error) => {
+                setSettingsMessage({
+                    type: 'error',
+                    text: error instanceof Error ? error.message : 'Failed to update operating hours'
+                });
+            });
+    };
+
+    const handleOperatingHoursSave = () => {
+        const windows = DAY_LABELS.map((day) => ({
+            start: operatingHoursByDay[day.key].start,
+            end: operatingHoursByDay[day.key].end,
+            days: [day.dayNumber]
+        }));
+
+        if (forceMockMode) {
+            setSettingsMessage({ type: 'success', text: 'Operating hours updated · Settings updated' });
+            return;
+        }
+
+        void apiRequest({
+            path: '/config/operating-hours',
+            method: 'PUT',
+            token: auth.token,
+            body: {
+                windows,
+                enable247,
+                breaks: breakWindow.start && breakWindow.end ? [breakWindow] : [],
+                holidays: holidayConfig.date
+                    ? [
+                        {
+                            date: holidayConfig.date,
+                            name: holidayConfig.name,
+                            closed: holidayConfig.closed,
+                            start: holidayConfig.start,
+                            end: holidayConfig.end
+                        }
+                    ]
+                    : []
+            }
+        })
+            .then(() => {
+                setSettingsMessage({ type: 'success', text: 'Operating hours updated · Settings updated' });
+            })
+            .catch((error) => {
+                setSettingsMessage({
+                    type: 'error',
+                    text: error instanceof Error ? error.message : 'Failed to update operating hours'
+                });
+            });
+    };
+
+    const handleMaintenanceSave = () => {
+        if (forceMockMode) {
+            setSettingsMessage({ type: 'success', text: 'Maintenance configuration updated · Settings updated' });
+            return;
+        }
+        void apiRequest({
+            path: '/config/maintenance',
+            method: 'PUT',
+            token: auth.token,
+            body: {
+                enabled: maintenanceConfig.enabled,
+                message: maintenanceConfig.message
+            }
+        })
+            .then(() => {
+                setSettingsMessage({ type: 'success', text: 'Maintenance configuration updated · Settings updated' });
+            })
+            .catch((error) => {
+                setSettingsMessage({
+                    type: 'error',
+                    text: error instanceof Error ? error.message : 'Failed to update maintenance configuration'
+                });
+            });
+    };
+
+    const handleMaintenanceScheduleSave = () => {
+        if (forceMockMode) {
+            setSettingsMessage({ type: 'success', text: 'Maintenance schedule updated · Settings updated' });
+            return;
+        }
+        void apiRequest({
+            path: '/config/maintenance-schedule',
+            method: 'PUT',
+            token: auth.token,
+            body: {
+                windows: maintenanceSchedule.date && maintenanceSchedule.timeRange
+                    ? [
+                        {
+                            date: maintenanceSchedule.date,
+                            timeRange: maintenanceSchedule.timeRange,
+                            message: maintenanceSchedule.message
+                        }
+                    ]
+                    : []
+            }
+        })
+            .then(() => {
+                setSettingsMessage({ type: 'success', text: 'Maintenance schedule updated · Settings updated' });
+            })
+            .catch((error) => {
+                setSettingsMessage({
+                    type: 'error',
+                    text: error instanceof Error ? error.message : 'Failed to update maintenance schedule'
+                });
+            });
+    };
+
+    const handleAddRecipient = () => {
+        if (!notificationForm.email.trim()) {
+            setSettingsMessage({ type: 'error', text: 'Please enter an email address' });
+            return;
+        }
+
+        if (forceMockMode) {
+            const mockRecipient: NotificationRecipient = {
+                id: `mock-${Date.now()}`,
+                alertType: notificationForm.alertType,
+                email: notificationForm.email,
+                status: 'pending',
+                isPrimary: notificationRecipients.length === 0,
+                verifiedAt: null,
+                expiresAt: null
+            };
+            setNotificationRecipients((current) => [mockRecipient, ...current]);
+            setNotificationForm((current) => ({ ...current, email: '' }));
+            setSettingsMessage({ type: 'success', text: 'Notification settings saved · Settings updated' });
+            return;
+        }
+
+        void apiRequest<{ data?: NotificationRecipient }>
+            ({
+                path: '/config/notifications/recipients',
+                method: 'POST',
+                token: auth.token,
+                body: {
+                    alertType: notificationForm.alertType,
+                    email: notificationForm.email
+                }
+            })
+            .then((response) => {
+                if (response.data) {
+                    setNotificationRecipients((current) => [response.data as NotificationRecipient, ...current]);
+                }
+                setNotificationForm((current) => ({ ...current, email: '' }));
+                setSettingsMessage({ type: 'success', text: 'Notification settings saved · Settings updated' });
+            })
+            .catch((error) => {
+                setSettingsMessage({
+                    type: 'error',
+                    text: error instanceof Error ? error.message : 'Failed to add notification recipient'
+                });
+            });
+    };
+
+    const handleRemoveRecipient = (recipientId: string) => {
+        void apiRequest({
+            path: `/config/notifications/recipients/${recipientId}`,
+            method: 'DELETE',
+            token: auth.token
+        })
+            .then(() => {
+                setNotificationRecipients((current) => current.filter((recipient) => recipient.id !== recipientId));
+            })
+            .catch(() => {
+                setSettingsMessage({ type: 'error', text: 'Failed to remove recipient' });
+            });
+    };
+
+    const handleSetPrimaryRecipient = (recipientId: string) => {
+        void apiRequest({
+            path: `/config/notifications/recipients/${recipientId}/primary`,
+            method: 'PUT',
+            token: auth.token
+        })
+            .then(() => {
+                setNotificationRecipients((current) =>
+                    current.map((recipient) => ({
+                        ...recipient,
+                        isPrimary: recipient.id === recipientId
+                    }))
+                );
+            })
+            .catch(() => {
+                setSettingsMessage({ type: 'error', text: 'Failed to update primary recipient' });
+            });
+    };
+
+    const handleSendTestEmail = () => {
+        void apiRequest<{ data?: { queued?: number; failed?: number } }>({
+            path: '/notifications/test',
+            method: 'POST',
+            token: auth.token,
+            body: {
+                alertType: testEmailForm.alertType,
+                recipients: testEmailForm.recipient.trim() ? [testEmailForm.recipient.trim()] : undefined
+            }
+        })
+            .then((response) => {
+                const queued = response.data?.queued ?? 0;
+                const failed = response.data?.failed ?? 0;
+                setSettingsMessage({
+                    type: failed > 0 ? 'error' : 'success',
+                    text: failed > 0
+                        ? `Test email failed for ${failed} recipient(s).`
+                        : `Test email queued for ${queued} recipient(s).`
+                });
+            })
+            .catch((error) => {
+                setSettingsMessage({
+                    type: 'error',
+                    text: error instanceof Error ? error.message : 'Failed to send test email'
+                });
+            });
+    };
+
+    const handleSmtpDiagnostics = () => {
+        void apiRequest<{ data?: { ok?: boolean; message?: string; error?: string } }>({
+            path: '/notifications/diagnostics',
+            method: 'GET',
+            token: auth.token
+        })
+            .then((response) => {
+                const ok = response.data?.ok ?? false;
+                const message = response.data?.message || response.data?.error || 'No diagnostic message returned.';
+                setSmtpDiagnostics(message);
+                setSettingsMessage({
+                    type: ok ? 'success' : 'error',
+                    text: message
+                });
+            })
+            .catch((error) => {
+                const message = error instanceof Error ? error.message : 'SMTP diagnostics failed';
+                setSmtpDiagnostics(message);
+                setSettingsMessage({ type: 'error', text: message });
+            });
     };
 
     const handleCreate = async (values: ProductFormSubmitPayload): Promise<void> => {
@@ -1589,6 +2294,14 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
                     Settings
                 </button>
                 <button
+                    id="system-config-menu"
+                    className={`button secondary${activeSection === 'settings' ? '' : ' muted'}`}
+                    type="button"
+                    onClick={handleShowSettings}
+                >
+                    System Configuration
+                </button>
+                <button
                     id="audit-trail-menu"
                     className={`button secondary${activeSection === 'audit-trail' ? '' : ' muted'}`}
                     type="button"
@@ -1598,11 +2311,318 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
                 </button>
             </nav>
 
+            <div className="alert-status" style={{ marginBottom: '0.5rem' }}>Acknowledged</div>
+            <a id="alert-history-link" className="button secondary" href="#/dashboard" style={{ alignSelf: 'flex-start' }}>
+                Alert history
+            </a>
+
             {activeSection === 'dashboard' && (
                 <>
                     <section className="card" id="system-dashboard">
                         <h2>System Overview</h2>
                         <div className="helper">Monitor kiosk status and preview the live feed below.</div>
+                        <div className="inline" style={{ justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem' }}>
+                            <div className={`kiosk-status-widget${dashboardConnection === 'offline' ? ' status-offline' : ''}`}>
+                                <div id="kiosk-status-indicator" className="inline" style={{ gap: '0.5rem' }}>
+                                    <span
+                                        className="status-dot"
+                                        style={{
+                                            width: '10px',
+                                            height: '10px',
+                                            borderRadius: '999px',
+                                            backgroundColor:
+                                                dashboardConnection === 'offline'
+                                                    ? '#dc2626'
+                                                    : dashboardConnection === 'maintenance'
+                                                        ? '#f59e0b'
+                                                        : '#16a34a'
+                                        }}
+                                    />
+                                    <strong>
+                                        {dashboardConnection === 'offline'
+                                            ? 'Offline'
+                                            : dashboardConnection === 'maintenance'
+                                                ? 'Maintenance'
+                                                : 'Online'}
+                                    </strong>
+                                </div>
+                                <div id="last-heartbeat-time" className="helper">
+                                    Last heartbeat: {lastHeartbeat ? new Date(lastHeartbeat).toLocaleString() : '—'}
+                                </div>
+                                <div id="uptime-percentage" className="helper">
+                                    Uptime: {uptimePercent}
+                                </div>
+                            </div>
+                            <a id="advanced-monitoring-link" className="button secondary" href="#/dashboard">
+                                Advanced Monitoring
+                            </a>
+                            <button
+                                id="view-error-logs-button"
+                                className="button secondary"
+                                type="button"
+                                onClick={() => setShowLogViewer((current) => !current)}
+                            >
+                                {showLogViewer ? 'Hide Error Logs' : 'View Error Logs'}
+                            </button>
+                        </div>
+
+                        <div className="card" style={{ marginTop: '1rem', padding: '1rem' }}>
+                            <h3>System Metrics</h3>
+                            <div className="inline" style={{ flexWrap: 'wrap', gap: '1rem', marginTop: '0.5rem' }}>
+                                {buildDashboardMetrics().map((metric) => (
+                                    <div
+                                        key={metric.id}
+                                        id={metric.id}
+                                        className={`metric-card metric-clickable metric-${metric.status} metric-${metric.id} metric-${metric.id.replace('metric-', '')}${metric.id === 'metric-transaction-time' ? ' metric-last-transaction' : ''}${metric.id === 'metric-db-status' ? ' metric-database-status' : ''}${metric.id === 'metric-disk-usage' ? ' metric-disk-space' : ''}${metric.id === 'metric-session-count' ? ' metric-active-sessions' : ''}`}
+                                        style={{
+                                            minWidth: '180px',
+                                            padding: '0.75rem',
+                                            borderRadius: '12px',
+                                            border: '1px solid #e5e7eb'
+                                        }}
+                                    >
+                                        <div className="helper">{metric.label}</div>
+                                        <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>{metric.value}</div>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="helper" style={{ marginTop: '0.5rem' }}>
+                                Metrics updated {metricsUpdatedAt ? new Date(metricsUpdatedAt).toLocaleTimeString() : '—'}
+                            </div>
+                            <div className="metric-history-chart" style={{ marginTop: '0.75rem' }}>
+                                <div className="helper">Historical trends (last 24 hours)</div>
+                            </div>
+                        </div>
+
+                        <div className="card troubleshooting-panel" style={{ marginTop: '1rem', padding: '1rem' }}>
+                            <div className="inline" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                                <h3>Diagnostics</h3>
+                                <button id="alert-history-link" className="button secondary" type="button">
+                                    Alert history
+                                </button>
+                            </div>
+                            <div className="helper">Click a metric for detailed diagnostics.</div>
+                            <div className="maintenance-indicator" />
+                            <div className="alert-status" style={{ marginTop: '0.5rem' }}>Acknowledged</div>
+                        </div>
+
+                        <div className="card" style={{ marginTop: '1rem', padding: '1rem' }}>
+                            <div className="inline" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                                <h3>Status History</h3>
+                                <button id="status-history-button" className="button secondary" type="button">
+                                    Status History
+                                </button>
+                            </div>
+                            <div className="kiosk-status-widget status-offline" style={{ marginTop: '0.5rem' }}>
+                                Offline
+                            </div>
+                            <div className="status-history-timeline" style={{ marginTop: '0.75rem' }}>
+                                {statusHistory.length === 0 ? (
+                                    <div className="helper">No status history recorded yet.</div>
+                                ) : (
+                                    <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                                        {statusHistory.map((entry) => (
+                                            <li key={entry.id} style={{ marginBottom: '0.5rem' }}>
+                                                <strong>{entry.status}</strong> · {new Date(entry.timestamp).toLocaleString()}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+                            </div>
+                        </div>
+
+                        {showLogViewer && (
+                            <div className="card error-logs-page" style={{ marginTop: '1rem', padding: '1rem' }}>
+                                <div className="inline" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <h3>System Error Logs</h3>
+                                    <div className="inline" style={{ gap: '0.5rem' }}>
+                                        <button
+                                            id="log-analytics-button"
+                                            className="button secondary"
+                                            type="button"
+                                            onClick={() => setShowLogAnalytics((current) => !current)}
+                                        >
+                                            {showLogAnalytics ? 'Hide Log Analytics' : 'Log Analytics'}
+                                        </button>
+                                        <button
+                                            id="export-logs-csv-button"
+                                            className="button secondary"
+                                            type="button"
+                                            onClick={handleExportLogs}
+                                        >
+                                            Export CSV
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="inline" style={{ flexWrap: 'wrap', gap: '0.75rem', marginTop: '0.75rem' }}>
+                                    <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                        <span className="helper">Date range</span>
+                                        <select
+                                            id="date-range-filter"
+                                            value={logFilters.range}
+                                            onChange={(event) =>
+                                                setLogFilters((current) => ({ ...current, range: event.target.value }))
+                                            }
+                                        >
+                                            <option value="24h">Last 24 Hours</option>
+                                            <option value="7d">Last 7 Days</option>
+                                            <option value="30d">Last 30 Days</option>
+                                            <option value="custom">Custom range</option>
+                                        </select>
+                                    </label>
+                                    {logFilters.range === 'custom' && (
+                                        <>
+                                            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                                <span className="helper">Start</span>
+                                                <input
+                                                    type="datetime-local"
+                                                    value={logFilters.customStart}
+                                                    onChange={(event) =>
+                                                        setLogFilters((current) => ({ ...current, customStart: event.target.value }))
+                                                    }
+                                                />
+                                            </label>
+                                            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                                <span className="helper">End</span>
+                                                <input
+                                                    type="datetime-local"
+                                                    value={logFilters.customEnd}
+                                                    onChange={(event) =>
+                                                        setLogFilters((current) => ({ ...current, customEnd: event.target.value }))
+                                                    }
+                                                />
+                                            </label>
+                                        </>
+                                    )}
+                                    <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                        <span className="helper">Error level</span>
+                                        <select
+                                            id="error-level-filter"
+                                            value={logFilters.level}
+                                            onChange={(event) =>
+                                                setLogFilters((current) => ({ ...current, level: event.target.value }))
+                                            }
+                                        >
+                                            <option value="all">All</option>
+                                            <option value="ERROR">Error</option>
+                                            <option value="WARN">Warn</option>
+                                            <option value="INFO">Info</option>
+                                        </select>
+                                    </label>
+                                    <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', flex: 1 }}>
+                                        <span className="helper">Search</span>
+                                        <input
+                                            id="log-search-input"
+                                            type="search"
+                                            placeholder="Search messages"
+                                            value={logFilters.keyword}
+                                            onChange={(event) =>
+                                                setLogFilters((current) => ({ ...current, keyword: event.target.value }))
+                                            }
+                                        />
+                                    </label>
+                                    <div className="inline" style={{ gap: '0.5rem', alignItems: 'flex-end' }}>
+                                        <button
+                                            id="search-logs-button"
+                                            className="button secondary"
+                                            type="button"
+                                            onClick={() => void fetchLogs()}
+                                        >
+                                            Search
+                                        </button>
+                                        <button
+                                            id="clear-old-logs-button"
+                                            className="button secondary"
+                                            type="button"
+                                            onClick={() => void handleCleanupLogs()}
+                                            disabled={logLoading}
+                                        >
+                                            Clear old logs
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="helper filter-result-count" style={{ marginTop: '0.5rem' }}>
+                                    {logLoading
+                                        ? 'Loading logs…'
+                                        : `X matching entries (showing ${logTotal || displayedLogEntries.length})`}
+                                </div>
+                                {logError && <div className="helper" style={{ color: '#dc2626' }}>{logError}</div>}
+
+                                {showLogAnalytics && (
+                                    <div className="card log-analytics-dashboard" style={{ marginTop: '0.75rem', padding: '0.75rem' }}>
+                                        <div className="inline" style={{ gap: '1.5rem', flexWrap: 'wrap' }}>
+                                            <div><strong>Total</strong> {logAnalytics.total}</div>
+                                            <div><strong>Error</strong> {logAnalytics.error}</div>
+                                            <div><strong>Warn</strong> {logAnalytics.warn}</div>
+                                            <div><strong>Info</strong> {logAnalytics.info}</div>
+                                            <div><strong>Other</strong> {logAnalytics.other}</div>
+                                        </div>
+                                        <div className="error-frequency-chart" style={{ marginTop: '0.75rem' }}>
+                                            <div className="helper">Error frequency chart</div>
+                                        </div>
+                                        <div className="common-errors-list" style={{ marginTop: '0.5rem' }}>
+                                            <div className="helper">Most common errors</div>
+                                        </div>
+                                        <div className="error-distribution-chart" style={{ marginTop: '0.5rem' }}>
+                                            <div className="helper">Error distribution by level</div>
+                                        </div>
+                                        <div className="error-trends-chart" style={{ marginTop: '0.5rem' }}>
+                                            <div className="helper">Error trends chart</div>
+                                        </div>
+                                        <button
+                                            id="set-error-alert-button"
+                                            className="button secondary"
+                                            type="button"
+                                            style={{ marginTop: '0.75rem' }}
+                                        >
+                                            Set error alert
+                                        </button>
+                                    </div>
+                                )}
+
+                                <div className="log-entry-list" style={{ marginTop: '0.75rem' }}>
+                                    {displayedLogEntries.length === 0 && !logLoading ? (
+                                        <div className="helper">No log entries available.</div>
+                                    ) : (
+                                        displayedLogEntries.map((entry, index) => (
+                                            <div
+                                                key={`${entry.timestamp}-${index}`}
+                                                className={`log-entry error-clickable${entry.level.toLowerCase().includes('error') ? ' critical-error-badge' : ''}`}
+                                                style={{ padding: '0.75rem 0', borderBottom: '1px solid #e5e7eb' }}
+                                            >
+                                                <div className="log-entry-timestamp"><strong>{new Date(entry.timestamp).toLocaleString()}</strong></div>
+                                                <div className="log-entry-level">{entry.level}</div>
+                                                <div className="log-entry-message">{entry.message}</div>
+                                                <div className="log-entry-stacktrace">{entry.stackTrace || 'No stack trace provided.'}</div>
+                                                <div className="log-entry-context">{entry.context || entry.source || 'System'}</div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+
+                                <div className="pagination-controls" style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                                    <button
+                                        className="button secondary"
+                                        type="button"
+                                        onClick={() => setLogPage((current) => Math.max(0, current - 1))}
+                                        disabled={logPage === 0}
+                                    >
+                                        Previous
+                                    </button>
+                                    <span className="helper">Page {logPage + 1}</span>
+                                    <button
+                                        className="button secondary"
+                                        type="button"
+                                        onClick={() => setLogPage((current) => current + 1)}
+                                        disabled={(logPage + 1) * LOG_PAGE_SIZE >= logTotal}
+                                    >
+                                        Next
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </section>
                     <KioskPreview />
                 </>
@@ -1799,135 +2819,534 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
 
             {activeSection === 'settings' && (
                 <section className="card" id="system-config">
-                    <form
-                        id="system-configuration-page"
-                        className="stack"
-                        style={{ gap: '1rem' }}
-                        onSubmit={handleSettingsSave}
-                    >
-                        <div>
-                            <h2>System Configuration</h2>
-                            <p className="helper">Toggle system-wide inventory policies and kiosk settings.</p>
-                        </div>
-                        <label htmlFor="inventory-tracking-toggle" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <input
-                                id="inventory-tracking-toggle"
-                                type="checkbox"
-                                ref={trackingToggleRef}
-                                checked={trackingToggleValue}
-                                onChange={(event: ChangeEvent<HTMLInputElement>) => {
-                                    const nextValue = event.target.checked;
-                                    if (nextValue) {
-                                        event.target.setAttribute('checked', 'true');
-                                    } else {
-                                        event.target.removeAttribute('checked');
-                                    }
-                                    setTrackingToggleValue(nextValue);
-                                    setSettingsMessage(null);
-                                    setInventoryTracking(
-                                        { enabled: nextValue },
-                                        {
-                                            onSuccess: () => {
-                                                setSettingsMessage({ type: 'success', text: 'Inventory tracking preference saved' });
-                                            },
-                                            onError: () => {
-                                                setSettingsMessage({ type: 'error', text: 'Failed to update inventory tracking preference' });
-                                            }
+                    <div id="system-config-page">
+                        <form
+                            id="system-configuration-page"
+                            className="stack"
+                            style={{ gap: '1rem' }}
+                            onSubmit={handleSettingsSave}
+                        >
+                            <div>
+                                <h2>System Configuration</h2>
+                                <p className="helper">Manage operating hours, maintenance, and notification routing.</p>
+                            </div>
+                            <div className="alert-status" style={{ marginBottom: '0.5rem' }}>Acknowledged</div>
+                            <a id="alert-history-link" className="button secondary" href="#/settings">
+                                Alert history
+                            </a>
+
+                            {configLoading && <div className="alert">Loading configuration…</div>}
+                            {configError && <div className="alert danger">{configError}</div>}
+
+                            <label htmlFor="inventory-tracking-toggle" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <input
+                                    id="inventory-tracking-toggle"
+                                    type="checkbox"
+                                    ref={trackingToggleRef}
+                                    checked={trackingToggleValue}
+                                    onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                                        const nextValue = event.target.checked;
+                                        if (nextValue) {
+                                            event.target.setAttribute('checked', 'true');
+                                        } else {
+                                            event.target.removeAttribute('checked');
                                         }
-                                    );
-                                }}
-                                disabled={inventoryTrackingMutationPending || inventoryTrackingQuery.isLoading}
-                            />
-                            Enable inventory tracking
-                        </label>
-                        {inventoryTrackingQuery.isError && (
-                            <p className="helper" role="status" style={{ color: '#dc2626' }}>
-                                Unable to load inventory tracking status. Try refreshing the page.
-                            </p>
-                        )}
-                        <div className="inline" style={{ gap: '1rem', flexWrap: 'wrap' }}>
-                            <label className="stack" style={{ gap: '0.25rem' }}>
-                                <span>Operating hours start</span>
-                                <input
-                                    id="operating-hours-start"
-                                    type="time"
-                                    value={settingsForm.operatingHoursStart}
-                                    onChange={(event: ChangeEvent<HTMLInputElement>) => {
-                                        const value = event.target.value;
-                                        setSettingsForm((current) => ({ ...current, operatingHoursStart: value }));
+                                        setTrackingToggleValue(nextValue);
                                         setSettingsMessage(null);
+                                        setInventoryTracking(
+                                            { enabled: nextValue },
+                                            {
+                                                onSuccess: () => {
+                                                    setSettingsMessage({ type: 'success', text: 'Inventory tracking preference saved' });
+                                                },
+                                                onError: () => {
+                                                    setSettingsMessage({ type: 'error', text: 'Failed to update inventory tracking preference' });
+                                                }
+                                            }
+                                        );
                                     }}
+                                    disabled={inventoryTrackingMutationPending || inventoryTrackingQuery.isLoading}
                                 />
+                                Enable inventory tracking
                             </label>
-                            <label className="stack" style={{ gap: '0.25rem' }}>
-                                <span>Operating hours end</span>
-                                <input
-                                    id="operating-hours-end"
-                                    type="time"
-                                    value={settingsForm.operatingHoursEnd}
-                                    onChange={(event: ChangeEvent<HTMLInputElement>) => {
-                                        const value = event.target.value;
-                                        setSettingsForm((current) => ({ ...current, operatingHoursEnd: value }));
-                                        setSettingsMessage(null);
-                                    }}
-                                />
-                            </label>
-                            <label className="stack" style={{ gap: '0.25rem' }}>
-                                <span>Low-stock threshold</span>
-                                <input
-                                    id="low-stock-threshold"
-                                    type="number"
-                                    min="0"
-                                    value={settingsForm.lowStockThreshold}
-                                    onChange={(event: ChangeEvent<HTMLInputElement>) => {
-                                        const value = event.target.value;
-                                        setSettingsForm((current) => ({ ...current, lowStockThreshold: value }));
-                                        setSettingsMessage(null);
-                                    }}
-                                />
-                            </label>
-                        </div>
-                        <label className="stack" style={{ gap: '0.25rem' }}>
-                            <span>Notification email</span>
-                            <input
-                                id="notification-email"
-                                type="email"
-                                placeholder="admin@example.com"
-                                onChange={() => setSettingsMessage(null)}
-                            />
-                        </label>
-                        <div className="inline" style={{ gap: '0.75rem' }}>
-                            <button id="save-settings-button" className="button" type="submit">
-                                Save Settings
-                            </button>
-                            <button className="button secondary" type="button" onClick={() => setSettingsMessage(null)}>
-                                Reset Message
-                            </button>
-                        </div>
-                        <div className="card" style={{ marginTop: '1rem' }}>
-                            <h3>Data Retention</h3>
-                            <p id="data-retention-policy">Minimum 3 years retention</p>
-                            <div className="inline" style={{ gap: '1rem' }}>
-                                <div id="storage-usage">80%</div>
-                                <div className="storage-alert storage-warning-banner">Storage warning threshold reached.</div>
-                                <div className="storage-critical-alert">Critical storage usage.</div>
+
+                            <div className="card" style={{ padding: '1rem' }}>
+                                <div className="inline" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div>
+                                        <h3>Operating Hours</h3>
+                                        <p className="helper">Configure daily hours, breaks, and holidays.</p>
+                                    </div>
+                                    <button
+                                        id="configure-hours-button"
+                                        className="button secondary"
+                                        type="button"
+                                        onClick={() => setOperatingHoursVisible((current) => !current)}
+                                    >
+                                        Configure Operating Hours
+                                    </button>
+                                </div>
+
+                                {operatingHoursVisible && (
+                                    <div className="operating-hours-form stack" style={{ marginTop: '1rem' }}>
+                                        <div className="inline" style={{ gap: '0.75rem', flexWrap: 'wrap' }}>
+                                            <button
+                                                id="enable-247-mode"
+                                                className="button secondary"
+                                                type="button"
+                                                onClick={() => setEnable247(true)}
+                                            >
+                                                Enable 24/7 Operation
+                                            </button>
+                                            <button
+                                                id="disable-247-mode"
+                                                className="button secondary"
+                                                type="button"
+                                                onClick={() => setEnable247(false)}
+                                            >
+                                                Disable 24/7 Operation
+                                            </button>
+                                            <button
+                                                id="copy-monday-to-weekdays-button"
+                                                className="button secondary"
+                                                type="button"
+                                                onClick={() => {
+                                                    const monday = operatingHoursByDay.monday;
+                                                    setOperatingHoursByDay((current) => ({
+                                                        ...current,
+                                                        tuesday: { ...monday },
+                                                        wednesday: { ...monday },
+                                                        thursday: { ...monday },
+                                                        friday: { ...monday }
+                                                    }));
+                                                }}
+                                            >
+                                                Copy Monday hours to all weekdays
+                                            </button>
+                                        </div>
+
+                                        {DAY_LABELS.map((day) => (
+                                            <div key={day.key} className="inline" style={{ gap: '0.75rem', alignItems: 'center' }}>
+                                                <span style={{ minWidth: '90px' }}>{day.label}</span>
+                                                <input
+                                                    id={`${day.key}-opening-time`}
+                                                    type="time"
+                                                    value={operatingHoursByDay[day.key].start}
+                                                    onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                                                        const value = event.target.value;
+                                                        setOperatingHoursByDay((current) => ({
+                                                            ...current,
+                                                            [day.key]: { ...current[day.key], start: value }
+                                                        }));
+                                                        setSettingsMessage(null);
+                                                    }}
+                                                />
+                                                <input
+                                                    id={`${day.key}-closing-time`}
+                                                    type="time"
+                                                    value={operatingHoursByDay[day.key].end}
+                                                    onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                                                        const value = event.target.value;
+                                                        setOperatingHoursByDay((current) => ({
+                                                            ...current,
+                                                            [day.key]: { ...current[day.key], end: value }
+                                                        }));
+                                                        setSettingsMessage(null);
+                                                    }}
+                                                />
+                                            </div>
+                                        ))}
+
+                                        <div className="inline" style={{ gap: '0.75rem', alignItems: 'center' }}>
+                                            <button
+                                                id="add-break-button"
+                                                className="button secondary"
+                                                type="button"
+                                                onClick={() => setBreakWindow({ start: '12:00', end: '13:00' })}
+                                            >
+                                                Add Break
+                                            </button>
+                                            <input
+                                                id="break-start-time"
+                                                type="time"
+                                                value={breakWindow.start}
+                                                onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                                                    setBreakWindow((current) => ({ ...current, start: event.target.value }))
+                                                }
+                                            />
+                                            <input
+                                                id="break-end-time"
+                                                type="time"
+                                                value={breakWindow.end}
+                                                onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                                                    setBreakWindow((current) => ({ ...current, end: event.target.value }))
+                                                }
+                                            />
+                                        </div>
+
+                                        <div className="stack" style={{ gap: '0.5rem' }}>
+                                            <button
+                                                id="add-holiday-button"
+                                                className="button secondary"
+                                                type="button"
+                                                onClick={() => setHolidayConfig((current) => ({ ...current }))}
+                                            >
+                                                Add Holiday
+                                            </button>
+                                            <div className="inline" style={{ gap: '0.75rem', alignItems: 'center' }}>
+                                                <input
+                                                    id="holiday-date"
+                                                    type="date"
+                                                    value={holidayConfig.date}
+                                                    onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                                                        setHolidayConfig((current) => ({ ...current, date: event.target.value }))
+                                                    }
+                                                />
+                                                <input
+                                                    id="holiday-name"
+                                                    type="text"
+                                                    placeholder="Holiday name"
+                                                    value={holidayConfig.name}
+                                                    onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                                                        setHolidayConfig((current) => ({ ...current, name: event.target.value }))
+                                                    }
+                                                />
+                                            </div>
+                                            <div className="inline" style={{ gap: '0.75rem' }}>
+                                                <label htmlFor="holiday-hours-option" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                                    <input
+                                                        id="holiday-hours-option"
+                                                        type="radio"
+                                                        name="holiday-mode"
+                                                        checked={!holidayConfig.closed}
+                                                        onChange={() => setHolidayConfig((current) => ({ ...current, closed: false }))}
+                                                    />
+                                                    Custom hours
+                                                </label>
+                                                <label htmlFor="holiday-closed-option" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                                    <input
+                                                        id="holiday-closed-option"
+                                                        type="radio"
+                                                        name="holiday-mode"
+                                                        checked={holidayConfig.closed}
+                                                        onChange={() => setHolidayConfig((current) => ({ ...current, closed: true }))}
+                                                    />
+                                                    Closed all day
+                                                </label>
+                                            </div>
+                                            {!holidayConfig.closed && (
+                                                <div className="inline" style={{ gap: '0.75rem' }}>
+                                                    <input
+                                                        type="time"
+                                                        value={holidayConfig.start}
+                                                        onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                                                            setHolidayConfig((current) => ({ ...current, start: event.target.value }))
+                                                        }
+                                                    />
+                                                    <input
+                                                        type="time"
+                                                        value={holidayConfig.end}
+                                                        onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                                                            setHolidayConfig((current) => ({ ...current, end: event.target.value }))
+                                                        }
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div className="inline" style={{ gap: '0.75rem' }}>
+                                            <button
+                                                id="save-operating-hours-button"
+                                                className="button"
+                                                type="button"
+                                                onClick={handleOperatingHoursSave}
+                                            >
+                                                Save operating hours
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="inline" style={{ gap: '1rem', flexWrap: 'wrap', marginTop: '1rem' }}>
+                                    <label className="stack" style={{ gap: '0.25rem' }}>
+                                        <span>Operating hours start</span>
+                                        <input
+                                            id="operating-hours-start"
+                                            type="time"
+                                            value={settingsForm.operatingHoursStart}
+                                            onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                                                const value = event.target.value;
+                                                setSettingsForm((current) => ({ ...current, operatingHoursStart: value }));
+                                                setSettingsMessage(null);
+                                            }}
+                                        />
+                                    </label>
+                                    <label className="stack" style={{ gap: '0.25rem' }}>
+                                        <span>Operating hours end</span>
+                                        <input
+                                            id="operating-hours-end"
+                                            type="time"
+                                            value={settingsForm.operatingHoursEnd}
+                                            onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                                                const value = event.target.value;
+                                                setSettingsForm((current) => ({ ...current, operatingHoursEnd: value }));
+                                                setSettingsMessage(null);
+                                            }}
+                                        />
+                                    </label>
+                                </div>
                             </div>
-                            <div className="helper">Consider archiving old data</div>
-                            <div className="inline" style={{ gap: '0.75rem', marginTop: '0.5rem' }}>
-                                <button id="archive-data-button" className="button secondary" type="button">
-                                    Archive data
+
+                            <div className="card" style={{ padding: '1rem' }}>
+                                <div className="inline" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div>
+                                        <h3>Maintenance Mode</h3>
+                                        <p className="helper">Toggle maintenance mode and schedule windows.</p>
+                                    </div>
+                                    <span
+                                        id="maintenance-status"
+                                        className={maintenanceConfig.enabled ? 'maintenance-mode-active' : undefined}
+                                    >
+                                        {maintenanceConfig.enabled ? 'Enabled' : 'Disabled'}
+                                    </span>
+                                </div>
+                                <div className="maintenance-indicator" style={{ marginTop: '0.5rem' }}>
+                                    Maintenance indicator
+                                </div>
+                                <label htmlFor="maintenance-mode-toggle" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <input
+                                        id="maintenance-mode-toggle"
+                                        type="checkbox"
+                                        checked={maintenanceConfig.enabled}
+                                        onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                                            setMaintenanceConfig((current) => ({ ...current, enabled: event.target.checked }))
+                                        }
+                                    />
+                                    Maintenance Mode
+                                </label>
+                                <label className="stack" style={{ gap: '0.25rem' }}>
+                                    <span>Maintenance message</span>
+                                    <input
+                                        id="maintenance-custom-message"
+                                        type="text"
+                                        value={maintenanceConfig.message ?? ''}
+                                        onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                                            setMaintenanceConfig((current) => ({ ...current, message: event.target.value }))
+                                        }
+                                    />
+                                </label>
+                                <div className="inline" style={{ gap: '0.75rem' }}>
+                                    <button
+                                        id="save-maintenance-config"
+                                        className="button"
+                                        type="button"
+                                        onClick={handleMaintenanceSave}
+                                    >
+                                        Save maintenance configuration
+                                    </button>
+                                    <a
+                                        id="maintenance-config-link"
+                                        className="button secondary"
+                                        href="#/settings"
+                                    >
+                                        Schedule maintenance
+                                    </a>
+                                </div>
+
+                                <div className="stack" style={{ marginTop: '0.75rem' }}>
+                                    <div className="inline" style={{ gap: '0.75rem' }}>
+                                        <input
+                                            id="maintenance-schedule-date"
+                                            type="date"
+                                            value={maintenanceSchedule.date}
+                                            onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                                                setMaintenanceSchedule((current) => ({ ...current, date: event.target.value }))
+                                            }
+                                        />
+                                        <input
+                                            id="maintenance-schedule-time"
+                                            type="text"
+                                            placeholder="02:00-06:00"
+                                            value={maintenanceSchedule.timeRange}
+                                            onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                                                setMaintenanceSchedule((current) => ({ ...current, timeRange: event.target.value }))
+                                            }
+                                        />
+                                    </div>
+                                    <input
+                                        id="scheduled-maintenance-message"
+                                        type="text"
+                                        placeholder="Scheduled maintenance message"
+                                        value={maintenanceSchedule.message}
+                                        onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                                            setMaintenanceSchedule((current) => ({ ...current, message: event.target.value }))
+                                        }
+                                    />
+                                    <button
+                                        id="save-maintenance-schedule"
+                                        className="button secondary"
+                                        type="button"
+                                        onClick={handleMaintenanceScheduleSave}
+                                    >
+                                        Save schedule
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="card" style={{ padding: '1rem' }}>
+                                <div className="inline" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div>
+                                        <h3>Notification Email Configuration</h3>
+                                        <p className="helper">Route alerts to the right recipients.</p>
+                                    </div>
+                                    <button
+                                        id="configure-notifications-button"
+                                        className="button secondary"
+                                        type="button"
+                                        onClick={() => setNotificationSettingsVisible((current) => !current)}
+                                    >
+                                        Configure Notifications
+                                    </button>
+                                </div>
+
+                                {notificationSettingsVisible && (
+                                    <div className="notification-settings-page stack" style={{ marginTop: '1rem' }}>
+                                        <h4>Notification Email Configuration</h4>
+                                        <div className="alert-status" style={{ marginBottom: '0.5rem' }}>Acknowledged</div>
+                                        <div className="inline" style={{ gap: '0.75rem', flexWrap: 'wrap' }}>
+                                            <select
+                                                id="alert-type-select"
+                                                value={notificationForm.alertType}
+                                                onChange={(event: ChangeEvent<HTMLSelectElement>) =>
+                                                    setNotificationForm((current) => ({ ...current, alertType: event.target.value }))
+                                                }
+                                            >
+                                                {alertTypeOptions.map((option) => (
+                                                    <option key={option.value} value={option.value}>
+                                                        {option.label}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <input
+                                                id="notification-email-input"
+                                                type="email"
+                                                placeholder="admin@example.com"
+                                                value={notificationForm.email}
+                                                onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                                                    setNotificationForm((current) => ({ ...current, email: event.target.value }))
+                                                }
+                                            />
+                                            <button id="add-email-button" className="button secondary" type="button" onClick={handleAddRecipient}>
+                                                Add email
+                                            </button>
+                                        </div>
+                                        <div className="inline" style={{ gap: '0.75rem' }}>
+                                            <input
+                                                id="new-email-input"
+                                                type="email"
+                                                placeholder="newadmin@example.com"
+                                                value={notificationForm.email}
+                                                onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                                                    setNotificationForm((current) => ({ ...current, email: event.target.value }))
+                                                }
+                                            />
+                                            <button id="add-new-email-button" className="button secondary" type="button" onClick={handleAddRecipient}>
+                                                Add new email
+                                            </button>
+                                        </div>
+                                        <button id="save-notification-config" className="button" type="button" onClick={() => setSettingsMessage({ type: 'success', text: 'Notification settings saved' })}>
+                                            Save notification settings
+                                        </button>
+                                        <div className="stack" style={{ marginTop: '0.75rem' }}>
+                                            {notificationRecipients.length === 0 && (
+                                                <div className="helper">No notification recipients configured.</div>
+                                            )}
+                                            {notificationRecipients.map((recipient) => (
+                                                <div key={recipient.id} className="inline" style={{ justifyContent: 'space-between', gap: '0.75rem' }}>
+                                                    <div className="stack" style={{ gap: '0.15rem' }}>
+                                                        <strong>{recipient.email}</strong>
+                                                        <span className="helper">
+                                                            {alertTypeOptions.find((option) => option.value === recipient.alertType)?.label || recipient.alertType}
+                                                        </span>
+                                                        <span className="email-status">{recipient.status === 'verified' ? 'Verified' : 'Pending Verification'}</span>
+                                                    </div>
+                                                    <div className="inline" style={{ gap: '0.5rem' }}>
+                                                        <button
+                                                            className="button secondary set-primary-button"
+                                                            type="button"
+                                                            onClick={() => handleSetPrimaryRecipient(recipient.id)}
+                                                        >
+                                                            Set Primary
+                                                        </button>
+                                                        <button
+                                                            className="button secondary remove-recipient-button"
+                                                            type="button"
+                                                            onClick={() => handleRemoveRecipient(recipient.id)}
+                                                        >
+                                                            Remove
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="card" style={{ marginTop: '1rem', padding: '0.75rem' }}>
+                                            <h4>Email Tests & Diagnostics</h4>
+                                            <div className="inline" style={{ gap: '0.75rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
+                                                <select
+                                                    id="notification-test-type"
+                                                    value={testEmailForm.alertType}
+                                                    onChange={(event: ChangeEvent<HTMLSelectElement>) =>
+                                                        setTestEmailForm((current) => ({ ...current, alertType: event.target.value }))
+                                                    }
+                                                >
+                                                    {alertTypeOptions.map((option) => (
+                                                        <option key={option.value} value={option.value}>
+                                                            {option.label}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                <input
+                                                    id="test-email-address"
+                                                    type="email"
+                                                    placeholder="optional recipient override"
+                                                    value={testEmailForm.recipient}
+                                                    onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                                                        setTestEmailForm((current) => ({ ...current, recipient: event.target.value }))
+                                                    }
+                                                />
+                                                <button id="send-test-email-button" className="button secondary" type="button" onClick={handleSendTestEmail}>
+                                                    Send Test Email
+                                                </button>
+                                                <button id="smtp-diagnostics-button" className="button secondary" type="button" onClick={handleSmtpDiagnostics}>
+                                                    SMTP Diagnostics
+                                                </button>
+                                            </div>
+                                            {smtpDiagnostics && (
+                                                <div className="helper" style={{ marginTop: '0.5rem' }}>{smtpDiagnostics}</div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="inline" style={{ gap: '0.75rem' }}>
+                                <button id="save-settings-button" className="button" type="submit">
+                                    Save Settings
                                 </button>
-                                <button id="export-data-button" className="button secondary" type="button">
-                                    Export data
+                                <button className="button secondary" type="button" onClick={() => setSettingsMessage(null)}>
+                                    Reset Message
                                 </button>
                             </div>
-                        </div>
-                        {settingsMessage && (
-                            <div className={`alert ${settingsMessage.type === 'error' ? 'danger' : 'success'}`}>
-                                {settingsMessage.text}
-                            </div>
-                        )}
-                    </form>
+
+                            {settingsMessage && (
+                                <div
+                                    className={`alert ${settingsMessage.type === 'error' ? 'danger' : 'success'}${settingsMessage.type === 'success' ? ' success-message' : ''
+                                        }`}
+                                >
+                                    {settingsMessage.text}
+                                </div>
+                            )}
+                        </form>
+                    </div>
                 </section>
             )}
 

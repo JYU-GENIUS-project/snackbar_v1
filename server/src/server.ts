@@ -26,10 +26,13 @@ import inventoryRoutes from './routes/inventory';
 import notificationRoutes from './routes/notifications';
 import transactionRoutes from './routes/transactions';
 import statusRoutes from './routes/status';
+import configRoutes from './routes/config';
+import logRoutes from './routes/logs';
 import cartRoutes from './routes/cart';
 import analyticsRoutes from './routes/analytics';
 import mediaStorage from './utils/mediaStorage';
 import notificationService from './services/notificationService';
+import monitoringService from './services/monitoringService';
 import db from './utils/database';
 
 // Load environment variables from project root (fallback to local .env)
@@ -159,6 +162,11 @@ if (process.env.NODE_ENV !== 'test') {
     }) as NotificationWorkerHandle | null;
 }
 
+let monitoringWorkerHandle: NotificationWorkerHandle | null = null;
+if (process.env.NODE_ENV !== 'test') {
+    monitoringWorkerHandle = monitoringService.startMonitoringWorker() as NotificationWorkerHandle | null;
+}
+
 // =============================================================================
 // API Routes
 // =============================================================================
@@ -190,8 +198,14 @@ app.use('/api/status', apiLimiter, statusRoutes);
 // Inventory management routes
 app.use('/api/inventory', apiLimiter, inventoryRoutes);
 
+// System configuration routes
+app.use('/api/config', apiLimiter, configRoutes);
+
 // Notification log routes
 app.use('/api/notifications', apiLimiter, notificationRoutes);
+
+// Log viewer routes
+app.use('/api/logs', apiLimiter, logRoutes);
 
 // Customer transaction routes
 app.use('/api/transactions', apiLimiter, transactionRoutes);
@@ -245,6 +259,10 @@ const gracefulShutdown = (signal: ShutdownSignal) => {
 
     if (notificationWorkerHandle) {
         void notificationWorkerHandle.stop();
+    }
+
+    if (monitoringWorkerHandle) {
+        void monitoringWorkerHandle.stop();
     }
 
     server.close(() => {

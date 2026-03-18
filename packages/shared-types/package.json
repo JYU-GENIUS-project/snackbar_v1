@@ -13,6 +13,7 @@
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json"
+    "build": "tsc -p tsconfig.build.json",
+    "test": "echo \"No tests for shared types\""
   }
 }

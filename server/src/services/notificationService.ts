@@ -3,8 +3,23 @@ import db from '../utils/database';
 
 const RETRY_SCHEDULE_SECONDS = [30, 60, 120];
 const NOTIFICATION_TYPES = {
-    LOW_STOCK: 'inventory.low_stock'
+    LOW_STOCK: 'inventory.low_stock',
+    STORAGE_INFO: 'storage.info',
+    STORAGE_WARNING: 'storage.warning',
+    STORAGE_CRITICAL: 'storage.critical',
+    BACKUP_SUCCESS: 'backup.success',
+    BACKUP_FAILURE: 'backup.failure',
+    TEST_EMAIL: 'system.test_email'
 } as const;
+
+const ALERT_TYPE_MAP: Record<string, string> = {
+    [NOTIFICATION_TYPES.LOW_STOCK]: 'low_stock',
+    [NOTIFICATION_TYPES.STORAGE_INFO]: 'storage_info',
+    [NOTIFICATION_TYPES.STORAGE_WARNING]: 'storage_warning',
+    [NOTIFICATION_TYPES.STORAGE_CRITICAL]: 'storage_critical',
+    [NOTIFICATION_TYPES.BACKUP_SUCCESS]: 'backup_confirmation',
+    [NOTIFICATION_TYPES.BACKUP_FAILURE]: 'backup_failure'
+};
 
 const NOTIFICATION_WORKER_LOCK_ID = 90210;
 
@@ -37,7 +52,7 @@ type NotificationLogRow = {
 };
 
 type NotificationPayload = {
-    productId: string;
+    productId?: string;
     productName?: string;
     currentStock?: number | null;
     lowStockThreshold?: number | null;
@@ -55,6 +70,12 @@ type NotificationSendRecord = NotificationLogRow & {
 };
 
 type NotificationOutcome = { id: string; status: string; error?: unknown };
+
+type TestEmailResult = {
+    recipient: string;
+    status: 'sent' | 'failed';
+    error?: string;
+};
 
 type LowStockSnapshot = {
     productId: string;
@@ -121,19 +142,38 @@ const parseConfigValue = (value: unknown) => {
     return value;
 };
 
-const getNotificationRecipients = async (): Promise<NotificationRecipient[]> => {
-    const result = (await database.query('SELECT value FROM system_config WHERE key = $1 LIMIT 1', [
+const getNotificationRecipients = async (alertType?: string): Promise<NotificationRecipient[]> => {
+    const params: unknown[] = [];
+    let where = "WHERE status = 'verified'";
+    if (alertType) {
+        params.push(alertType);
+        where += ' AND alert_type = $1';
+    }
+
+    const tableResult = (await database.query(
+        `SELECT email FROM notification_recipients ${where}`,
+        params
+    )) as DbQueryResult<{ email: string }>;
+
+    const tableRecipients = tableResult.rows
+        .map((row) => row.email)
+        .filter((entry): entry is string => typeof entry === 'string' && entry.includes('@'));
+
+    if (tableRecipients.length) {
+        return tableRecipients;
+    }
+
+    const legacyResult = (await database.query('SELECT value FROM system_config WHERE key = $1 LIMIT 1', [
         'notification_recipients'
     ])) as DbQueryResult<{ value: unknown }>;
 
-    if (result.rows.length === 0) {
+    if (legacyResult.rows.length === 0) {
         return [];
     }
 
-    const value = parseConfigValue(result.rows[0]?.value);
+    const value = parseConfigValue(legacyResult.rows[0]?.value);
     if (Array.isArray(value)) {
-        const recipients = value.filter((entry): entry is string => typeof entry === 'string' && entry.includes('@'));
-        return recipients;
+        return value.filter((entry): entry is string => typeof entry === 'string' && entry.includes('@'));
     }
 
     if (typeof value === 'string') {
@@ -204,6 +244,37 @@ const markLowStockResolved = async (productId: string) => {
     );
 };
 
+const queueSystemAlert = async ({
+    notificationType,
+    alertType,
+    subject,
+    payload
+}: {
+    notificationType: string;
+    alertType?: string;
+    subject: string;
+    payload: NotificationPayload;
+}) => {
+    const targetAlertType = alertType || ALERT_TYPE_MAP[notificationType] || undefined;
+    const recipients = await getNotificationRecipients(targetAlertType);
+    if (!recipients.length) {
+        return { queued: 0, reason: 'no-recipients-configured' };
+    }
+
+    await Promise.all(
+        recipients.map((recipient) =>
+            createNotificationLogEntry({
+                notificationType,
+                recipient,
+                subject,
+                payload
+            })
+        )
+    );
+
+    return { queued: recipients.length };
+};
+
 const queueLowStockAlerts = async ({
     snapshot,
     context
@@ -211,7 +282,7 @@ const queueLowStockAlerts = async ({
     snapshot: LowStockSnapshot;
     context?: Record<string, unknown>;
 }) => {
-    const recipients = await getNotificationRecipients();
+    const recipients = await getNotificationRecipients(ALERT_TYPE_MAP[NOTIFICATION_TYPES.LOW_STOCK]);
     if (!recipients.length) {
         return { queued: 0, reason: 'no-recipients-configured' };
     }
@@ -295,6 +366,110 @@ const sendNotification = async ({ notification }: { notification: NotificationSe
         text: textBody,
         html: htmlBody
     });
+};
+
+const sendTestEmail = async ({
+    alertType,
+    recipients
+}: {
+    alertType?: string | null;
+    recipients?: string[] | null;
+}) => {
+    const targetRecipients = recipients?.length
+        ? recipients
+        : await getNotificationRecipients(alertType || undefined);
+    if (!targetRecipients.length) {
+        return { results: [] as TestEmailResult[], queued: 0, failed: 0, reason: 'no-recipients-configured' };
+    }
+
+    const smtpConfig = getSmtpConfig();
+    const mailTransport = getTransport();
+    const subject = `[Snackbar] Test email${alertType ? ` (${alertType})` : ''}`;
+    const payload: NotificationPayload = {
+        triggeredAt: new Date().toISOString(),
+        text: 'This is a test email generated from the Snackbar admin console.',
+        html: '<p>This is a test email generated from the Snackbar admin console.</p>',
+        context: {
+            alertType: alertType || 'general',
+            test: true
+        }
+    };
+
+    const results: TestEmailResult[] = [];
+    for (const recipient of targetRecipients) {
+        try {
+            await mailTransport.sendMail({
+                from: smtpConfig.from,
+                to: recipient,
+                subject,
+                text: payload.text,
+                html: payload.html
+            });
+            await database.query(
+                `INSERT INTO email_notification_log (
+                    notification_type,
+                    recipient,
+                    subject,
+                    payload,
+                    status,
+                    attempt_count,
+                    last_error,
+                    last_attempt_at
+                ) VALUES ($1, $2, $3, $4::jsonb, 'sent', 1, NULL, CURRENT_TIMESTAMP)`,
+                [NOTIFICATION_TYPES.TEST_EMAIL, recipient, subject, JSON.stringify(payload)]
+            );
+            results.push({ recipient, status: 'sent' });
+        } catch (error) {
+            const message = (error as Error)?.message?.slice(0, 512) || 'Unknown error';
+            await database.query(
+                `INSERT INTO email_notification_log (
+                    notification_type,
+                    recipient,
+                    subject,
+                    payload,
+                    status,
+                    attempt_count,
+                    last_error,
+                    last_attempt_at
+                ) VALUES ($1, $2, $3, $4::jsonb, 'failed', 1, $5, CURRENT_TIMESTAMP)`,
+                [NOTIFICATION_TYPES.TEST_EMAIL, recipient, subject, JSON.stringify(payload), message]
+            );
+            results.push({ recipient, status: 'failed', error: message });
+        }
+    }
+
+    return {
+        results,
+        queued: results.filter((item) => item.status === 'sent').length,
+        failed: results.filter((item) => item.status === 'failed').length
+    };
+};
+
+const getSmtpDiagnostics = async () => {
+    const config = getSmtpConfig();
+    const mailTransport = getTransport();
+
+    try {
+        await mailTransport.verify();
+        return {
+            ok: true,
+            message: 'SMTP connection verified',
+            host: config.transport.host,
+            port: config.transport.port,
+            secure: config.transport.secure,
+            from: config.from
+        };
+    } catch (error) {
+        return {
+            ok: false,
+            message: 'SMTP verification failed',
+            error: (error as Error)?.message || 'Unknown error',
+            host: config.transport.host,
+            port: config.transport.port,
+            secure: config.transport.secure,
+            from: config.from
+        };
+    }
 };
 
 const scheduleNextAttempt = (attemptNumber: number) => {
@@ -625,22 +800,28 @@ const notificationService = {
     NOTIFICATION_TYPES,
     getNotificationRecipients,
     queueLowStockAlerts,
+    queueSystemAlert,
     evaluateLowStockState,
     markLowStockResolved,
     processPendingNotifications,
     startNotificationWorker,
-    getNotificationLog
+    getNotificationLog,
+    sendTestEmail,
+    getSmtpDiagnostics
 };
 
 export {
     NOTIFICATION_TYPES,
     getNotificationRecipients,
     queueLowStockAlerts,
+    queueSystemAlert,
     evaluateLowStockState,
     markLowStockResolved,
     processPendingNotifications,
     startNotificationWorker,
-    getNotificationLog
+    getNotificationLog,
+    sendTestEmail,
+    getSmtpDiagnostics
 };
 
 export default notificationService;
