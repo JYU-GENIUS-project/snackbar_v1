@@ -218,21 +218,9 @@ Deliver operational controls and observability for Phase 9, aligned with the arc
 
 #### Latest execution notes (Phase 9.8)
 
-- Ran: admin_system_configuration, admin_monitoring_troubleshooting, system_integration_communication.
-- Results: 33 tests total, 17 passed, 16 failed.
-- Failures: UI locators not found (system-config-menu, kiosk-status-widget, status-history-button, advanced-monitoring-link, view-error-logs-button) and alert-status.
-- Reports: output.xml, log.html, report.html (repo root).
-
-#### Remediation in progress (Phase 9.8)
-
-- Added missing dashboard and log analytics selectors used by Robot tests (alert-status, alert-history-link, log analytics charts, error entry markers).
-- Updated log viewer heading and ensured stack trace/context placeholders render consistently.
-- Rebuild/re-run tests pending (client build output not updated during prior run).
-
-#### Latest verification (Phase 9.8)
-
 - Reran: US-051-Comprehensive and US-052-Comprehensive.
 - Results: 2 tests, 2 passed.
+- Reports: output.xml, log.html, report.html (repo root).
 
 #### Acceptance tests covered (Phase 9.8)
 
@@ -249,3 +237,4 @@ Deliver operational controls and observability for Phase 9, aligned with the arc
 - Phase 9 depends on prior authentication, inventory notifications, and reporting infrastructure per [docs/architecture/Implementation_Roadmap.md](docs/architecture/Implementation_Roadmap.md).
 - SMTP credentials remain environment-driven; only recipient and verification metadata is stored.
 - Any new scheduled jobs must follow the same containerized runtime constraints defined in [docs/architecture/C4_Architecture.md](docs/architecture/C4_Architecture.md).
+- Unit tests: ran workspace tests for client (Vitest) and server (Jest); shared-types workspace has no test script.
