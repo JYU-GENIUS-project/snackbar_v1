@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useArchiveProduct, useCreateProduct, useProducts, useUpdateProduct } from '../hooks/useProducts.js';
@@ -596,10 +596,9 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
     const [notificationForm, setNotificationForm] = useState({ alertType: 'low_stock', email: '' });
     const [testEmailForm, setTestEmailForm] = useState({ alertType: 'system_errors', recipient: '' });
     const [smtpDiagnostics, setSmtpDiagnostics] = useState<string | null>(null);
-    const [dashboardStatus, setDashboardStatus] = useState<KioskStatusPayload | null>(null);
     const [dashboardConnection, setDashboardConnection] = useState<'online' | 'offline' | 'maintenance'>('online');
     const [lastHeartbeat, setLastHeartbeat] = useState<string | null>(null);
-    const [uptimePercent, setUptimePercent] = useState('99.9%');
+    const uptimePercent = '99.9%';
     const [statusHistory, setStatusHistory] = useState<StatusHistoryEntry[]>([]);
     const [metricsUpdatedAt, setMetricsUpdatedAt] = useState<string | null>(null);
     const [logEntries, setLogEntries] = useState<ErrorLogEntry[]>([]);
@@ -839,7 +838,6 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
                 token: auth.token
             });
             const status = response.data ?? null;
-            setDashboardStatus(status);
             const statusValue = status?.status || 'open';
             const resolvedConnection = statusValue === 'maintenance'
                 ? 'maintenance'

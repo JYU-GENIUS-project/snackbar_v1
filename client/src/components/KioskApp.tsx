@@ -580,28 +580,6 @@ const applyTestStatusOverride = (
     };
 };
 
-const updateQuantityInCart = (
-    cart: CartItem[],
-    productId: string,
-    updater: (quantity: number, purchaseLimit: number | null) => number
-): CartItem[] => {
-    return cart
-        .map((item) => {
-            if (item.id !== productId) {
-                return item;
-            }
-            const nextQuantity = updater(item.quantity, item.purchaseLimit);
-            if (nextQuantity <= 0) {
-                return null;
-            }
-            return {
-                ...item,
-                quantity: nextQuantity
-            };
-        })
-        .filter((item): item is CartItem => Boolean(item));
-};
-
 const parsePurchaseLimitDetails = (details: unknown): { limit?: number } | null => {
     if (!details || typeof details !== 'object') {
         return null;
@@ -754,7 +732,7 @@ const KioskApp = () => {
             }
         }
         return null;
-    }, [overlayVariant, statusPayload, statusPayload?.windows]);
+    }, [overlayVariant, statusPayload]);
 
     const closedBannerMessage = useMemo(() => {
         if (overlayVariant !== 'closed') {
@@ -891,7 +869,6 @@ const KioskApp = () => {
     const [limitMessage, setLimitMessage] = useState('');
     const [cartTimeoutWarning, setCartTimeoutWarning] = useState(false);
     const [checkoutTransactionId, setCheckoutTransactionId] = useState<string | null>(null);
-    const [checkoutTransactionNumber, setCheckoutTransactionNumber] = useState<string | null>(null);
     const [confirmationErrorMessage, setConfirmationErrorMessage] = useState<string | null>(null);
     const cartTimeoutRef = useRef<number | null>(null);
     const cartWarningRef = useRef<number | null>(null);
@@ -1001,10 +978,6 @@ const KioskApp = () => {
         if (transaction?.id) {
             setCheckoutTransactionId(transaction.id);
         }
-        if (transaction?.transaction_number) {
-            setCheckoutTransactionNumber(transaction.transaction_number);
-        }
-
         if (response?.data?.confirmationTimeoutSeconds) {
             const timeoutMs = response.data.confirmationTimeoutSeconds * 1000;
             confirmationDeadlineRef.current = Date.now() + timeoutMs;
@@ -1791,7 +1764,6 @@ const KioskApp = () => {
         setCheckoutPromptReady(false);
         setCheckoutVisible(true);
         setCheckoutTransactionId(null);
-        setCheckoutTransactionNumber(null);
         setConfirmationErrorMessage(null);
         confirmationTimeoutTriggeredRef.current = false;
         setCartOpen(false);
@@ -1822,7 +1794,6 @@ const KioskApp = () => {
         confirmationDeadlineRef.current = null;
         setConfirmationCountdownMs(CONFIRMATION_TIMEOUT_MS);
         setCheckoutTransactionId(null);
-        setCheckoutTransactionNumber(null);
         setConfirmationErrorMessage(null);
         confirmationTimeoutTriggeredRef.current = false;
         resetCartTimeout();
@@ -1885,7 +1856,6 @@ const KioskApp = () => {
             confirmationDeadlineRef.current = null;
             setConfirmationCountdownMs(CONFIRMATION_TIMEOUT_MS);
             setCheckoutTransactionId(null);
-            setCheckoutTransactionNumber(null);
             setConfirmationErrorMessage(null);
         }
     }, [hasCartItems]);
@@ -1927,7 +1897,6 @@ const KioskApp = () => {
             confirmationDeadlineRef.current = null;
             setCheckoutReferenceCode('');
             setCheckoutTransactionId(null);
-            setCheckoutTransactionNumber(null);
             void clearCart();
         }, SUCCESS_MESSAGE_MIN_DURATION_MS);
 

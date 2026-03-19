@@ -366,6 +366,7 @@ export const useKioskStatus = (options: UseKioskStatusOptions = {}) => {
     }, [applyStatusPayload, forcedOffline, offlineState, statusQuery.data]);
 
     const inventoryAvailability = useMemo(() => {
+        void availabilityVersion;
         const source = availabilityRef.current instanceof Map ? availabilityRef.current : null;
         if (!source || source.size === 0) {
             return {} as Record<string, InventoryAvailabilityEntry>;

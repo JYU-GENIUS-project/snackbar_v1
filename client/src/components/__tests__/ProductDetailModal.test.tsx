@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+/// <reference types="vitest/globals" />
 import { render, screen } from '@testing-library/react';
 import ProductDetailModal from '../ProductDetailModal.js';
 
