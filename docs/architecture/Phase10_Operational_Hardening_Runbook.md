@@ -76,6 +76,6 @@ Define operational hardening steps for log rotation, backup retention, and disas
 
 ## Status
 
-**In progress:** Runbook defined; execution validation to be recorded in Phase 10.3 completion notes.
+**Completed (2026-03-19):** Backup and restore drill executed; DR validation recorded in Phase 10.3 execution notes.
 
 <!-- markdownlint-enable MD013 MD036 -->

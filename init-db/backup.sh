@@ -11,7 +11,7 @@
 # - Email notifications (optional)
 # - Backup verification
 #
-# Usage: 
+# Usage:
 #   Manual:   docker-compose run backup /backup.sh
 #   Cron:     0 2 * * * docker-compose -f /path/to/docker-compose.yml run --rm backup /backup.sh
 # =============================================================================
@@ -42,7 +42,7 @@ log() {
 send_notification() {
     local subject="$1"
     local body="$2"
-    
+
     # If SMTP is configured, send email notification
     if [ -n "${SMTP_HOST}" ] && [ -n "${ADMIN_NOTIFICATION_EMAILS}" ]; then
         # Note: In production, use a proper email sending tool
@@ -84,19 +84,19 @@ pg_dump \
 if [ $? -eq 0 ] && [ -f "${BACKUP_FILE}" ]; then
     # Get backup size
     BACKUP_SIZE=$(ls -lh "${BACKUP_FILE}" | awk '{print $5}')
-    
+
     # Calculate checksum
     CHECKSUM=$(sha256sum "${BACKUP_FILE}" | awk '{print $1}')
-    
+
     # Record end time
     END_TIME=$(date +%s)
     DURATION=$((END_TIME - START_TIME))
-    
+
     log "Backup completed successfully!"
     log "Size: ${BACKUP_SIZE}"
     log "Checksum (SHA256): ${CHECKSUM}"
     log "Duration: ${DURATION} seconds"
-    
+
     # Store metadata
     cat > "${BACKUP_DIR}/snackbar_backup_${TIMESTAMP}.meta" <<EOF
 {
@@ -109,7 +109,7 @@ if [ $? -eq 0 ] && [ -f "${BACKUP_FILE}" ]; then
     "created_at": "$(date -Iseconds)"
 }
 EOF
-    
+
     # Send success notification
     send_notification \
         "Snackbar Backup Completed - ${TIMESTAMP}" \

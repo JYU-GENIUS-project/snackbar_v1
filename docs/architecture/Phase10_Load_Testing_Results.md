@@ -33,4 +33,24 @@ Automated reporting benchmark executed to validate API response times for analyt
 - Rerun (headless) after fixes: `customer_product_browsing.robot` 8/8 pass and `customer_shopping_cart.robot` 7/7 pass. Outputs saved under [tests/results/phase10_2_fix2](tests/results/phase10_2_fix2).
 - Remaining Phase 10.2 scenarios (UI filter/cart timing under sustained load) require interactive or dedicated load tooling.
 
+## UI Filter/Cart Latency Under Sustained Load
+
+**Date:** 2026-03-19
+
+**Tool:** [server/scripts/uiLatencyLoadTest.mjs](server/scripts/uiLatencyLoadTest.mjs)
+
+**Parameters:** 50 iterations, concurrency 5, base URL [http://localhost:3000](http://localhost:3000)
+
+**Results (ms):**
+
+| Metric | Samples | Avg | P50 | P95 | Min | Max |
+| --- | --- | --- | --- | --- | --- | --- |
+| ui-filter-fetch | 50 | 28.82 | 23.08 | 74.69 | 12.69 | 84.39 |
+| cart-update | 50 | 30.42 | 28.51 | 53.00 | 14.36 | 56.29 |
+
+**Notes:**
+
+- Load test uses kiosk feed API (`/api/feed/products`) as the UI filter data source and cart update API (`/api/cart/items`) with unique session keys.
+- Results satisfy UI filter <300ms and cart update <200ms targets for this sustained load run.
+
 <!-- markdownlint-enable MD013 MD036 -->
