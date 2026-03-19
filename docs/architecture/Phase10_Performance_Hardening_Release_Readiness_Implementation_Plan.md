@@ -42,8 +42,8 @@ Deliver performance certification, operational hardening, and release readiness 
 | Phase | Status | Completion Date |
 | --- | --- | --- |
 | 10.1 Baseline Performance Profiling & Test Harness | Completed | 2026-03-18 |
-| 10.2 Load Testing & Performance Tuning | Not started | – |
-| 10.3 Operational Hardening (Logs, Backups, DR) | Not started | – |
+| 10.2 Load Testing & Performance Tuning | In progress | 2026-03-19 |
+| 10.3 Operational Hardening (Logs, Backups, DR) | In progress | 2026-03-19 |
 | 10.4 Security Penetration Testing & Remediation | Not started | – |
 | 10.5 Deployment Automation, Observability, Alert Routing | Not started | – |
 | 10.6 Release Regression & Final Certification | Not started | – |
@@ -83,7 +83,7 @@ Deliver performance certification, operational hardening, and release readiness 
 
 **Goal:** Achieve and validate QR <1s and UI <300ms targets under expected load.
 
-**Status:** Not started
+**Status:** In progress (2026-03-19)
 
 **Tasks**
 
@@ -95,6 +95,10 @@ Deliver performance certification, operational hardening, and release readiness 
    - Nginx caching/compression for static assets.
    - Client bundle optimization (code-splitting, prefetch) within Vite/React constraints.
 4. Re-run load tests and verify SLAs.
+
+**Artifacts**
+
+- [docs/architecture/Phase10_Load_Testing_Performance_Tuning_Plan.md](docs/architecture/Phase10_Load_Testing_Performance_Tuning_Plan.md)
 
 **Acceptance linkage**
 
@@ -110,7 +114,7 @@ Deliver performance certification, operational hardening, and release readiness 
 
 **Goal:** Finalize log rotation, backup retention, and disaster recovery (DR) readiness.
 
-**Status:** Not started
+**Status:** In progress (2026-03-19)
 
 **Tasks**
 
@@ -120,6 +124,10 @@ Deliver performance certification, operational hardening, and release readiness 
    - Restore verification checklist and audit trail entry.
 3. Produce DR runbook aligned with containerized deployment (Docker Compose) and C4 deployment flow.
 4. Ensure admin-only access for log/backup diagnostics (Phase 9 guardrails).
+
+**Artifacts**
+
+- [docs/architecture/Phase10_Operational_Hardening_Runbook.md](docs/architecture/Phase10_Operational_Hardening_Runbook.md)
 
 **Acceptance linkage**
 
