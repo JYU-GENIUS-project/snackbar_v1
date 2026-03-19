@@ -45,7 +45,7 @@ Deliver performance certification, operational hardening, and release readiness 
 | 10.2 Load Testing & Performance Tuning | In progress | 2026-03-19 |
 | 10.3 Operational Hardening (Logs, Backups, DR) | In progress | 2026-03-19 |
 | 10.4 Security Penetration Testing & Remediation | In progress | 2026-03-19 |
-| 10.5 Deployment Automation, Observability, Alert Routing | Not started | – |
+| 10.5 Deployment Automation, Observability, Alert Routing | In progress | 2026-03-19 |
 | 10.6 Release Regression & Final Certification | Not started | – |
 
 ## Sequential Implementation Plan
@@ -172,7 +172,7 @@ Deliver performance certification, operational hardening, and release readiness 
 
 **Goal:** Harden CI/CD and observability with clear alert routing.
 
-**Status:** Not started
+**Status:** In progress (2026-03-19)
 
 **Tasks**
 
@@ -181,6 +181,10 @@ Deliver performance certification, operational hardening, and release readiness 
    - API latency/health, DB health, confirmation throughput.
    - Alert routing and escalation paths for failures.
 3. Confirm alert thresholds and notification routing match Phase 9 configuration.
+
+**Artifacts**
+
+- [docs/architecture/Phase10_Deployment_Observability_Alerting_Plan.md](docs/architecture/Phase10_Deployment_Observability_Alerting_Plan.md)
 
 **Acceptance linkage**
 
