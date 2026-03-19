@@ -44,7 +44,7 @@ Deliver performance certification, operational hardening, and release readiness 
 | 10.1 Baseline Performance Profiling & Test Harness | Completed | 2026-03-18 |
 | 10.2 Load Testing & Performance Tuning | In progress | 2026-03-19 |
 | 10.3 Operational Hardening (Logs, Backups, DR) | In progress | 2026-03-19 |
-| 10.4 Security Penetration Testing & Remediation | Not started | – |
+| 10.4 Security Penetration Testing & Remediation | In progress | 2026-03-19 |
 | 10.5 Deployment Automation, Observability, Alert Routing | Not started | – |
 | 10.6 Release Regression & Final Certification | Not started | – |
 
@@ -143,7 +143,7 @@ Deliver performance certification, operational hardening, and release readiness 
 
 **Goal:** Validate and harden security posture; remediate findings and regress.
 
-**Status:** Not started
+**Status:** In progress (2026-03-19)
 
 **Tasks**
 
@@ -153,6 +153,10 @@ Deliver performance certification, operational hardening, and release readiness 
    - Log/backup access controls
 2. Remediate findings within PERN + Express constraints.
 3. Re-run technical security suite to validate fixes.
+
+**Artifacts**
+
+- [docs/architecture/Phase10_Security_PenTest_Remediation_Plan.md](docs/architecture/Phase10_Security_PenTest_Remediation_Plan.md)
 
 **Acceptance linkage**
 
