@@ -860,10 +860,11 @@ textarea {
 }
 
 .cart-item-controls {
-  display: flex;
+  display: grid;
+  grid-template-columns: 48px auto 48px 1fr;
+  grid-template-rows: auto auto;
   gap: 0.5rem;
   align-items: center;
-  flex-wrap: wrap;
 }
 
 .quantity-minus-button,
@@ -890,6 +891,13 @@ textarea {
 .item-subtotal {
   font-weight: 600;
   font-size: var(--kiosk-font-size-body);
+  justify-self: end;
+}
+
+.remove-button {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  justify-self: start;
 }
 
 .cart-footer {

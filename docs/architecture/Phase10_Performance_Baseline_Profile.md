@@ -125,6 +125,6 @@ Record the following per scenario:
 
 ## Status
 
-**Completed:** Baseline harness defined for Phase 10.1. Measurements will be captured in Phase 10.2 during tuning.
+**Completed (2026-03-19):** Baseline harness defined for Phase 10.1. Measurements will be captured in Phase 10.2 during tuning.
 
 <!-- markdownlint-enable MD013 MD036 -->

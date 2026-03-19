@@ -223,6 +223,7 @@ const useCart = (): UseCartResult => {
     const [cart, setCart] = useState<CartItem[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
+    const mutationRequestIdRef = useRef(0);
 
     const headers = useMemo(() => ({ 'x-kiosk-session': sessionKeyRef.current }), []);
 
@@ -262,6 +263,7 @@ const useCart = (): UseCartResult => {
     const setItemQuantity = useCallback(
         async (product: CartProductSnapshot, quantity: number) => {
             const previous = cart;
+            const requestId = ++mutationRequestIdRef.current;
             setError(null);
             if (isOfflineModeEnabled()) {
                 setCart((current) => {
@@ -282,6 +284,9 @@ const useCart = (): UseCartResult => {
                         quantity
                     }
                 });
+                if (requestId !== mutationRequestIdRef.current) {
+                    return;
+                }
                 applyServerCart(response);
             } catch (err) {
                 setCart(previous);
@@ -295,6 +300,7 @@ const useCart = (): UseCartResult => {
     const removeItem = useCallback(
         async (productId: string) => {
             const previous = cart;
+            const requestId = ++mutationRequestIdRef.current;
             setError(null);
             if (isOfflineModeEnabled()) {
                 setCart((current) => {
@@ -311,6 +317,9 @@ const useCart = (): UseCartResult => {
                     method: 'DELETE',
                     headers
                 });
+                if (requestId !== mutationRequestIdRef.current) {
+                    return;
+                }
                 applyServerCart(response);
             } catch (err) {
                 setCart(previous);
@@ -323,6 +332,7 @@ const useCart = (): UseCartResult => {
 
     const clearCart = useCallback(async () => {
         const previous = cart;
+        const requestId = ++mutationRequestIdRef.current;
         setError(null);
         if (isOfflineModeEnabled()) {
             setCart([]);
@@ -336,6 +346,9 @@ const useCart = (): UseCartResult => {
                 method: 'POST',
                 headers
             });
+            if (requestId !== mutationRequestIdRef.current) {
+                return;
+            }
             applyServerCart(response);
         } catch (err) {
             setCart(previous);
