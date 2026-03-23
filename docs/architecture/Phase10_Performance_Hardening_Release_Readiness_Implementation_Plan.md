@@ -59,9 +59,9 @@ Deliver performance certification, operational hardening, and release readiness 
 **Tasks (Completed)**
 
 - [x] Define performance test scenarios:
-   - [x] QR generation latency under concurrent checkout requests.
-   - [x] UI update latency for product filters and cart operations.
-   - [x] API response latency for high-traffic endpoints (products, transactions, status).
+  - [x] QR generation latency under concurrent checkout requests.
+  - [x] UI update latency for product filters and cart operations.
+  - [x] API response latency for high-traffic endpoints (products, transactions, status).
 - [x] Capture baseline metrics in staging-like data volume (10k–50k transactions).
 - [x] Confirm instrumentation sources (PM2 logs, API timing, database metrics) align with Phase 9 dashboards.
 
@@ -94,10 +94,10 @@ Deliver performance certification, operational hardening, and release readiness 
 - [x] Execute end-to-end load tests with realistic concurrency (50–100 daily transactions, burst tests).
 - [x] Profile bottlenecks across API, database, and client bundles.
 - [x] Apply targeted tuning within approved architecture:
-   - [x] Query optimization and indexes for high-latency endpoints.
-   - [x] PM2 clustering/limits and Node.js tuning.
-   - [x] Nginx caching/compression for static assets.
-   - [x] Client bundle optimization (code-splitting, prefetch) within Vite/React constraints.
+  - [x] Query optimization and indexes for high-latency endpoints.
+  - [x] PM2 clustering/limits and Node.js tuning.
+  - [x] Nginx caching/compression for static assets.
+  - [x] Client bundle optimization (code-splitting, prefetch) within Vite/React constraints.
 - [x] Re-run load tests and verify SLAs.
 
 **Artifacts**
@@ -135,8 +135,8 @@ Deliver performance certification, operational hardening, and release readiness 
 
 - [x] Confirm PM2 and Nginx log rotation policies, retention windows, and cleanup automation.
 - [x] Validate backup retention compliance and restore drill documentation:
-   - [x] Recovery steps, RPO/RTO, and required credentials.
-   - [x] Restore verification checklist and audit trail entry.
+  - [x] Recovery steps, RPO/RTO, and required credentials.
+  - [x] Restore verification checklist and audit trail entry.
 - [x] Produce DR runbook aligned with containerized deployment (Docker Compose) and C4 deployment flow.
 - [x] Ensure admin-only access for log/backup diagnostics (Phase 9 guardrails).
 
@@ -169,9 +169,9 @@ Deliver performance certification, operational hardening, and release readiness 
 **Tasks (Completed)**
 
 - [x] Execute penetration tests focusing on:
-   - [x] Authentication/session hardening
-   - [x] API input validation and authz boundaries
-   - [x] Log/backup access controls
+  - [x] Authentication/session hardening
+  - [x] API input validation and authz boundaries
+  - [x] Log/backup access controls
 - [x] Remediate findings within PERN + Express constraints.
 - [x] Re-run technical security suite to validate fixes.
 
@@ -204,8 +204,8 @@ Deliver performance certification, operational hardening, and release readiness 
 
 - [x] Validate CI/CD pipelines for staging/production (lint, unit, Robot gating).
 - [x] Ensure observability dashboards expose key KPIs:
-   - [x] API latency/health, DB health, confirmation throughput.
-   - [x] Alert routing and escalation paths for failures.
+  - [x] API latency/health, DB health, confirmation throughput.
+  - [x] Alert routing and escalation paths for failures.
 - [x] Confirm alert thresholds and notification routing match Phase 9 configuration.
 
 **Artifacts**
@@ -238,14 +238,14 @@ Deliver performance certification, operational hardening, and release readiness 
 **Tasks (Completed)**
 
 - [x] Run required regression suites:
-   - [x] `admin_monitoring_troubleshooting.robot` (US-057–US-058)
-   - [x] `system_technical_security.robot` (US-060–US-063)
-   - [x] `system_integration_communication.robot` (US-064–US-068)
+  - [x] `admin_monitoring_troubleshooting.robot` (US-057–US-058)
+  - [x] `system_technical_security.robot` (US-060–US-063)
+  - [x] `system_integration_communication.robot` (US-064–US-068)
 - [x] Targeted reruns for suites impacted by tuning/remediation:
-   - [x] `customer_payment_checkout.robot` (US-011–US-015) if QR/payment logic or performance tuning touched.
-   - [x] `customer_product_browsing.robot` (US-001–US-005) and `customer_shopping_cart.robot` (US-006–US-010) if UI performance changes alter behavior.
-   - [x] `admin_transactions_statistics.robot` (US-039–US-047) if reporting queries/indexes were tuned.
-   - [x] `admin_system_configuration.robot` (US-048–US-052) and Phase 9 monitoring coverage if alert routing/logging changed.
+  - [x] `customer_payment_checkout.robot` (US-011–US-015) if QR/payment logic or performance tuning touched.
+  - [x] `customer_product_browsing.robot` (US-001–US-005) and `customer_shopping_cart.robot` (US-006–US-010) if UI performance changes alter behavior.
+  - [x] `admin_transactions_statistics.robot` (US-039–US-047) if reporting queries/indexes were tuned.
+  - [x] `admin_system_configuration.robot` (US-048–US-052) and Phase 9 monitoring coverage if alert routing/logging changed.
 - [x] Document final sign-off checklist and attach benchmark artifacts.
 
 **Acceptance linkage**
