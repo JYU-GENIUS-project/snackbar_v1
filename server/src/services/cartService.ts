@@ -181,7 +181,7 @@ const fetchCartItems = async (client: DbClient, sessionId: string): Promise<Cart
                 cart_items.unit_price,
                 cart_items.quantity,
                 cart_items.purchase_limit,
-                products.image_url AS image_url
+                NULL AS image_url
          FROM cart_items
          LEFT JOIN products ON products.id = cart_items.product_id
          WHERE cart_items.cart_session_id = $1

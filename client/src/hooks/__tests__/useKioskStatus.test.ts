@@ -1,4 +1,4 @@
-import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
+/// <reference types="vitest/globals" />
 import { renderHook, waitFor, act } from '@testing-library/react';
 
 vi.mock('../../services/apiClient', () => ({

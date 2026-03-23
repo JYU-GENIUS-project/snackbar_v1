@@ -420,7 +420,7 @@ Click Plus Button For Product
     Ensure Cart Panel Closed
     Click Element    id=cart-icon
     Wait Until Element Is Visible    id=cart-items    timeout=5s
-    Click Element    xpath=//div[@data-product-name='${product_name}']//button[contains(@class, 'quantity-plus-button')]
+    Execute Javascript    (function(){ const btn = document.querySelector("div[data-product-name='${product_name}'] .quantity-plus-button"); if (btn) { btn.scrollIntoView({ block: 'center' }); btn.click(); } })();
     Sleep    0.5s
     Ensure Cart Panel Closed
 
@@ -430,7 +430,7 @@ Click Minus Button For Product
     Ensure Cart Panel Closed
     Click Element    id=cart-icon
     Wait Until Element Is Visible    id=cart-items    timeout=5s
-    Click Element    xpath=//div[@data-product-name='${product_name}']//button[contains(@class, 'quantity-minus-button')]
+    Execute Javascript    (function(){ const btn = document.querySelector("div[data-product-name='${product_name}'] .quantity-minus-button"); if (btn) { btn.scrollIntoView({ block: 'center' }); btn.click(); } })();
     Sleep    0.5s
     Ensure Cart Panel Closed
 

@@ -41,14 +41,16 @@ type TransactionReconcilePayload = {
     metadata?: Record<string, unknown> | null;
 };
 
-type TransactionResult = Record<string, unknown>;
-
 const asyncHandler = (
     handler: (req: Request, res: Response, next: NextFunction) => Promise<void>,
 ): RequestHandler => {
     return (req, res, next) => {
         void handler(req, res, next).catch(next);
     };
+};
+
+const authenticateHandler: RequestHandler = (req, res, next) => {
+    void authenticate(req, res, next);
 };
 
 const transactionValidation = [
@@ -132,15 +134,7 @@ router.post(
         const payload = req.body as TransactionPayload;
         const items = payload.items ?? [];
 
-        const createTransaction =
-            transactionService.createTransaction as (params: {
-                items: TransactionItem[];
-                paymentStatus?: string;
-                paymentMethod?: string;
-                confirmationChannel?: string | null;
-                confirmationReference?: string | null;
-                confirmationMetadata?: Record<string, unknown> | null;
-            }) => Promise<TransactionResult>;
+        const createTransaction = transactionService.createTransaction;
         const requestPayload: {
             items: TransactionItem[];
             paymentStatus?: string;
@@ -198,15 +192,7 @@ router.post(
         }
         const payload = req.body as TransactionConfirmationPayload;
 
-        const confirmTransaction =
-            transactionService.confirmTransaction as (params: {
-                transactionId: string;
-                declaredOutcome: string;
-                declaredTender?: string | null;
-                confirmationChannel?: string | null;
-                confirmationReference?: string | null;
-                confirmationMetadata?: Record<string, unknown> | null;
-            }) => Promise<TransactionResult>;
+        const confirmTransaction = transactionService.confirmTransaction;
 
         const result = await confirmTransaction({
             transactionId,
@@ -227,25 +213,9 @@ router.post(
 
 router.get(
     '/',
-    authenticate as unknown as RequestHandler,
+    authenticateHandler,
     asyncHandler(async (req, res) => {
-        const listTransactions =
-            transactionService.listTransactions as (params: {
-                status?: string;
-                page?: number;
-                pageSize?: number;
-                startDate?: string;
-                endDate?: string;
-                reference?: string;
-                kioskSessionId?: string;
-                productId?: string;
-                productName?: string;
-                amountMin?: number;
-                amountMax?: number;
-                sortBy?: 'date' | 'amount' | 'status';
-                sortDirection?: 'asc' | 'desc';
-                search?: string;
-            }) => Promise<Record<string, unknown>>;
+        const listTransactions = transactionService.listTransactions;
 
         const listPayload: {
             status?: string;
@@ -306,13 +276,13 @@ router.get(
         if (typeof req.query.sortBy === 'string') {
             const sortBy = req.query.sortBy.toLowerCase();
             if (sortBy === 'date' || sortBy === 'amount' || sortBy === 'status') {
-                listPayload.sortBy = sortBy as 'date' | 'amount' | 'status';
+                listPayload.sortBy = sortBy;
             }
         }
         if (typeof req.query.sortDirection === 'string') {
             const direction = req.query.sortDirection.toLowerCase();
             if (direction === 'asc' || direction === 'desc') {
-                listPayload.sortDirection = direction as 'asc' | 'desc';
+                listPayload.sortDirection = direction;
             }
         }
         if (typeof req.query.search === 'string') {
@@ -331,15 +301,13 @@ router.get(
 
 router.get(
     '/:id/audit',
-    authenticate as unknown as RequestHandler,
+    authenticateHandler,
     asyncHandler(async (req, res) => {
         const transactionId = req.params.id;
         if (!transactionId) {
             throw new ApiError(400, 'Transaction id is required');
         }
-        const getAudit = transactionService.getTransactionAudit as (params: {
-            transactionId: string;
-        }) => Promise<Record<string, unknown>>;
+        const getAudit = transactionService.getTransactionAudit;
 
         const result = await getAudit({ transactionId });
 
@@ -353,23 +321,9 @@ router.get(
 
 router.get(
     '/export',
-    authenticate as unknown as RequestHandler,
+    authenticateHandler,
     asyncHandler(async (req, res) => {
-        const exportTransactions =
-            transactionService.exportTransactions as (params: {
-                status?: string;
-                startDate?: string;
-                endDate?: string;
-                reference?: string;
-                kioskSessionId?: string;
-                productId?: string;
-                productName?: string;
-                amountMin?: number;
-                amountMax?: number;
-                sortBy?: 'date' | 'amount' | 'status';
-                sortDirection?: 'asc' | 'desc';
-                search?: string;
-            }) => Promise<Array<Record<string, unknown>>>;
+        const exportTransactions = transactionService.exportTransactions;
 
         const exportPayload: {
             status?: string;
@@ -496,7 +450,7 @@ router.get(
 
 router.post(
     '/:id/reconcile',
-    authenticate as unknown as RequestHandler,
+    authenticateHandler,
     reconcileValidation,
     asyncHandler(async (req, res) => {
         const errors = validationResult(req);
@@ -512,18 +466,9 @@ router.post(
         }
         const payload = req.body as TransactionReconcilePayload;
 
-        const reconcileTransaction =
-            (transactionService as {
-                reconcileTransaction: (params: {
-                    transactionId: string;
-                    action: string;
-                    notes?: string | null;
-                    metadata?: Record<string, unknown> | null;
-                    actor: { id: string; username: string };
-                }) => Promise<TransactionResult>;
-            }).reconcileTransaction;
+        const reconcileTransaction = transactionService.reconcileTransaction;
 
-        const actor = req.user as { id: string; username: string } | undefined;
+        const actor = req.user;
         if (!actor) {
             throw new ApiError(401, 'Authentication required');
         }

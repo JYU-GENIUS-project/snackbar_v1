@@ -122,6 +122,7 @@ Navigate To Kiosk Home
     Seed Default Kiosk Products
     Go To    ${KIOSK_URL}
     Wait For Page Load Complete
+    Clear Shopping Cart If Not Empty
 
 The customer views the home screen
     [Documentation]    Customer is on the home screen viewing products

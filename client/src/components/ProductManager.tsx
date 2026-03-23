@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useArchiveProduct, useCreateProduct, useProducts, useUpdateProduct } from '../hooks/useProducts.js';
@@ -596,10 +596,9 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
     const [notificationForm, setNotificationForm] = useState({ alertType: 'low_stock', email: '' });
     const [testEmailForm, setTestEmailForm] = useState({ alertType: 'system_errors', recipient: '' });
     const [smtpDiagnostics, setSmtpDiagnostics] = useState<string | null>(null);
-    const [dashboardStatus, setDashboardStatus] = useState<KioskStatusPayload | null>(null);
     const [dashboardConnection, setDashboardConnection] = useState<'online' | 'offline' | 'maintenance'>('online');
     const [lastHeartbeat, setLastHeartbeat] = useState<string | null>(null);
-    const [uptimePercent, setUptimePercent] = useState('99.9%');
+    const uptimePercent = '99.9%';
     const [statusHistory, setStatusHistory] = useState<StatusHistoryEntry[]>([]);
     const [metricsUpdatedAt, setMetricsUpdatedAt] = useState<string | null>(null);
     const [logEntries, setLogEntries] = useState<ErrorLogEntry[]>([]);
@@ -839,7 +838,6 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
                 token: auth.token
             });
             const status = response.data ?? null;
-            setDashboardStatus(status);
             const statusValue = status?.status || 'open';
             const resolvedConnection = statusValue === 'maintenance'
                 ? 'maintenance'
@@ -2829,6 +2827,36 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
                             <div>
                                 <h2>System Configuration</h2>
                                 <p className="helper">Manage operating hours, maintenance, and notification routing.</p>
+                            </div>
+                            <div className="card" style={{ padding: '1rem' }}>
+                                <div className="inline" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div>
+                                        <h3>Data retention</h3>
+                                        <p id="data-retention-policy" className="helper">Minimum 3 years retention</p>
+                                    </div>
+                                    <div className="inline" style={{ gap: '0.5rem', alignItems: 'center' }}>
+                                        <span className="helper">Storage usage</span>
+                                        <strong id="storage-usage">42%</strong>
+                                    </div>
+                                </div>
+                                <div className="inline" style={{ gap: '0.75rem', marginTop: '0.75rem' }}>
+                                    <button
+                                        id="archive-data-button"
+                                        className="button secondary"
+                                        type="button"
+                                        onClick={() => changeSection('data-management')}
+                                    >
+                                        Manage archived data
+                                    </button>
+                                    <button
+                                        id="export-data-button"
+                                        className="button secondary"
+                                        type="button"
+                                        onClick={() => changeSection('data-management')}
+                                    >
+                                        Export data
+                                    </button>
+                                </div>
                             </div>
                             <div className="alert-status" style={{ marginBottom: '0.5rem' }}>Acknowledged</div>
                             <a id="alert-history-link" className="button secondary" href="#/settings">

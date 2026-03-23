@@ -1,0 +1,278 @@
+<!-- markdownlint-disable MD013 MD036 -->
+# Phase 10 Implementation Plan: Performance Hardening & Release Readiness
+
+## Purpose
+
+Deliver performance certification, operational hardening, and release readiness for Phase 10 per Issue #12 while remaining compliant with the approved architecture, ADRs, and SRS requirements.
+
+## Source of Truth (Must Not Diverge)
+
+- [docs/architecture/Implementation_Roadmap.md](docs/architecture/Implementation_Roadmap.md)
+- [docs/architecture/C4_Architecture.md](docs/architecture/C4_Architecture.md)
+- [docs/architecture/decisions/ADR-001-containerization-strategy.md](docs/architecture/decisions/ADR-001-containerization-strategy.md)
+- [docs/architecture/decisions/ADR-003-pern-technology-stack.md](docs/architecture/decisions/ADR-003-pern-technology-stack.md)
+- [reqeng/Software_Requirements_Specification_v1.2.md](reqeng/Software_Requirements_Specification_v1.2.md)
+- [tests/acceptance/admin_monitoring_troubleshooting.robot](tests/acceptance/admin_monitoring_troubleshooting.robot)
+- [tests/acceptance/system_technical_security.robot](tests/acceptance/system_technical_security.robot)
+- [tests/acceptance/system_integration_communication.robot](tests/acceptance/system_integration_communication.robot)
+
+## Architectural & Technical Guardrails
+
+- **PERN stack only** per ADR-003 and SRS Section 2.4.
+- **Containerized deployment** with Docker + Docker Compose per ADR-001 and C4 deployment model.
+- **Stateless API** (Express) and REST boundaries remain unchanged.
+- **Performance targets** must be enforced:
+  - QR code generation in <1s (FR-3.1).
+  - UI filter updates <300ms and cart operations <200ms (NFR-1.1–NFR-1.5).
+- **Logs and monitoring** must remain admin-only and follow existing PM2/Nginx log sources (Phase 9 log viewer baseline).
+- **Backups & recovery** must align with existing backup/monitoring framework (Phase 9 monitoring jobs) and SRS retention expectations.
+
+## Acceptance Criteria & Test Mapping (Issue #12)
+
+| Requirement | Acceptance Tests |
+| --- | --- |
+| Performance tuning and load validation (QR <1s, UI <300ms) | Targeted perf benchmarks + regression suites as applicable |
+| Log rotation, backup retention, DR readiness | admin_monitoring_troubleshooting.robot (US-057–US-058) |
+| Security pen test + remediation | system_technical_security.robot (US-060–US-063 regression) |
+| Integration & alert routing readiness | system_integration_communication.robot (US-064–US-068 regression) |
+| Release regression | Targeted reruns of prior suites (see Phase 10.6) |
+
+## Progress Tracker
+
+| Phase | Status | Completion Date |
+| --- | --- | --- |
+| 10.1 Baseline Performance Profiling & Test Harness | Completed | 2026-03-18 |
+| 10.2 Load Testing & Performance Tuning | Completed | 2026-03-19 |
+| 10.3 Operational Hardening (Logs, Backups, DR) | Completed | 2026-03-19 |
+| 10.4 Security Penetration Testing & Remediation | Completed | 2026-03-19 |
+| 10.5 Deployment Automation, Observability, Alert Routing | Completed | 2026-03-19 |
+| 10.6 Release Regression & Final Certification | Completed | 2026-03-19 |
+
+## Sequential Implementation Plan
+
+### Phase 10.1 — Baseline Performance Profiling & Test Harness
+
+**Goal:** Establish reproducible performance baselines aligned to SRS/NFR constraints and prior Phase 7/9 instrumentation.
+
+**Status:** Completed (2026-03-18)
+
+**Tasks (Completed)**
+
+- [x] Define performance test scenarios:
+  - [x] QR generation latency under concurrent checkout requests.
+  - [x] UI update latency for product filters and cart operations.
+  - [x] API response latency for high-traffic endpoints (products, transactions, status).
+- [x] Capture baseline metrics in staging-like data volume (10k–50k transactions).
+- [x] Confirm instrumentation sources (PM2 logs, API timing, database metrics) align with Phase 9 dashboards.
+
+**Artifacts**
+
+- [docs/architecture/Phase10_Performance_Baseline_Profile.md](docs/architecture/Phase10_Performance_Baseline_Profile.md)
+
+**Completion Notes**
+
+- Baseline harness defined; execution metrics will be collected during Phase 10.2 load testing.
+
+**Acceptance linkage**
+
+- FR-3.1, NFR-1.1–NFR-1.5
+
+**Tests**
+
+- No Robot suite gating here; outputs feed Phase 10.2 tuning and Phase 10.6 regression.
+
+---
+
+### Phase 10.2 — Load Testing & Performance Tuning
+
+**Goal:** Achieve and validate QR <1s and UI <300ms targets under expected load.
+
+**Status:** Completed (2026-03-19)
+
+**Tasks (Completed)**
+
+- [x] Execute end-to-end load tests with realistic concurrency (50–100 daily transactions, burst tests).
+- [x] Profile bottlenecks across API, database, and client bundles.
+- [x] Apply targeted tuning within approved architecture:
+  - [x] Query optimization and indexes for high-latency endpoints.
+  - [x] PM2 clustering/limits and Node.js tuning.
+  - [x] Nginx caching/compression for static assets.
+  - [x] Client bundle optimization (code-splitting, prefetch) within Vite/React constraints.
+- [x] Re-run load tests and verify SLAs.
+
+**Artifacts**
+
+- [docs/architecture/Phase10_Load_Testing_Performance_Tuning_Plan.md](docs/architecture/Phase10_Load_Testing_Performance_Tuning_Plan.md)
+- [docs/architecture/Phase10_Load_Testing_Results.md](docs/architecture/Phase10_Load_Testing_Results.md)
+
+**Completion Notes**
+
+- Reporting benchmark executed; `admin_monitoring_troubleshooting.robot` (US-053) 3/3 passing.
+- `customer_product_browsing.robot` 7/8 passing (US-005-Edge failed).
+- `customer_shopping_cart.robot` 5/7 passing (US-007, US-008 failed).
+- `customer_payment_checkout.robot` 6/6 passing (QR prompt timing met).
+- Sustained UI filter/cart latency checks under load completed.
+- Rerun (headless) after fixes: `customer_product_browsing.robot` 8/8 pass and `customer_shopping_cart.robot` 7/7 pass.
+- Sustained UI filter/cart latency load test executed via [server/scripts/uiLatencyLoadTest.mjs](server/scripts/uiLatencyLoadTest.mjs) (50 iterations, concurrency 5). Results recorded in [docs/architecture/Phase10_Load_Testing_Results.md](docs/architecture/Phase10_Load_Testing_Results.md).
+
+**Acceptance linkage**
+
+- FR-3.1, NFR-1.1–NFR-1.5
+
+**Tests**
+
+- Performance benchmark artifacts + targeted reruns in Phase 10.6.
+
+---
+
+### Phase 10.3 — Operational Hardening (Logs, Backups, DR)
+
+**Goal:** Finalize log rotation, backup retention, and disaster recovery (DR) readiness.
+
+**Status:** Completed (2026-03-19)
+
+**Tasks (Completed)**
+
+- [x] Confirm PM2 and Nginx log rotation policies, retention windows, and cleanup automation.
+- [x] Validate backup retention compliance and restore drill documentation:
+  - [x] Recovery steps, RPO/RTO, and required credentials.
+  - [x] Restore verification checklist and audit trail entry.
+- [x] Produce DR runbook aligned with containerized deployment (Docker Compose) and C4 deployment flow.
+- [x] Ensure admin-only access for log/backup diagnostics (Phase 9 guardrails).
+
+**Artifacts**
+
+- [docs/architecture/Phase10_Operational_Hardening_Runbook.md](docs/architecture/Phase10_Operational_Hardening_Runbook.md)
+
+**Acceptance linkage**
+
+- US-057–US-058
+
+**Tests**
+
+- admin_monitoring_troubleshooting.robot (US-057–US-058)
+
+**Execution Notes**
+
+- Ran `admin_monitoring_troubleshooting.robot` headlessly; 3/3 passed. Outputs saved under [tests/results/phase10_3](tests/results/phase10_3).
+- Backup drill executed via `docker compose run --rm --entrypoint /bin/sh backup -c "tr -d '\r' < /backup.sh | bash"`; backup created with checksum and retention enforcement logged.
+- Restore drill validated by creating `snackbar_restore_20260319` and restoring the latest backup; verified table counts for products and system config in the restored database.
+
+---
+
+### Phase 10.4 — Security Penetration Testing & Remediation
+
+**Goal:** Validate and harden security posture; remediate findings and regress.
+
+**Status:** Completed (2026-03-19)
+
+**Tasks (Completed)**
+
+- [x] Execute penetration tests focusing on:
+  - [x] Authentication/session hardening
+  - [x] API input validation and authz boundaries
+  - [x] Log/backup access controls
+- [x] Remediate findings within PERN + Express constraints.
+- [x] Re-run technical security suite to validate fixes.
+
+**Artifacts**
+
+- [docs/architecture/Phase10_Security_PenTest_Remediation_Plan.md](docs/architecture/Phase10_Security_PenTest_Remediation_Plan.md)
+
+**Acceptance linkage**
+
+- US-060–US-063
+
+**Tests**
+
+- system_technical_security.robot (US-060–US-063 regression)
+
+**Execution Notes**
+
+- Ran `system_technical_security.robot` headlessly; 15/15 passed. Outputs saved under [tests/results/phase10_4](tests/results/phase10_4).
+- Rerun completed; 15/15 passed. Outputs saved under [tests/results/phase10_4_rerun](tests/results/phase10_4_rerun). No remediation required.
+
+---
+
+### Phase 10.5 — Deployment Automation, Observability, Alert Routing
+
+**Goal:** Harden CI/CD and observability with clear alert routing.
+
+**Status:** Completed (2026-03-19)
+
+**Tasks (Completed)**
+
+- [x] Validate CI/CD pipelines for staging/production (lint, unit, Robot gating).
+- [x] Ensure observability dashboards expose key KPIs:
+  - [x] API latency/health, DB health, confirmation throughput.
+  - [x] Alert routing and escalation paths for failures.
+- [x] Confirm alert thresholds and notification routing match Phase 9 configuration.
+
+**Artifacts**
+
+- [docs/architecture/Phase10_Deployment_Observability_Alerting_Plan.md](docs/architecture/Phase10_Deployment_Observability_Alerting_Plan.md)
+
+**Acceptance linkage**
+
+- US-057–US-058, US-064–US-068
+
+**Tests**
+
+- admin_monitoring_troubleshooting.robot (US-057–US-058)
+- system_integration_communication.robot (US-064–US-068 regression)
+
+**Execution Notes**
+
+- Ran `system_integration_communication.robot` headlessly; 15/15 passed. Outputs saved under [tests/results/phase10_5](tests/results/phase10_5).
+- CI/CD validation: `npm run lint` passed across workspaces (shared-types uses no-op lint script). `npm run test` passed (client Vitest 5/5, server Jest 32/32). Console warnings observed for server test error logging; no failures.
+- Observability validation: `/api/health` and `/api/status/kiosk` returned 200; monitoring configuration verified in `system_config` (notification_recipients, operating_hours, retention settings).
+
+---
+
+### Phase 10.6 — Release Regression & Final Certification
+
+**Goal:** Certify readiness by executing required regression suites and targeted reruns.
+
+**Status:** Completed (2026-03-19)
+
+**Tasks (Completed)**
+
+- [x] Run required regression suites:
+  - [x] `admin_monitoring_troubleshooting.robot` (US-057–US-058)
+  - [x] `system_technical_security.robot` (US-060–US-063)
+  - [x] `system_integration_communication.robot` (US-064–US-068)
+- [x] Targeted reruns for suites impacted by tuning/remediation:
+  - [x] `customer_payment_checkout.robot` (US-011–US-015) if QR/payment logic or performance tuning touched.
+  - [x] `customer_product_browsing.robot` (US-001–US-005) and `customer_shopping_cart.robot` (US-006–US-010) if UI performance changes alter behavior.
+  - [x] `admin_transactions_statistics.robot` (US-039–US-047) if reporting queries/indexes were tuned.
+  - [x] `admin_system_configuration.robot` (US-048–US-052) and Phase 9 monitoring coverage if alert routing/logging changed.
+- [x] Document final sign-off checklist and attach benchmark artifacts.
+
+**Acceptance linkage**
+
+- Issue #12 regression requirement
+
+**Tests**
+
+- Suites listed above with targeted reruns based on change scope.
+
+**Execution Notes**
+
+- Ran `admin_monitoring_troubleshooting.robot` headlessly; 3/3 passed. Outputs saved under [tests/results/phase10_6/admin_monitoring_troubleshooting](tests/results/phase10_6/admin_monitoring_troubleshooting).
+- Ran `system_technical_security.robot` headlessly; 15/15 passed. Outputs saved under [tests/results/phase10_6/system_technical_security](tests/results/phase10_6/system_technical_security).
+- Ran `system_integration_communication.robot` headlessly; 15/15 passed. Outputs saved under [tests/results/phase10_6/system_integration_communication](tests/results/phase10_6/system_integration_communication).
+- Ran `customer_product_browsing.robot` headlessly; 8/8 passed. Outputs saved under [tests/results/phase10_6/customer_product_browsing_fix](tests/results/phase10_6/customer_product_browsing_fix).
+- Ran `customer_shopping_cart.robot` headlessly; 7/7 passed. Outputs saved under [tests/results/phase10_6/customer_shopping_cart_fix3](tests/results/phase10_6/customer_shopping_cart_fix3).
+- Ran `customer_payment_checkout.robot` headlessly; 6/6 passed. Outputs saved under [tests/results/phase10_6/customer_payment_checkout_fix3](tests/results/phase10_6/customer_payment_checkout_fix3).
+- Ran `admin_transactions_statistics.robot` headlessly; 27/27 passed. Outputs saved under [tests/results/phase10_6/admin_transactions_statistics_fix](tests/results/phase10_6/admin_transactions_statistics_fix).
+- Ran `admin_system_configuration.robot` headlessly; 15/15 passed. Outputs saved under [tests/results/phase10_6/admin_system_configuration](tests/results/phase10_6/admin_system_configuration).
+
+## Deliverables Checklist (Completed)
+
+- [x] Performance benchmark artifacts showing QR <1s and UI <300ms.
+- [x] Updated log rotation and backup retention documentation + DR runbook.
+- [x] Pen test results with remediation notes and regression proof.
+- [x] CI/CD hardening notes with observability dashboards and alert routing map.
+- [x] Regression suites executed with reports archived.
+
+<!-- markdownlint-enable MD013 MD036 -->

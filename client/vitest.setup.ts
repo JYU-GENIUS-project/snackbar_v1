@@ -1,4 +1,4 @@
-import { afterEach } from 'vitest';
+/// <reference types="vitest/globals" />
 import { cleanup } from '@testing-library/react';
 
 const createStorageMock = () => {
