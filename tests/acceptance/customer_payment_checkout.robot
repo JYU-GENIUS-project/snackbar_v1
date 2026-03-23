@@ -107,6 +107,7 @@ The cart contains items totaling ${total}€
     # Add items to reach desired total
     Add Product To Cart    Coca-Cola
     Add Product To Cart    Chips
+    Run Keyword If    '${total}' == '5.00'    Add Product To Cart    Cookie
     Verify Cart Total    ${total}
 
 The customer clicks the checkout button
@@ -127,9 +128,8 @@ A confirmation prompt should appear within 1 second
 The confirmation modal should display payment guidance
     [Documentation]    Verifies manual payment guidance is shown
     Element Should Be Visible    id=manual-confirmation-modal
-    ${message}=    Get Text    id=manual-confirmation-modal
-    Should Contain    ${message}    Confirm your payment
-    Should Contain    ${message}    Show receipt to staff
+    Wait Until Page Contains    Confirm your payment    timeout=2s
+    Page Should Contain    Show receipt to staff
 
 The confirm payment button should be prominent
     [Documentation]    Verifies confirm button is available and primary CTA

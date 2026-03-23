@@ -56,14 +56,14 @@ Deliver performance certification, operational hardening, and release readiness 
 
 **Status:** Completed (2026-03-18)
 
-**Tasks**
+**Tasks (Completed)**
 
-1. Define performance test scenarios:
-   - QR generation latency under concurrent checkout requests.
-   - UI update latency for product filters and cart operations.
-   - API response latency for high-traffic endpoints (products, transactions, status).
-2. Capture baseline metrics in staging-like data volume (10k–50k transactions).
-3. Confirm instrumentation sources (PM2 logs, API timing, database metrics) align with Phase 9 dashboards.
+- [x] Define performance test scenarios:
+   - [x] QR generation latency under concurrent checkout requests.
+   - [x] UI update latency for product filters and cart operations.
+   - [x] API response latency for high-traffic endpoints (products, transactions, status).
+- [x] Capture baseline metrics in staging-like data volume (10k–50k transactions).
+- [x] Confirm instrumentation sources (PM2 logs, API timing, database metrics) align with Phase 9 dashboards.
 
 **Artifacts**
 
@@ -89,16 +89,16 @@ Deliver performance certification, operational hardening, and release readiness 
 
 **Status:** Completed (2026-03-19)
 
-**Tasks**
+**Tasks (Completed)**
 
-1. Execute end-to-end load tests with realistic concurrency (50–100 daily transactions, burst tests).
-2. Profile bottlenecks across API, database, and client bundles.
-3. Apply targeted tuning within approved architecture:
-   - Query optimization and indexes for high-latency endpoints.
-   - PM2 clustering/limits and Node.js tuning.
-   - Nginx caching/compression for static assets.
-   - Client bundle optimization (code-splitting, prefetch) within Vite/React constraints.
-4. Re-run load tests and verify SLAs.
+- [x] Execute end-to-end load tests with realistic concurrency (50–100 daily transactions, burst tests).
+- [x] Profile bottlenecks across API, database, and client bundles.
+- [x] Apply targeted tuning within approved architecture:
+   - [x] Query optimization and indexes for high-latency endpoints.
+   - [x] PM2 clustering/limits and Node.js tuning.
+   - [x] Nginx caching/compression for static assets.
+   - [x] Client bundle optimization (code-splitting, prefetch) within Vite/React constraints.
+- [x] Re-run load tests and verify SLAs.
 
 **Artifacts**
 
@@ -131,14 +131,14 @@ Deliver performance certification, operational hardening, and release readiness 
 
 **Status:** Completed (2026-03-19)
 
-**Tasks**
+**Tasks (Completed)**
 
-1. Confirm PM2 and Nginx log rotation policies, retention windows, and cleanup automation.
-2. Validate backup retention compliance and restore drill documentation:
-   - Recovery steps, RPO/RTO, and required credentials.
-   - Restore verification checklist and audit trail entry.
-3. Produce DR runbook aligned with containerized deployment (Docker Compose) and C4 deployment flow.
-4. Ensure admin-only access for log/backup diagnostics (Phase 9 guardrails).
+- [x] Confirm PM2 and Nginx log rotation policies, retention windows, and cleanup automation.
+- [x] Validate backup retention compliance and restore drill documentation:
+   - [x] Recovery steps, RPO/RTO, and required credentials.
+   - [x] Restore verification checklist and audit trail entry.
+- [x] Produce DR runbook aligned with containerized deployment (Docker Compose) and C4 deployment flow.
+- [x] Ensure admin-only access for log/backup diagnostics (Phase 9 guardrails).
 
 **Artifacts**
 
@@ -166,14 +166,14 @@ Deliver performance certification, operational hardening, and release readiness 
 
 **Status:** Completed (2026-03-19)
 
-**Tasks**
+**Tasks (Completed)**
 
-1. Execute penetration tests focusing on:
-   - Authentication/session hardening
-   - API input validation and authz boundaries
-   - Log/backup access controls
-2. Remediate findings within PERN + Express constraints.
-3. Re-run technical security suite to validate fixes.
+- [x] Execute penetration tests focusing on:
+   - [x] Authentication/session hardening
+   - [x] API input validation and authz boundaries
+   - [x] Log/backup access controls
+- [x] Remediate findings within PERN + Express constraints.
+- [x] Re-run technical security suite to validate fixes.
 
 **Artifacts**
 
@@ -200,13 +200,13 @@ Deliver performance certification, operational hardening, and release readiness 
 
 **Status:** Completed (2026-03-19)
 
-**Tasks**
+**Tasks (Completed)**
 
-1. Validate CI/CD pipelines for staging/production (lint, unit, Robot gating).
-2. Ensure observability dashboards expose key KPIs:
-   - API latency/health, DB health, confirmation throughput.
-   - Alert routing and escalation paths for failures.
-3. Confirm alert thresholds and notification routing match Phase 9 configuration.
+- [x] Validate CI/CD pipelines for staging/production (lint, unit, Robot gating).
+- [x] Ensure observability dashboards expose key KPIs:
+   - [x] API latency/health, DB health, confirmation throughput.
+   - [x] Alert routing and escalation paths for failures.
+- [x] Confirm alert thresholds and notification routing match Phase 9 configuration.
 
 **Artifacts**
 
@@ -235,18 +235,18 @@ Deliver performance certification, operational hardening, and release readiness 
 
 **Status:** Completed (2026-03-19)
 
-**Tasks**
+**Tasks (Completed)**
 
-1. Run required regression suites:
-   - `admin_monitoring_troubleshooting.robot` (US-057–US-058)
-   - `system_technical_security.robot` (US-060–US-063)
-   - `system_integration_communication.robot` (US-064–US-068)
-2. Targeted reruns for suites impacted by tuning/remediation:
-   - `customer_payment_checkout.robot` (US-011–US-015) if QR/payment logic or performance tuning touched.
-   - `customer_product_browsing.robot` (US-001–US-005) and `customer_shopping_cart.robot` (US-006–US-010) if UI performance changes alter behavior.
-   - `admin_transactions_statistics.robot` (US-039–US-047) if reporting queries/indexes were tuned.
-   - `admin_system_configuration.robot` (US-048–US-052) and Phase 9 monitoring coverage if alert routing/logging changed.
-3. Document final sign-off checklist and attach benchmark artifacts.
+- [x] Run required regression suites:
+   - [x] `admin_monitoring_troubleshooting.robot` (US-057–US-058)
+   - [x] `system_technical_security.robot` (US-060–US-063)
+   - [x] `system_integration_communication.robot` (US-064–US-068)
+- [x] Targeted reruns for suites impacted by tuning/remediation:
+   - [x] `customer_payment_checkout.robot` (US-011–US-015) if QR/payment logic or performance tuning touched.
+   - [x] `customer_product_browsing.robot` (US-001–US-005) and `customer_shopping_cart.robot` (US-006–US-010) if UI performance changes alter behavior.
+   - [x] `admin_transactions_statistics.robot` (US-039–US-047) if reporting queries/indexes were tuned.
+   - [x] `admin_system_configuration.robot` (US-048–US-052) and Phase 9 monitoring coverage if alert routing/logging changed.
+- [x] Document final sign-off checklist and attach benchmark artifacts.
 
 **Acceptance linkage**
 
@@ -261,13 +261,18 @@ Deliver performance certification, operational hardening, and release readiness 
 - Ran `admin_monitoring_troubleshooting.robot` headlessly; 3/3 passed. Outputs saved under [tests/results/phase10_6/admin_monitoring_troubleshooting](tests/results/phase10_6/admin_monitoring_troubleshooting).
 - Ran `system_technical_security.robot` headlessly; 15/15 passed. Outputs saved under [tests/results/phase10_6/system_technical_security](tests/results/phase10_6/system_technical_security).
 - Ran `system_integration_communication.robot` headlessly; 15/15 passed. Outputs saved under [tests/results/phase10_6/system_integration_communication](tests/results/phase10_6/system_integration_communication).
+- Ran `customer_product_browsing.robot` headlessly; 8/8 passed. Outputs saved under [tests/results/phase10_6/customer_product_browsing_fix](tests/results/phase10_6/customer_product_browsing_fix).
+- Ran `customer_shopping_cart.robot` headlessly; 7/7 passed. Outputs saved under [tests/results/phase10_6/customer_shopping_cart_fix3](tests/results/phase10_6/customer_shopping_cart_fix3).
+- Ran `customer_payment_checkout.robot` headlessly; 6/6 passed. Outputs saved under [tests/results/phase10_6/customer_payment_checkout_fix3](tests/results/phase10_6/customer_payment_checkout_fix3).
+- Ran `admin_transactions_statistics.robot` headlessly; 27/27 passed. Outputs saved under [tests/results/phase10_6/admin_transactions_statistics_fix](tests/results/phase10_6/admin_transactions_statistics_fix).
+- Ran `admin_system_configuration.robot` headlessly; 15/15 passed. Outputs saved under [tests/results/phase10_6/admin_system_configuration](tests/results/phase10_6/admin_system_configuration).
 
-## Deliverables Checklist
+## Deliverables Checklist (Completed)
 
-- Performance benchmark artifacts showing QR <1s and UI <300ms.
-- Updated log rotation and backup retention documentation + DR runbook.
-- Pen test results with remediation notes and regression proof.
-- CI/CD hardening notes with observability dashboards and alert routing map.
-- Regression suites executed with reports archived.
+- [x] Performance benchmark artifacts showing QR <1s and UI <300ms.
+- [x] Updated log rotation and backup retention documentation + DR runbook.
+- [x] Pen test results with remediation notes and regression proof.
+- [x] CI/CD hardening notes with observability dashboards and alert routing map.
+- [x] Regression suites executed with reports archived.
 
 <!-- markdownlint-enable MD013 MD036 -->
