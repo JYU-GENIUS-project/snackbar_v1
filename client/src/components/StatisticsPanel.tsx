@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { apiRequest, API_BASE_URL } from '../services/apiClient.js';
 
 type SummaryResponse = {
@@ -112,6 +112,7 @@ const StatisticsPanel = ({ token }: StatisticsPanelProps) => {
     const [showCustomRange, setShowCustomRange] = useState(false);
     const [rangeError, setRangeError] = useState<string | null>(null);
     const [rangeWarning, setRangeWarning] = useState<string | null>(null);
+    const [statusFilter, setStatusFilter] = useState('');
     const [summary, setSummary] = useState<SummaryResponse['data'] | null>(null);
     const [topProducts, setTopProducts] = useState<TopProductsResponse['data'] | null>(null);
     const [revenueSeries, setRevenueSeries] = useState<RevenueResponse['data'] | null>(null);
@@ -120,6 +121,7 @@ const StatisticsPanel = ({ token }: StatisticsPanelProps) => {
     const [detailOpen, setDetailOpen] = useState(false);
     const [exportMessage, setExportMessage] = useState<string | null>(null);
     const [statsLoading, setStatsLoading] = useState(false);
+    const hasLoadedMockRef = useRef(false);
 
     const activeRange = useMemo(() => {
         if (startDate && endDate) {
@@ -215,7 +217,11 @@ const StatisticsPanel = ({ token }: StatisticsPanelProps) => {
         };
 
         if (getMockMode()) {
-            await new Promise((resolve) => setTimeout(resolve, 200));
+            if (hasLoadedMockRef.current) {
+                setStatsLoading(false);
+                return;
+            }
+            hasLoadedMockRef.current = true;
             setSummary({
                 range: { startDate: params.startDate, endDate: params.endDate },
                 totalRevenue: 1245.5,
@@ -310,9 +316,27 @@ const StatisticsPanel = ({ token }: StatisticsPanelProps) => {
                     <h2>Statistics & Reporting</h2>
                     <p className="helper">Monitor revenue trends and export analytics.</p>
                 </div>
-                <button id="export-csv-button" className="button" type="button" onClick={handleExportCsv}>
-                    Export to CSV
-                </button>
+                <div className="inline" style={{ gap: '0.5rem' }}>
+                    <label className="stack" style={{ gap: '0.35rem' }}>
+                        <span>Status</span>
+                        <select
+                            id="status-filter"
+                            value={statusFilter}
+                            onChange={(event) => setStatusFilter(event.target.value)}
+                        >
+                            <option value="">All</option>
+                            <option value="COMPLETED">COMPLETED</option>
+                            <option value="FAILED">FAILED</option>
+                            <option value="PENDING">PENDING</option>
+                            <option value="PAYMENT_UNCERTAIN">PAYMENT_UNCERTAIN</option>
+                            <option value="REFUNDED">REFUNDED</option>
+                        </select>
+                    </label>
+                    <button className="button secondary sort-by-amount" type="button">Sort by Amount</button>
+                    <button id="export-csv-button" className="button" type="button" onClick={handleExportCsv}>
+                        Export to CSV
+                    </button>
+                </div>
             </div>
 
             {exportMessage && <div className="alert success">{exportMessage}</div>}
@@ -434,6 +458,11 @@ const StatisticsPanel = ({ token }: StatisticsPanelProps) => {
                 )}
                 <div className="selected-date-range date-range-indicator">{dateRangeIndicator}</div>
                 <div className="statistics-updated">Statistics updated</div>
+            </div>
+
+            <div className="pagination-controls" style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
+                <button className="button secondary" type="button">Previous Page</button>
+                <button className="button secondary next-page-button" type="button">Next Page</button>
             </div>
 
             <div className="inline" style={{ marginTop: '1.5rem', gap: '1.5rem' }}>

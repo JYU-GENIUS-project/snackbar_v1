@@ -200,7 +200,7 @@ Status: In progress 2026-05-14
 Phase 6 Notes:
 
 - admin_authentication_products.robot passed (18/18).
-- admin_transactions_statistics.robot failed 2 tests: US-043 stale element reference; US-047-Edge could not find id=status-filter.
+- admin_transactions_statistics.robot now only fails US-047-Edge: id=status-filter not found during statistics filter steps.
 
 ## Deliverables
 
