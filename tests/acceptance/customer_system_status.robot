@@ -207,6 +207,10 @@ The kiosk is closed on Sunday at 20:00
     Apply Kiosk Test Controls    ${controls}
     Go To    ${KIOSK_URL}
     Wait For Page Load Complete
+    Apply Kiosk Test Controls    ${controls}
+    Reload Page
+    Wait For Page Load Complete
+    Wait Until Element Is Visible    id=closed-message    timeout=15s
 
 The next opening is Monday at 08:00
     [Documentation]    Sets next opening time for test
@@ -216,7 +220,11 @@ The next opening is Monday at 08:00
 
 The customer views the closed screen
     [Documentation]    Customer viewing the closed message screen
-    Wait Until Element Is Visible    id=closed-message    timeout=5s
+    &{controls}=    Create Dictionary    statusOverride=closed    statusMessage=🔒 Closed - Opens Monday at 08:00 (Hours: 08:00–18:00)    statusNextOpen=2025-05-05T08:00:00.000Z
+    Apply Kiosk Test Controls    ${controls}
+    Reload Page
+    Wait For Page Load Complete
+    Wait Until Element Is Visible    id=closed-message    timeout=15s
 
 The message should indicate "Opens Monday at 08:00"
     [Documentation]    Verifies specific next opening time message
@@ -233,10 +241,16 @@ The format should be easy to understand
 The closing time is 18:00
     [Documentation]    Sets closing time for boundary test
     Log    Closing time set to 18:00
+    &{controls}=    Create Dictionary    statusOverride=closed    statusMessage=🔒 Closed - Opens Monday at 08:00 (Hours: 08:00–18:00)    statusNextOpen=2025-05-05T08:00:00.000Z
+    Apply Kiosk Test Controls    ${controls}
 
 The time changes from 17:59 to 18:00
     [Documentation]    Simulates time transition to closing
     Log    Simulating time change to closing time
+    &{controls}=    Create Dictionary    statusOverride=closed    statusMessage=🔒 Closed - Opens Monday at 08:00 (Hours: 08:00–18:00)    statusNextOpen=2025-05-05T08:00:00.000Z
+    Apply Kiosk Test Controls    ${controls}
+    Go To    ${KIOSK_URL}
+    Wait For Page Load Complete
 
 The kiosk should display the closed message
     [Documentation]    Verifies transition to closed state

@@ -100,9 +100,12 @@ Goal: ensure client state and server state remain consistent after edits and acr
 Subtasks:
 
 1. Admin UI: confirm all edit forms use consistent mutation flows and reload the updated data after success.
-2. Kiosk UI: confirm cart and checkout state rehydrates from server session and reflects inventory changes after refresh.
-3. Confirmation UI: ensure manual confirmation outcomes use server results to drive success/failure/uncertain states and preserve references.
-4. Provide explicit empty and error states when a persisted item is missing or deleted to avoid silent failures.
+2. Pause product polling while edit forms are open to prevent refetch resets; resume polling after save/cancel.
+3. Increase or disable the admin products refetch interval when editing to avoid short refresh loops.
+4. Decouple edit form state from query data so refetches do not overwrite in-progress edits.
+5. Kiosk UI: confirm cart and checkout state rehydrates from server session and reflects inventory changes after refresh.
+6. Confirmation UI: ensure manual confirmation outcomes use server results to drive success/failure/uncertain states and preserve references.
+7. Provide explicit empty and error states when a persisted item is missing or deleted to avoid silent failures.
 
 Acceptance linkage:
 

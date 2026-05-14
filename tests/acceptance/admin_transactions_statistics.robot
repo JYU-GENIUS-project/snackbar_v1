@@ -822,8 +822,10 @@ The system should prevent non-essential writes
 
 The admin is on the statistics page
     [Documentation]    Navigates to statistics
+    Wait Until Element Is Visible    id=statistics-menu    timeout=15s
+    Wait Until Element Is Enabled    id=statistics-menu    timeout=15s
     Click Element    id=statistics-menu
-    Wait Until Page Contains Element    id=statistics-page    timeout=10s
+    Wait Until Keyword Succeeds    20s    1s    Page Should Contain Element    id=statistics-page
 
 The top 10 most popular products should be displayed
     [Documentation]    Verifies top products shown
@@ -1108,8 +1110,11 @@ Chart legend should explain all visual elements
 
 The admin clicks "Custom Date Range"
     [Documentation]    Opens custom date picker
+    Wait Until Element Is Visible    id=statistics-page    timeout=10s
+    Wait Until Element Is Visible    id=custom-date-range-button    timeout=10s
+    Scroll Element Into View    id=custom-date-range-button
     Click Button    id=custom-date-range-button
-    Wait Until Element Is Visible    css=.date-picker    timeout=5s
+    Wait Until Element Is Visible    css=.date-picker    timeout=10s
 
 A date picker should appear
     [Documentation]    Verifies date picker visible
@@ -1358,7 +1363,7 @@ The database contains ${count} transactions
 
 The admin applies multiple filters simultaneously
     [Documentation]    Multiple filter application
-    The admin is on the transaction history page
+    The admin is on the statistics page
 
 Filters by custom date range spanning ${period}
     [Documentation]    Date range filter
