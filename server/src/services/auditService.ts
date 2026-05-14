@@ -111,18 +111,22 @@ const sleep = (ms: number) =>
 /**
  * Create an audit log entry
  */
-const createAuditLog = async ({
-    adminId,
-    adminUsername,
-    action,
-    entityType,
-    entityId = null,
-    oldValues = null,
-    newValues = null,
-    ipAddress = null,
-    userAgent = null
-}: AuditLogParams): Promise<AuditLogRecord> => {
-    const result = (await database.query(
+const createAuditLog = async (
+    {
+        adminId,
+        adminUsername,
+        action,
+        entityType,
+        entityId = null,
+        oldValues = null,
+        newValues = null,
+        ipAddress = null,
+        userAgent = null
+    }: AuditLogParams,
+    { client = null }: { client?: DbClient | null } = {}
+): Promise<AuditLogRecord> => {
+    const executor = client ?? database;
+    const result = (await executor.query(
         `INSERT INTO audit_logs 
      (admin_id, admin_username, action, entity_type, entity_id, old_values, new_values, ip_address, user_agent)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)

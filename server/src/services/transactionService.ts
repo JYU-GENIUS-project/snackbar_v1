@@ -4,7 +4,7 @@ import inventoryService from './inventoryService';
 import {
     AuditActions,
     EntityTypes,
-    createAuditLogWithRetry
+    createAuditLog
 } from './auditService';
 
 type TransactionItemInput = {
@@ -433,6 +433,25 @@ const createTransaction = async ({
                 transactionId: transaction.id,
                 lineItems,
             });
+
+            await createAuditLog(
+                {
+                    adminId: null,
+                    adminUsername: 'system',
+                    action: AuditActions.TRANSACTION_CREATED,
+                    entityType: EntityTypes.TRANSACTION,
+                    entityId: transaction.id,
+                    oldValues: null,
+                    newValues: {
+                        transactionNumber: transaction.transaction_number,
+                        status: normalizedStatus,
+                        totalAmount,
+                        confirmationReference,
+                        confirmationChannel
+                    }
+                },
+                { client }
+            );
 
             const deductions: InventoryDeduction[] = [];
             if (shouldDeductInventory) {
@@ -927,6 +946,47 @@ const confirmTransaction = async ({
                     }
                 }
 
+                const auditBase = {
+                    adminId: null,
+                    adminUsername: 'system',
+                    entityType: EntityTypes.TRANSACTION,
+                    entityId: updatedTransaction.id,
+                    oldValues: {
+                        status: 'PENDING'
+                    },
+                    newValues: {
+                        transactionNumber: updatedTransaction.transaction_number,
+                        confirmationReference: updatedTransaction.confirmation_reference,
+                        confirmationChannel: updatedTransaction.confirmation_channel,
+                        declaredTender: declaredTender ?? null,
+                        status: updatedTransaction.payment_status,
+                        totalAmount: updatedTransaction.total_amount
+                    }
+                };
+
+                await createAuditLog(
+                    {
+                        ...auditBase,
+                        action: AuditActions.TRANSACTION_CONFIRMATION_ATTEMPTED
+                    },
+                    { client }
+                );
+
+                const outcomeAction =
+                    updatedTransaction.payment_status === 'COMPLETED'
+                        ? AuditActions.TRANSACTION_CONFIRMED
+                        : updatedTransaction.payment_status === 'FAILED'
+                            ? AuditActions.TRANSACTION_FAILED
+                            : AuditActions.TRANSACTION_MARKED_UNCERTAIN;
+
+                await createAuditLog(
+                    {
+                        ...auditBase,
+                        action: outcomeAction
+                    },
+                    { client }
+                );
+
                 return {
                     transaction: updatedTransaction,
                     lineItems,
@@ -986,54 +1046,6 @@ const confirmTransaction = async ({
         }
     }
 
-    const auditBase = {
-        adminId: null,
-        adminUsername: 'system',
-        entityType: EntityTypes.TRANSACTION,
-        entityId: result.transaction.id,
-        oldValues: {
-            status: 'PENDING'
-        },
-        newValues: {
-            transactionNumber: result.transaction.transaction_number,
-            confirmationReference: result.transaction.confirmation_reference,
-            confirmationChannel: result.transaction.confirmation_channel,
-            declaredTender: declaredTender ?? null,
-            status: result.transaction.payment_status,
-            totalAmount: result.transaction.total_amount
-        }
-    };
-
-    const attemptAudit = await createAuditLogWithRetry({
-        ...auditBase,
-        action: AuditActions.TRANSACTION_CONFIRMATION_ATTEMPTED
-    });
-
-    const outcomeAction =
-        result.transaction.payment_status === 'COMPLETED'
-            ? AuditActions.TRANSACTION_CONFIRMED
-            : result.transaction.payment_status === 'FAILED'
-                ? AuditActions.TRANSACTION_FAILED
-                : AuditActions.TRANSACTION_MARKED_UNCERTAIN;
-
-    const outcomeAudit = await createAuditLogWithRetry({
-        ...auditBase,
-        action: outcomeAction,
-        newValues: {
-            ...auditBase.newValues,
-            auditAttemptCount: attemptAudit.attempts,
-            auditAttemptTimestamps: attemptAudit.timestamps
-        }
-    });
-
-    if (!attemptAudit.succeeded || !outcomeAudit.succeeded) {
-        console.warn('[Transaction] Audit logging retries exhausted', {
-            transactionId: result.transaction.id,
-            attemptAuditSucceeded: attemptAudit.succeeded,
-            outcomeAuditSucceeded: outcomeAudit.succeeded
-        });
-    }
-
     logStructuredEvent('transaction.confirmation_processed', {
         transactionId: result.transaction.id,
         transactionNumber: result.transaction.transaction_number,
@@ -1041,10 +1053,6 @@ const confirmTransaction = async ({
         confirmationReference: result.transaction.confirmation_reference,
         confirmationChannel: result.transaction.confirmation_channel,
         declaredTender: declaredTender ?? null,
-        auditAttempts: {
-            confirmationAttempt: attemptAudit.attempts,
-            confirmationOutcome: outcomeAudit.attempts
-        },
         inventoryApplied: result.shouldDeductInventory
     });
 
@@ -1058,12 +1066,12 @@ const confirmTransaction = async ({
         inventoryApplied: result.shouldDeductInventory,
         audit: {
             confirmationAttempt: {
-                succeeded: attemptAudit.succeeded,
-                attempts: attemptAudit.attempts
+                succeeded: true,
+                attempts: 1
             },
             confirmationOutcome: {
-                succeeded: outcomeAudit.succeeded,
-                attempts: outcomeAudit.attempts
+                succeeded: true,
+                attempts: 1
             }
         }
     };
@@ -1229,6 +1237,30 @@ const reconcileTransaction = async ({
             }
         }
 
+        const auditAction =
+            normalizedAction === 'CONFIRMED'
+                ? AuditActions.TRANSACTION_RECONCILED_CONFIRMED
+                : AuditActions.TRANSACTION_RECONCILED_REFUNDED;
+
+        await createAuditLog(
+            {
+                adminId: actor.id,
+                adminUsername: actor.username,
+                action: auditAction,
+                entityType: EntityTypes.TRANSACTION,
+                entityId: updatedTransaction.id,
+                oldValues: {
+                    status: 'PAYMENT_UNCERTAIN'
+                },
+                newValues: {
+                    status: updatedTransaction.payment_status,
+                    reconciliationOutcome: normalizedAction,
+                    reconciliationNotes: normalizedNotes
+                }
+            },
+            { client }
+        );
+
         return {
             transaction: updatedTransaction,
             lineItems,
@@ -1275,34 +1307,6 @@ const reconcileTransaction = async ({
         }
     }
 
-    const auditAction =
-        normalizedAction === 'CONFIRMED'
-            ? AuditActions.TRANSACTION_RECONCILED_CONFIRMED
-            : AuditActions.TRANSACTION_RECONCILED_REFUNDED;
-
-    const reconciliationAudit = await createAuditLogWithRetry({
-        adminId: actor.id,
-        adminUsername: actor.username,
-        action: auditAction,
-        entityType: EntityTypes.TRANSACTION,
-        entityId: result.transaction.id,
-        oldValues: {
-            status: 'PAYMENT_UNCERTAIN'
-        },
-        newValues: {
-            status: result.transaction.payment_status,
-            reconciliationOutcome: normalizedAction,
-            reconciliationNotes: normalizedNotes
-        }
-    });
-
-    if (!reconciliationAudit.succeeded) {
-        console.warn('[Transaction] Reconciliation audit logging failed', {
-            transactionId: result.transaction.id,
-            attempts: reconciliationAudit.attempts
-        });
-    }
-
     logStructuredEvent('transaction.reconciled', {
         transactionId: result.transaction.id,
         transactionNumber: result.transaction.transaction_number,
@@ -1310,7 +1314,6 @@ const reconcileTransaction = async ({
         reconciliationOutcome: normalizedAction,
         reconciliationNotes: normalizedNotes,
         reconciledBy: actor.id,
-        auditAttempts: reconciliationAudit.attempts,
         inventoryApplied: result.shouldDeductInventory
     });
 
