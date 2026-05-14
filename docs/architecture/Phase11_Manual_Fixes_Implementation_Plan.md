@@ -39,8 +39,8 @@ Make the application customer ready by ensuring that all admin and kiosk edits a
 - [x] Phase 1 - Persistence Audit and Gap Map
 - [x] Phase 2 - Database Integrity and Transactional Writes
 - [x] Phase 3 - API Read-After-Write and Cache Invalidation
-- [ ] Phase 4 - UI Synchronization and Reload Safety
-- [ ] Phase 5 - Reconciliation and Audit Review
+- [x] Phase 4 - UI Synchronization and Reload Safety
+- [x] Phase 5 - Reconciliation and Audit Review
 - [ ] Phase 6 - Regression and Release Validation
 
 ## Sequential Implementation Plan
@@ -149,6 +149,13 @@ Acceptance linkage:
 - admin_inventory_management.robot (US-032 to US-038)
 - admin_transactions_statistics.robot (US-039 to US-041)
 
+Status: Completed 2026-05-14
+
+Phase 4 Notes:
+
+- Admin product polling pauses while edit or create forms are open to prevent refetch resets.
+- Product edit state is snapshotted on selection to decouple form data from live query updates.
+
 ### Phase 5 - Reconciliation and Audit Review
 
 Goal: make sure reconciliation edits and audit trails load correctly for admin review workflows.
@@ -164,6 +171,12 @@ Acceptance linkage:
 
 - admin_transactions_statistics.robot (US-039 to US-041)
 - customer_payment_checkout.robot (US-015 and US-015-Edge)
+
+Status: Completed 2026-05-14
+
+Phase 5 Notes:
+
+- Transaction detail view now fetches the confirmation audit trail to support reconciliation review.
 
 ### Phase 6 - Regression and Release Validation
 

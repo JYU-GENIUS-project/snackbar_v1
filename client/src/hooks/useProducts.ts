@@ -9,6 +9,7 @@ export type ProductsQueryParams = {
   search?: string | undefined;
   limit?: number | undefined;
   offset?: number | undefined;
+  refetchInterval?: number | false | undefined;
 };
 
 export type ProductsResponse = {
@@ -71,12 +72,12 @@ const archiveProductRequest = async ({ token, productId }: { token?: string | un
   return response.data;
 };
 
-export const useProducts = ({ token, includeArchived, search, limit = 50, offset = 0 }: ProductsQueryParams & { token?: string | undefined }) => {
+export const useProducts = ({ token, includeArchived, search, limit = 50, offset = 0, refetchInterval = 5000 }: ProductsQueryParams & { token?: string | undefined }) => {
   return useQuery({
     queryKey: [PRODUCTS_QUERY_KEY, { includeArchived, search, limit, offset }],
     queryFn: ({ signal }) => listProductsRequest({ token, includeArchived, search, limit, offset, signal }),
     enabled: Boolean(token),
-    refetchInterval: 5000
+    refetchInterval
   });
 };
 

@@ -21,6 +21,21 @@ type TransactionRecord = {
     items?: TransactionItem[];
 };
 
+type TransactionAuditEntry = {
+    id?: string;
+    action?: string;
+    admin_username?: string;
+    created_at?: string;
+    new_values?: Record<string, unknown> | null;
+};
+
+type TransactionAuditResponse = {
+    data?: {
+        transactionId?: string;
+        audit?: TransactionAuditEntry[];
+    };
+};
+
 type TransactionResponse = {
     data?: {
         transactions?: TransactionRecord[];
@@ -140,6 +155,9 @@ const TransactionsPanel = ({ token }: TransactionsPanelProps) => {
     const [isLoading, setIsLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [selectedTransaction, setSelectedTransaction] = useState<TransactionRecord | null>(null);
+    const [selectedAudit, setSelectedAudit] = useState<TransactionAuditEntry[]>([]);
+    const [auditLoading, setAuditLoading] = useState(false);
+    const [auditError, setAuditError] = useState<string | null>(null);
     const [reconcileTransaction, setReconcileTransaction] = useState<TransactionRecord | null>(null);
     const [reconcileResolution, setReconcileResolution] = useState<'Confirmed' | 'Refunded'>('Confirmed');
     const [reconcileNotes, setReconcileNotes] = useState('');
@@ -319,6 +337,56 @@ const TransactionsPanel = ({ token }: TransactionsPanelProps) => {
     const handleRowClick = (transaction: TransactionRecord) => {
         setSelectedTransaction(transaction);
     };
+
+    const fetchTransactionAudit = useCallback(async (transactionId: string) => {
+        setAuditLoading(true);
+        setAuditError(null);
+        try {
+            if (getMockMode()) {
+                setSelectedAudit([
+                    {
+                        id: 'audit-mock-1',
+                        action: 'TRANSACTION_CONFIRMATION_ATTEMPTED',
+                        admin_username: 'system',
+                        created_at: new Date().toISOString(),
+                        new_values: { status: 'PENDING' }
+                    },
+                    {
+                        id: 'audit-mock-2',
+                        action: 'TRANSACTION_CONFIRMED',
+                        admin_username: 'system',
+                        created_at: new Date().toISOString(),
+                        new_values: { status: 'COMPLETED' }
+                    }
+                ]);
+                return;
+            }
+
+            const response = await apiRequest<TransactionAuditResponse>({
+                path: `/transactions/${transactionId}/audit`,
+                method: 'GET',
+                token
+            });
+
+            const auditRows = response?.data?.audit;
+            setSelectedAudit(Array.isArray(auditRows) ? auditRows : []);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Failed to load audit trail.';
+            setAuditError(message);
+            setSelectedAudit([]);
+        } finally {
+            setAuditLoading(false);
+        }
+    }, [token]);
+
+    useEffect(() => {
+        if (!selectedTransaction) {
+            setSelectedAudit([]);
+            setAuditError(null);
+            return;
+        }
+        void fetchTransactionAudit(selectedTransaction.id);
+    }, [fetchTransactionAudit, selectedTransaction]);
 
     const handleOpenReconcile = (transaction: TransactionRecord, event: MouseEvent<HTMLButtonElement>) => {
         event.stopPropagation();
@@ -862,6 +930,24 @@ const TransactionsPanel = ({ token }: TransactionsPanelProps) => {
                                 Verify the confirmation audit log before approving refunds. If the customer was charged,
                                 mark as confirmed and adjust inventory as needed.
                             </p>
+                        </div>
+                        <div className="transaction-audit" style={{ marginTop: '1rem' }}>
+                            <strong>Confirmation audit trail</strong>
+                            {auditLoading ? (
+                                <p className="helper">Loading audit entries…</p>
+                            ) : auditError ? (
+                                <p className="helper" style={{ color: '#dc2626' }}>{auditError}</p>
+                            ) : selectedAudit.length === 0 ? (
+                                <p className="helper">No audit entries recorded.</p>
+                            ) : (
+                                <ul>
+                                    {selectedAudit.map((entry, index) => (
+                                        <li key={entry.id ?? `${entry.action ?? 'audit'}-${index}`}>
+                                            {entry.action ?? 'AUDIT'} · {entry.admin_username ?? 'system'} · {formatDateTime(entry.created_at ?? '')}
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
                         </div>
                         <button
                             id="close-transaction-details-button"

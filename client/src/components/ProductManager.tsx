@@ -753,12 +753,22 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
         };
     }, [auditEntries, recordAuditEntry, resetAuditEntries]);
 
+    const cloneProduct = useCallback((product: Product): Product => {
+        if (typeof structuredClone === 'function') {
+            return structuredClone(product);
+        }
+        return JSON.parse(JSON.stringify(product)) as Product;
+    }, []);
+
+    const shouldPauseProductPolling = activeSection === 'products' && showForm;
+
     const { data, isLoading, isFetching, error } = useProducts({
         token: auth.token,
         includeArchived,
         search: debouncedSearch,
         limit: DEFAULT_LIMIT,
-        offset: 0
+        offset: 0,
+        refetchInterval: shouldPauseProductPolling ? false : 5000
     }) as ProductsQueryResult;
 
     const createMutation = useCreateProduct(auth.token) as unknown as MutationResult<Product, ProductPayload>;
@@ -2180,7 +2190,7 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
     const handleEditSelection = (product: ProductTableProduct) => {
         setOfflineNotice(null);
         updateOfflineStatusText('');
-        setEditingProduct(resolveTableProduct(product));
+        setEditingProduct(cloneProduct(resolveTableProduct(product)));
         setFormMode('edit');
         changeSection('products');
         setShowForm(true);
@@ -2205,7 +2215,7 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
     };
 
     const handleManageMedia = (product: ProductTableProduct) => {
-        setEditingProduct(resolveTableProduct(product));
+        setEditingProduct(cloneProduct(resolveTableProduct(product)));
         setFormMode('edit');
         changeSection('products');
         setShowForm(false);
