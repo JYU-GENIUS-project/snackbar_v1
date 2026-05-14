@@ -195,6 +195,13 @@ Acceptance linkage:
 - system_integration_communication.robot (US-064 to US-068)
 - customer_payment_checkout.robot (US-011 to US-015)
 
+Status: In progress 2026-05-14
+
+Phase 6 Notes:
+
+- admin_authentication_products.robot passed (18/18).
+- admin_transactions_statistics.robot failed 2 tests: US-043 stale element reference; US-047-Edge could not find id=status-filter.
+
 ## Deliverables
 
 - Persistence gap map with affected endpoints and UI surfaces.

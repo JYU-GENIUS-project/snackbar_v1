@@ -188,10 +188,10 @@ export const useUpdateProduct = (token?: string | undefined) => {
           data: current.data.map((product) =>
             product.id === productId
               ? {
-                  ...ensureMinimumProductShape({ ...product, ...payload }),
-                  id: product.id,
-                  updatedAt: new Date().toISOString()
-                }
+                ...ensureMinimumProductShape({ ...product, ...payload }),
+                id: product.id,
+                updatedAt: new Date().toISOString()
+              }
               : product
           )
         };
