@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '../services/apiClient.js';
+import { PRODUCTS_QUERY_KEY } from './useProducts.js';
 
 export const INVENTORY_QUERY_KEY = 'inventory-snapshot';
 export const INVENTORY_TRACKING_QUERY_KEY = 'inventory-tracking';
@@ -167,6 +168,8 @@ export const useSetInventoryTracking = (token?: string | undefined) => {
         onSuccess: (data) => {
             queryClient.setQueryData([INVENTORY_TRACKING_QUERY_KEY], data);
             queryClient.invalidateQueries({ queryKey: [INVENTORY_QUERY_KEY] });
+            queryClient.invalidateQueries({ queryKey: [PRODUCTS_QUERY_KEY] });
+            queryClient.invalidateQueries({ queryKey: ['product-feed'] });
         }
     });
 };
@@ -179,6 +182,8 @@ export const useRecordStockUpdate = (token?: string | undefined) => {
             recordStockRequest({ token, productId, quantity, reason }),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: [INVENTORY_QUERY_KEY] });
+            queryClient.invalidateQueries({ queryKey: [PRODUCTS_QUERY_KEY] });
+            queryClient.invalidateQueries({ queryKey: ['product-feed'] });
         }
     });
 };
@@ -191,6 +196,8 @@ export const useRecordInventoryAdjustment = (token?: string | undefined) => {
             recordAdjustmentRequest({ token, productId, newQuantity, reason }),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: [INVENTORY_QUERY_KEY] });
+            queryClient.invalidateQueries({ queryKey: [PRODUCTS_QUERY_KEY] });
+            queryClient.invalidateQueries({ queryKey: ['product-feed'] });
         }
     });
 };

@@ -38,7 +38,7 @@ Make the application customer ready by ensuring that all admin and kiosk edits a
 
 - [x] Phase 1 - Persistence Audit and Gap Map
 - [x] Phase 2 - Database Integrity and Transactional Writes
-- [ ] Phase 3 - API Read-After-Write and Cache Invalidation
+- [x] Phase 3 - API Read-After-Write and Cache Invalidation
 - [ ] Phase 4 - UI Synchronization and Reload Safety
 - [ ] Phase 5 - Reconciliation and Audit Review
 - [ ] Phase 6 - Regression and Release Validation
@@ -120,6 +120,12 @@ Acceptance linkage:
 - admin_inventory_management.robot (US-032 to US-038)
 - customer_product_browsing.robot (US-001 to US-005)
 - admin_transactions_statistics.robot (US-039)
+
+Status: Completed 2026-05-14
+
+Phase 3 Notes:
+
+- Inventory mutations now invalidate product lists and kiosk feed caches so read-after-write is consistent across admin and kiosk views.
 
 ### Phase 4 - UI Synchronization and Reload Safety
 
