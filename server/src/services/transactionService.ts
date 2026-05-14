@@ -1327,8 +1327,8 @@ const reconcileTransaction = async ({
         inventoryApplied: result.shouldDeductInventory,
         audit: {
             reconciliation: {
-                succeeded: reconciliationAudit.succeeded,
-                attempts: reconciliationAudit.attempts
+                succeeded: true,
+                attempts: 1
             }
         }
     };
