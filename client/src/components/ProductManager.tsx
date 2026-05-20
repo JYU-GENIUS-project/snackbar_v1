@@ -559,14 +559,13 @@ const ProductManager = ({ auth }: ProductManagerProps) => {
     });
     const [forceMockMode, setForceMockMode] = useState<boolean>(() => {
         if (typeof window === 'undefined') {
-            return true;
+            return false;
         }
         try {
             return window.sessionStorage.getItem('snackbar-force-mock') === '1'
-                || window.localStorage.getItem('snackbar-force-mock') === '1'
-                || true;
+                || window.localStorage.getItem('snackbar-force-mock') === '1';
         } catch {
-            return true;
+            return false;
         }
     });
     const [settingsForm, setSettingsForm] = useState<SettingsFormState>({

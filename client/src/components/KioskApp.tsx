@@ -432,6 +432,19 @@ const listPurchasedItems = (items: CartItem[]) => {
         .map((item) => `${item.name}${item.quantity > 1 ? ` x${item.quantity}` : ''}`)
         .join(', ');
 };
+
+const isKioskMockMode = () => {
+    if (typeof window === 'undefined') {
+        return false;
+    }
+    try {
+        return window.location.search.includes('mock=1')
+            || window.sessionStorage.getItem('snackbar-force-mock') === '1'
+            || window.localStorage.getItem('snackbar-force-mock') === '1';
+    } catch {
+        return false;
+    }
+};
 const DEFAULT_PRODUCT_IMAGE = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300"><rect width="400" height="300" fill="%23e5e7eb"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="%236b7280" font-size="28">No Image</text></svg>';
 const REQUIRED_CUSTOMER_FILTERS = [
     { name: 'Hot Drinks', id: 'virtual-hot-drinks' }
@@ -939,7 +952,8 @@ const KioskApp = () => {
 
     const createPendingTransaction = useCallback(async () => {
         if (typeof window !== 'undefined'
-            && window.localStorage.getItem('snackbar-force-offline-feed') === '1') {
+            && window.localStorage.getItem('snackbar-force-offline-feed') === '1'
+            && isKioskMockMode()) {
             return;
         }
         const items = cart.map((item) => ({
@@ -991,7 +1005,8 @@ const KioskApp = () => {
             metadata?: Record<string, unknown>
         ) => {
             if (typeof window !== 'undefined'
-                && window.localStorage.getItem('snackbar-force-offline-feed') === '1') {
+                && window.localStorage.getItem('snackbar-force-offline-feed') === '1'
+                && isKioskMockMode()) {
                 return;
             }
             if (!checkoutTransactionId) {

@@ -54,6 +54,19 @@ const isRecord = (value: unknown): value is Record<string, unknown> => {
 
 const readRecord = (value: unknown): Record<string, unknown> => (isRecord(value) ? value : {});
 
+const isMockMode = () => {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+  try {
+    return window.location.search.includes('mock=1')
+      || window.sessionStorage.getItem('snackbar-force-mock') === '1'
+      || window.localStorage.getItem('snackbar-force-mock') === '1';
+  } catch {
+    return false;
+  }
+};
+
 const normalizeStatusPayload = (input: unknown): ProductFeedStatus => {
   if (!input || typeof input !== 'object') {
     return null;
@@ -197,7 +210,7 @@ const fetchProductFeed = async ({ signal }: { signal?: AbortSignal }): Promise<P
   try {
     if (typeof window !== 'undefined') {
       const forceOffline = window.localStorage.getItem('snackbar-force-offline-feed') === '1';
-      if (forceOffline) {
+      if (forceOffline && isMockMode()) {
         const fallbackSnapshot = readOfflineProductSnapshot();
         if (fallbackSnapshot?.products?.length) {
           return buildFeedFromOfflineSnapshot(fallbackSnapshot);
